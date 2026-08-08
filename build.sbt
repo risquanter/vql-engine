@@ -4,6 +4,27 @@ ThisBuild / organization := "com.risquanter"
 ThisBuild / version      := "0.10.1-SNAPSHOT"
 ThisBuild / scalaVersion := scala3Version
 
+// POM metadata required by the Maven Central Publisher Portal
+ThisBuild / description := "First-order logic engine with vague quantifiers (probabilistic semantics after Fermüller et al. 2016)"
+ThisBuild / homepage    := Some(url("https://github.com/risquanter/vague-quantifier-logic"))
+ThisBuild / licenses    := List("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0"))
+ThisBuild / developers := List(
+  Developer("fixbits", "Daniel Agota", "danago@risquanter.com", url("https://github.com/risquanter"))
+)
+ThisBuild / scmInfo := Some(
+  ScmInfo(
+    url("https://github.com/risquanter/vague-quantifier-logic"),
+    "scm:git:git@github.com:risquanter/vague-quantifier-logic.git"
+  )
+)
+ThisBuild / versionScheme := Some("early-semver")
+
+// `sbt publish` stages a Maven-layout bundle under target/bundle; CI signs it
+// and the release workflow uploads the zip to the Central Portal via REST.
+ThisBuild / publishTo := Some(
+  "central-bundle" at ((LocalRootProject / baseDirectory).value / "target" / "bundle").toURI.toString
+)
+
 lazy val root = project
   .in(file("."))
   .aggregate(folEngine.jvm, folEngine.js)

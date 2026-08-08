@@ -1,0 +1,206 @@
+###############################################################
+# Release workflow for the Maven Central Publisher Portal.
+#
+# Trust model (mirrors risquanter/simulation-util):
+#   1. verify-authorization gates the run on a TOTP code
+#      (60-second period, YubiKey OATH credential).
+#   2. sign-and-publish downloads the bundle built by a trusted
+#      ci-build.yml run, verifies every artifact's Sigstore
+#      signature against that workflow's OIDC identity, and only
+#      then uploads to the Central Portal (staged, USER_MANAGED —
+#      publishing requires a manual click in the portal).
+#
+# Required org-level secrets:
+#   - TOTP_ORG:                       Base32 secret for TOTP verification
+#   - CENTRAL_PORTAL_ORG_TOKEN_NAME:  Central Portal token username part
+#   - CENTRAL_PORTAL_ORG_TOKEN:       Central Portal token secret part
+#
+# For details, see:
+#   https://central.sonatype.org/publish/publish-portal-api/
+###############################################################
+
+name: Release (Maven Central Publisher Portal, GPG-signed)
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'ci-build run ID whose artifacts to release'
+        required: true
+      totp_code:
+        description: 'TOTP code from your authenticator app'
+        required: true
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  # The only lines that differ between risquanter repos:
+  ARTIFACT_NAME: vql-engine
+  GROUP_PATH: com/risquanter
+
+jobs:
+  verify-authorization:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install oathtool
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y oathtool
+
+      - name: Verify TOTP
+        env:
+          TOTP_SECRET: ${{ secrets.TOTP_ORG }}
+          INPUT_TOTP: ${{ inputs.totp_code }}
+        run: |
+          set -euo pipefail
+          date --utc
+          EXPECTED=$(oathtool --totp --base32 --time-step-size 60 "$TOTP_SECRET")
+          if [ "${INPUT_TOTP}" != "$EXPECTED" ]; then
+            echo "❌ Invalid TOTP code"
+            exit 1
+          fi
+          echo "✅ TOTP verified successfully"
+
+  sign-and-publish:
+    needs: verify-authorization
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install tools
+        run: sudo apt-get update -y && sudo apt-get install -y jq unzip
+
+      - name: Determine version
+        run: |
+          set -euo pipefail
+          VERSION=$(sed -n 's#^ThisBuild / version[[:space:]]*:=[[:space:]]*"\([^"]*\)".*#\1#p' build.sbt)
+          if [ -z "$VERSION" ]; then
+            echo "❌ Could not extract version from build.sbt"
+            exit 1
+          fi
+          case "$VERSION" in
+            *SNAPSHOT*) echo "❌ Refusing to release SNAPSHOT version $VERSION"; exit 1 ;;
+          esac
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Releasing version: $VERSION"
+
+      - name: Download Maven deployment bundle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run download ${{ inputs.run_id }} \
+            --name deployment-${{ inputs.run_id }} \
+            --dir /tmp/maven-release \
+            --repo ${{ github.repository }}
+
+      - name: Extract bundle
+        run: |
+          set -euo pipefail
+          unzip -q /tmp/maven-release/maven-central-artifacts.zip -d /tmp/maven-deployment-contents
+          echo "Bundle contents:"
+          find /tmp/maven-deployment-contents -type f | sort
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4.0.0
+
+      - name: Verify Sigstore signatures
+        env:
+          COSIGN_EXPERIMENTAL: 1
+        run: |
+          set -euo pipefail
+
+          COUNT=0
+          while read -r f; do
+            if [[ ! -f "${f}.sigstore.json" ]]; then
+              echo "❌ Missing sigstore.json for $f"
+              exit 1
+            fi
+            if [[ ! -f "${f}.asc" ]]; then
+              echo "❌ Missing GPG signature (.asc) for $f"
+              exit 1
+            fi
+            cosign verify-blob --bundle "${f}.sigstore.json" \
+              --certificate-identity-regexp="https://github.com/${{ github.repository }}/.github/workflows/ci-build.yml@refs/heads/main" \
+              --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
+              "$f"
+            echo "✅ verified: $f"
+            COUNT=$((COUNT + 1))
+          done < <(find /tmp/maven-deployment-contents -type f \( -name '*.jar' -o -name '*.pom' \))
+
+          if [ "$COUNT" -eq 0 ]; then
+            echo "❌ No artifacts found to verify"
+            exit 1
+          fi
+          echo "✅ All $COUNT artifact signatures verified"
+
+      - name: Deploy to Maven Central Publisher Portal
+        env:
+          CENTRAL_PORTAL_USERNAME: ${{ secrets.CENTRAL_PORTAL_ORG_TOKEN_NAME }}
+          CENTRAL_PORTAL_TOKEN: ${{ secrets.CENTRAL_PORTAL_ORG_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          echo "Uploading to Central Portal..."
+          BEARER_TOKEN=$(printf "%s:%s" "${CENTRAL_PORTAL_USERNAME}" "${CENTRAL_PORTAL_TOKEN}" | base64 -w 0)
+
+          HTTP_CODE=$(curl -sS -o /tmp/upload-response.txt -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${BEARER_TOKEN}" \
+            -F "bundle=@/tmp/maven-release/maven-central-artifacts.zip" \
+            "https://central.sonatype.com/api/v1/publisher/upload?name=${ARTIFACT_NAME}-${VERSION}&publishingType=USER_MANAGED")
+
+          RESPONSE=$(cat /tmp/upload-response.txt)
+          if [ "$HTTP_CODE" != "201" ]; then
+            echo "❌ Upload failed with HTTP $HTTP_CODE:"
+            echo "$RESPONSE"
+            exit 1
+          fi
+
+          # On success the response body is the deployment ID (a UUID)
+          DEPLOYMENT_ID=$(echo "$RESPONSE" | tr -d '[:space:]')
+          if ! echo "$DEPLOYMENT_ID" | grep -qE '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'; then
+            echo "❌ Unexpected upload response (not a deployment ID):"
+            echo "$RESPONSE"
+            exit 1
+          fi
+          echo "Deployment ID: $DEPLOYMENT_ID"
+
+          echo "Checking deployment status..."
+          STATUS_RESPONSE=$(curl -sS -X POST "https://central.sonatype.com/api/v1/publisher/status?id=$DEPLOYMENT_ID" \
+            -H "Authorization: Bearer ${BEARER_TOKEN}")
+          echo "Deployment status: $STATUS_RESPONSE"
+          echo "✅ Deployment staged. Visit https://central.sonatype.com/publishing/deployments to publish (or drop)."
+
+      - name: Create Git tag and GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          TAG_NAME="v$VERSION"
+          echo "Creating tag: $TAG_NAME"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG_NAME" -m "Release version $VERSION"
+          git push origin "$TAG_NAME"
+
+          gh release create "$TAG_NAME" \
+            --title "Release $VERSION" \
+            --notes "Release $VERSION deployed to Maven Central (staged)" \
+            --verify-tag
+
+      - name: Clean up
+        if: always()
+        run: |
+          set +e  # Don't fail on cleanup errors
+          rm -rf /tmp/maven-release /tmp/maven-deployment-contents /tmp/upload-response.txt 2>/dev/null
+          echo "✅ Cleanup completed"

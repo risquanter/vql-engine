@@ -1,0 +1,37 @@
+###############################################################
+# Pull-request test workflow.
+#
+# Runs tests only. Deliberately references NO secrets, so runs
+# triggered by fork PRs are safe by construction; the signing
+# and bundle-staging pipeline lives in ci-build.yml, which runs
+# only on pushes to main.
+###############################################################
+
+name: PR build
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: sbt
+
+      - name: Set up sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Run tests (JVM + Scala.js)
+        run: sbt -batch +test

@@ -1,0 +1,133 @@
+name: CI Build + Sigstore provenance
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: sbt
+
+      - name: Set up sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Install tools
+        run: sudo apt-get update -y && sudo apt-get install -y jq gpg zip
+
+      - name: Run tests (JVM + Scala.js) and stage Maven bundle
+        run: |
+          set -euo pipefail
+          sbt -batch "+test; publish"
+
+          # The Central Portal bundle must contain only version directories
+          find target/bundle \( -name 'maven-metadata*' -o -name '*.module*' \) -delete
+
+          echo "Staged bundle contents:"
+          find target/bundle -type f | sort
+
+      - name: Import encrypted GPG private-subkey into ephemeral GNUPGHOME
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+
+          # create ephemeral GNUPGHOME for isolation
+          export GNUPGHOME="$(mktemp -d)"
+          chmod 700 "$GNUPGHOME"
+
+          # write the armored encrypted blob to a temp file (do not expose to logs)
+          TMP_ENC="/tmp/private-key.asc.gpg"
+          printf '%s' "$GPG_PRIVATE_KEY" > "$TMP_ENC"
+          chmod 600 "$TMP_ENC"
+
+          # decrypt the encrypted blob into a temporary plaintext file
+          TMP_PLAINT="/tmp/private-key.asc"
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
+            --decrypt --output "$TMP_PLAINT" "$TMP_ENC"
+
+          # import the plaintext secret key into the ephemeral GNUPGHOME
+          gpg --batch --import "$TMP_PLAINT"
+          gpgconf --kill gpg-agent || true
+
+          # discover the signing keyid (first secret key)
+          KEYID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/ {print $5; exit}')
+          if [ -z "$KEYID" ]; then
+            echo "Failed to determine GPG KEYID"
+            shred -u "$TMP_PLAINT" || rm -f "$TMP_PLAINT"
+            rm -f "$TMP_ENC"
+            exit 1
+          fi
+
+          echo "GNUPGHOME=$GNUPGHOME" >> $GITHUB_ENV
+          echo "GPG_KEYID=$KEYID" >> $GITHUB_ENV
+
+          # securely delete the plaintext file as soon as possible
+          shred -u "$TMP_PLAINT" || rm -f "$TMP_PLAINT"
+          rm -f "$TMP_ENC"
+
+          echo "Imported encrypted GPG key into ephemeral GNUPGHOME and removed plaintext."
+
+      - name: GPG-sign all bundle artifacts
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          find target/bundle -type f \( -name '*.jar' -o -name '*.pom' \) | while read -r f; do
+            gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
+              --local-user "$GPG_KEYID" --armor --detach-sign "$f"
+            echo "signed: $f"
+          done
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4.0.0
+
+      - name: Sign artifacts with Sigstore
+        env:
+          COSIGN_EXPERIMENTAL: 1
+        run: |
+          set -euo pipefail
+          find target/bundle -type f \( -name '*.jar' -o -name '*.pom' \) | while read -r f; do
+            cosign sign-blob --yes --bundle "${f}.sigstore.json" "$f"
+            echo "sigstore-signed: $f"
+          done
+
+      - name: Create deployment bundle ZIP
+        run: |
+          set -euo pipefail
+          cd target/bundle
+          zip -r ../../maven-central-artifacts.zip com
+          cd -
+          unzip -l maven-central-artifacts.zip
+
+      - name: Upload Maven deployment bundle
+        uses: actions/upload-artifact@v5
+        with:
+          name: deployment-${{ github.run_id }}
+          path: maven-central-artifacts.zip
+          retention-days: 7
+
+      - name: Cleanup GPG
+        if: always()
+        run: |
+          set +e  # Don't fail on cleanup errors
+          if [ -n "${GNUPGHOME:-}" ] && [ -d "${GNUPGHOME}" ]; then
+            rm -rf "${GNUPGHOME}"
+          fi
+          pkill -u "$(id -u)" gpg-agent 2>/dev/null || true
+          rm -f maven-central-artifacts.zip 2>/dev/null
+          echo "✅ Cleanup completed"
