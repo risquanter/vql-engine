@@ -133,3 +133,27 @@ super-typeclass.
 **Authoritative design:** [ADR-016](ADR-016-carrier-witness-on-symmetric-value-typeclasses.md).
 
 **Implementation sketch:** see `PLAN-symmetric-value-boundaries.md` §7.3.
+
+---
+
+## T-006 — Evaluate retiring the untyped evaluation backend
+
+**Status:** PROPOSED — needs evaluation (raised from register-side findings).
+
+**Context:** The untyped evaluation backend — `fol.semantics.VagueSemantics.holds`/`evaluate`,
+`fol.semantics.RangeExtractor` (`buildPattern` / `DomainExtraction`), and the
+`fol.datastore.KnowledgeSource` / `DomainCodec` machinery — has **no production consumer**.
+The register project, the only downstream user, evaluates exclusively via the typed
+many-sorted backend (`VagueSemantics.evaluateTyped` → `fol.typed.TypedSemantics`,
+`QueryBinder` → `BoundQuery`). The untyped path is live only in this engine's own demos
+(`examples/VagueSemanticsDemo`, `fol/examples/CyberSecurityExamples`) and its tests. "Used
+only by tests and demos" is a dead-code smell.
+
+**Scope to evaluate:**
+- (a) Retire the untyped backend and migrate the demos to the typed path; or
+- (b) keep it as a documented reference implementation of the pre-typed semantics.
+- Range expressiveness (`∧`/`¬`/`∃` in the range) that register may need lands in the
+  **typed** path (`TypedSemantics.collectRangeElements`), not in `buildPattern` — so the
+  untyped path is not the place that extension would live either.
+
+**Reference:** register `docs/scratch/MITIGATION-PRE-PLANNING.md` §P-4, §P-5.
