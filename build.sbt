@@ -6,15 +6,15 @@ ThisBuild / scalaVersion := scala3Version
 
 // POM metadata required by the Maven Central Publisher Portal
 ThisBuild / description := "First-order logic engine with vague quantifiers (probabilistic semantics after Fermüller et al. 2016)"
-ThisBuild / homepage    := Some(url("https://github.com/risquanter/vague-quantifier-logic"))
+ThisBuild / homepage    := Some(url("https://github.com/risquanter/vql-engine"))
 ThisBuild / licenses    := List("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0"))
 ThisBuild / developers := List(
   Developer("fixbits", "Daniel Agota", "danago@risquanter.com", url("https://github.com/risquanter"))
 )
 ThisBuild / scmInfo := Some(
   ScmInfo(
-    url("https://github.com/risquanter/vague-quantifier-logic"),
-    "scm:git:git@github.com:risquanter/vague-quantifier-logic.git"
+    url("https://github.com/risquanter/vql-engine"),
+    "scm:git:git@github.com:risquanter/vql-engine.git"
   )
 )
 ThisBuild / versionScheme := Some("early-semver")
