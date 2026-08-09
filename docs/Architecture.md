@@ -8,7 +8,7 @@ of the codebase and the integration flow between layers.
 ## Package Map
 
 ```
-src/main/scala/
+core/src/main/scala/
 ├── logic/           Formula, Term, FOL, Model, Valuation
 ├── parser/          Combinators, FormulaParser, FOLAtomParser, TermParser
 ├── lexer/           Lexer (String → List[String])

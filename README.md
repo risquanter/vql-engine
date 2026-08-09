@@ -1,268 +1,87 @@
-# First-Order Logic Parser with Vague Quantifiers
+# vql-engine
 
-A Scala 3 implementation of first-order logic with support for **vague quantifiers** ("about half", "most", "at least 3/4"), translated from John Harrison's OCaml code and extended with the probabilistic semantics from Fermüller et al. (2016).
+A Scala 3 first-order logic engine with **vague quantifiers** ("about half", "most", "at least 3/4"), cross-built for the JVM and Scala.js.
 
-## Features
+The FOL foundation (parser combinators, pretty printer, Tarski semantics) follows John Harrison's *Handbook of Practical Logic and Automated Reasoning*; the vague-quantifier layer implements the probabilistic semantics of Fermüller, Hofer & Ortiz (2016). Sampling-based evaluation uses [hdr-rng](https://github.com/risquanter/hdr-rng) for deterministic, reproducible draws.
 
-### Core FOL Parser
-
-✅ **Complete FOL parser** with:
-- Terms: variables, constants, functions, 6 levels of infix operators
-- Formulas: quantifiers (∀, ∃), logical connectives (∧, ∨, ⟹, ⟺), negation
-- Predicates and infix relations (=, <, ≤, >, ≥)
-
-✅ **Parser combinator infrastructure**:
-- Generic `parseGinfix` for iterated infix operators
-- Left and right associativity support
-- Precedence handling through subparser composition
-
-✅ **Parametric formula parser**:
-- Generic over atom types
-- Works with propositional logic, FOL, or custom logics
-
-✅ **FOL utilities**:
-- Free variable analysis (fvt, fvFOL)
-- Substitution with capture avoidance
-- Variable renaming and universal closure
-
-✅ **Pretty printer**:
-- Converts parsed formulas back to readable strings
-- Handles operator precedence and parenthesization
-- Round-trip property (parse → print → parse preserves meaning)
-
-✅ **Formal semantics (Model Theory)**:
-- Tarski semantics for FOL
-- Term evaluation in models
-- Formula satisfaction (M,v ⊨ φ)
-- Semantic entailment
-- Example models: integer arithmetic, boolean algebra
-
-### Vague Quantifiers
-
-✅ **Parser for vague quantifier queries**:
-- Paper syntax: `Q[op]^{k/n} x (R, φ)(y)`
-- Operators: About (~), AtLeast (≥), AtMost (≤)
-- Custom tolerance: `Q[~]^{1/2}[0.05]`
-- Complex scope formulas with nested quantifiers
-
-✅ **Vague query semantics**:
-- Proportion-based evaluation: Prop_D(S, φ)
-- Quantifier satisfaction with tolerance
-- Exact and sampling evaluation modes
-- Statistical confidence intervals
-
-✅ **Knowledge base integration**:
-- Relational datastore for facts
-- Range extraction (D_R) from relations
-- Scope evaluation using FOL semantics
-- Answer variable substitution
-
-✅ **Practical examples**:
-- Cybersecurity risk management domain
-- 4 working demonstration queries
-- Boolean and unary query types
-- Real-world data and results
-
-## Quick Start
-
-### Basic FOL Parsing
+## Installation
 
 ```scala
-import parser.FOLParser
-
-// Parse simple predicates
-val p1 = FOLParser.parse("P(x)")
-
-// Parse quantified formulas
-val p2 = FOLParser.parse("forall x . exists y . x < y")
-
-// Parse complex formulas with arithmetic
-val p3 = FOLParser.parse("forall x y z . x < y /\\ y < z ==> x < z")
-
-// Parse arithmetic relations
-val p4 = FOLParser.parse("2 * x + 3 = y")
-
-// Pretty print formulas
-import printer.FOLPrinter
-val formula = FOLParser.parse("forall x y. x < y ==> exists z. x < z /\\ z < y")
-println(FOLPrinter.print(formula))
+libraryDependencies += "com.risquanter" %%% "vql-engine" % "0.10.2"
 ```
 
-### Vague Quantifiers
+(`%%%` resolves to `vql-engine_3` on the JVM and `vql-engine_sjs1_3` on Scala.js; use `%%` for JVM-only projects.)
+
+## Quick start
+
+Parse a query in the paper's syntax and evaluate it against a knowledge source. The public API is `Either`-based: parse and evaluation errors come back as typed `QueryError` values, never exceptions.
 
 ```scala
-import vague.parser.VagueQueryParser
-import vague.semantics.VagueSemantics
-import vague.examples.CyberSecurityDomain
+import fol.parser.VagueQueryParser
+import fol.semantics.VagueSemantics
+import fol.datastore.KnowledgeSource
+import fol.examples.CyberSecurityDomain
 
-// Parse a vague quantifier query
-val query = VagueQueryParser.parse(
-  "Q[>=]^{3/4} x (asset(x), exists r . (has_risk(x, r) /\\ critical_risk(r)))"
-)
+// "At least 3/4 of assets have critical risks"
+val queryStr = """Q[>=]^{3/4} x (asset(x), exists r . (has_risk(x, r) /\ critical_risk(r)))"""
 
-// Exact evaluation (use entire range - deterministic)
-val domain = CyberSecurityDomain.kb
-val result = VagueSemantics.holdsExact(query, domain)
+val source = KnowledgeSource.fromKnowledgeBase(CyberSecurityDomain.kb)
 
-println(s"Satisfied: ${result.satisfied}")
-println(s"Proportion: ${result.actualProportion}")
-println(s"Range size: ${result.rangeSize}")
+val outcome = for
+  query  <- VagueQueryParser.parse(queryStr)
+  result <- VagueSemantics.holds(query, source)
+yield result
 
-// Sampling evaluation (for large datasets - probabilistic)
-val sampledResult = VagueSemantics.holdsWithSampling(
-  query, domain,
-  sampleSize = 1000,
-  seed = Some(42L)  // Optional: for reproducibility
-)
-
-// Run complete demo
-// sbt "runMain vague.examples.demo"
+outcome match
+  case Right(r) => println(s"satisfied=${r.satisfied} proportion=${r.proportion} (${r.satisfyingCount}/${r.domainSize})")
+  case Left(e)  => println(e.formatted)
 ```
 
-### Example Query: Cybersecurity Risk Assessment
+Supported quantifier operators: About (`~`), AtLeast (`>=`), AtMost (`<=`), each with a proportion `k/n` and an optional custom tolerance (`Q[~]^{1/2}[0.05]`). Queries with answer variables return answer sets; queries without are Boolean.
 
-**Query**: "At least 3/4 of assets have critical risks"
+## Architecture
 
-```scala
-Q[>=]^{3/4} x (asset(x), exists r . (has_risk(x, r) /\ critical_risk(r)))
-```
+Two layers in `core/src/main/scala`:
 
-**Result**: ✅ SATISFIED (86% of assets have critical risks)
+- **FOL foundation** (`logic`, `lexer`, `parser`, `printer`, `semantics`, `util`): terms, formulas, parser combinators with precedence and associativity, pretty printing with round-trip fidelity, Tarski model semantics.
+- **Vague quantifier extension** (`fol.*`): query parser, `ResolvedQuery` intermediate representation, exact and sampling evaluation (`VagueSemantics.holds` / `evaluate`), HDR-based samplers with confidence intervals, a relational `KnowledgeBase[D]` / `KnowledgeSource[D]` datastore, FOL bridge with model augmenters, and typed `QueryError`s. The extension imports the foundation, never the reverse.
 
-**Note**: All examples use exact evaluation (`holdsExact`). Sampling evaluation (`holdsWithSampling`) is available for large datasets but not currently demonstrated.
+[docs/Architecture.md](docs/Architecture.md) has the full package map, layer diagram, and integration flow.
 
-See `src/main/scala/vague/examples/` for more examples.
-
-## Project Structure
-
-```
-src/main/scala/
-├── logic/
-│   ├── Term.scala          # Term data type (Var, Fn)
-│   ├── Formula.scala       # Polymorphic formula type
-│   ├── FOL.scala           # FOL atoms (predicates)
-│   └── FOLUtil.scala       # Utilities (free vars, substitution)
-├── util/
-│   └── StringUtil.scala    # String utilities (explode, implode)
-├── lexer/
-│   └── Lexer.scala         # Tokenization
-├── parser/
-│   ├── Combinators.scala   # Parser combinators (parseGinfix, etc.)
-│   ├── SimpleExpr.scala    # Example: arithmetic expression parser
-│   ├── FormulaParser.scala # Generic formula parser
-│   ├── TermParser.scala    # FOL term parser
-│   ├── FOLAtomParser.scala # FOL atom parser
-│   └── FOLParser.scala     # Public API
-├── printer/
-│   └── FOLPrinter.scala    # Pretty printer
-├── semantics/
-│   └── FOLSemantics.scala  # Tarski semantics for FOL
-└── vague/                   # Vague quantifier implementation
-    ├── logic/
-    │   ├── Quantifier.scala      # About/AtLeast/AtMost quantifiers
-    │   └── VagueQuery.scala      # Query ADT: Q[op]^{k/n} x (R, φ)(y)
-    ├── parser/
-    │   └── VagueQueryParser.scala # Parser for vague queries
-    ├── datastore/
-    │   ├── Relation.scala        # Relational schema
-    │   └── KnowledgeBase.scala   # In-memory fact store
-    ├── semantics/
-    │   ├── RangeExtractor.scala  # Extract D_R from KB
-    │   ├── ScopeEvaluator.scala  # Evaluate φ with FOL semantics
-    │   └── VagueSemantics.scala  # Main evaluation orchestrator
-    ├── sampling/
-    │   └── Sampling.scala        # Statistical sampling utilities
-    └── examples/
-        ├── CyberSecurityDomain.scala   # Realistic domain data
-        └── CyberSecurityExamples.scala # Demo queries
-
-src/test/scala/             # Comprehensive test suite (270+ vague tests)
-```
-
-## Implementation Phases
-
-### Core FOL (Completed)
-
-- ✅ Core types, utilities, lexer, parser combinators
-- ✅ Simple expression parser (learning exercise)
-- ✅ Generic formula parser
-- ✅ Term parser (6 operator levels)
-- ✅ FOL atom parser
-- ✅ Public API
-- ✅ Utility functions (free vars, substitution, renaming)
-- ✅ Pretty printer
-- ✅ Formal semantics (model theory)
-
-### Vague Quantifiers (Completed)
-
-- ✅ Core ADTs (Quantifier, VagueQuery) - 69 tests
-- ✅ Range extraction from knowledge base - 21 tests
-- ✅ Scope evaluation with FOL semantics - 26 tests
-- ✅ Vague semantics orchestration - 15 tests
-- ✅ Parser for paper syntax - 41 tests
-- ✅ Cybersecurity examples - 4 working demos
-- ✅ Documentation
-
-**Total: 270 vague quantifier tests passing + 4 working examples**
-
-## Running Tests
+## Tests and examples
 
 ```bash
-# Run all tests
-sbt test
-
-# Run only vague quantifier tests
-sbt "testOnly vague.*"
-
-# Run specific test suite
-sbt "testOnly vague.parser.VagueQueryParserSpec"
+sbt +test                                  # full suite, JVM + Scala.js
+sbt "folEngineJVM/runMain fol.examples.demo"   # cybersecurity demo: Boolean, unary, and complex queries
 ```
 
-All tests should pass:
-- **358 FOL tests**: Parsing, utilities, pretty printing, semantics
-- **270 vague tests**: Quantifiers, queries, evaluation, parsing
-
-## Running Examples
-
-```bash
-# Run cybersecurity risk management demo
-sbt "runMain vague.examples.demo"
-```
-
-The demo will show:
-- Domain summary (assets, risks, mitigations)
-- 4 example queries with results
-- Boolean and unary query evaluation
-- Answer set extraction
+Example domain and queries live in `core/src/main/scala/fol/examples/`.
 
 ## Documentation
 
-- **[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)**: Detailed implementation phases and architecture
-- **[docs/VagueQuantifiers.md](docs/VagueQuantifiers.md)**: Theory, semantics, and API reference
-- **Source code**: Comprehensive scaladoc on all public APIs
+- [docs/Architecture.md](docs/Architecture.md) — structural map and integration flow
+- [docs/VagueQuantifiers.md](docs/VagueQuantifiers.md) — theory, semantics, API reference
+- [docs/](docs/) — ADRs recording design decisions
+- [docs/RELEASE.md](docs/RELEASE.md) — CI, signing, and release procedure
 
-## Educational Value
+## Release verification
 
-This project demonstrates:
-- **OCaml to Scala translation** patterns
-- **Parser combinator** design
-- **Precedence and associativity** handling without parser generators
-- **Parametric polymorphism** in parser design
-- **Functional programming** techniques
-- **Variable capture avoidance** in substitution
-- **Tarski semantics** for first-order logic
-- **Model theory** implementation
-- **Vague quantifier semantics** from database theory
-- **Proportion-based query evaluation**
-- **Statistical sampling** for large datasets
-- **Knowledge base** design and querying foundations
+Artifacts on Maven Central are GPG-signed (key `0F0D975BADB0C1F45F5424A20BCC447FF2426979`,
+published on `keyserver.ubuntu.com`) and carry Sigstore bundles (`*.sigstore.json`) bound to this
+repository's CI workflow identity:
+
+```
+cosign verify-blob --bundle vql-engine_3-<version>.jar.sigstore.json \
+  --certificate-identity-regexp="https://github.com/risquanter/vql-engine/.github/workflows/ci-build.yml@refs/heads/main" \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
+  vql-engine_3-<version>.jar
+```
+
+## License
+
+Apache License 2.0 — see [LICENSE.md](LICENSE.md).
 
 ## References
 
-1. **Harrison, J.** (2009). *Handbook of Practical Logic and Automated Reasoning*. Cambridge University Press. ISBN: 978-0-521-89957-4.
-   - OCaml parser combinator implementation
-   - FOL syntax and semantics foundations
-
-2. **Fermüller, C. G., Hofer, M., & Ortiz, M.** (2016). Querying with Vague Quantifiers Using Probabilistic Semantics. *Proceedings of the 25th International Conference on Information and Knowledge Management (CIKM)*, TU Vienna, Austria.
-   - Vague quantifier semantics: Q[op]^{k/n}
-   - Sampling-based probabilistic evaluation
+1. **Harrison, J.** (2009). *Handbook of Practical Logic and Automated Reasoning*. Cambridge University Press. ISBN 978-0-521-89957-4.
+2. **Fermüller, C. G., Hofer, M., & Ortiz, M.** (2016). Querying with Vague Quantifiers Using Probabilistic Semantics. *CIKM 2016*.
