@@ -188,7 +188,7 @@ class QueryBinderSpec extends FunSuite:
       case BoundFormula.Exists(_, b) => fromFormula(b)
       case BoundFormula.True | BoundFormula.False => None
     fromFormula(bq.scope)
-      .orElse(bq.range.args.iterator.flatMap(fromTerm).nextOption())
+      .orElse(fromFormula(bq.range))
       .getOrElse(fail("no LiteralRef found in bound query"))
 
   test("Phase 3/5a: validator parses inline literal, LiteralRef.value is parsed Any (Long)"):

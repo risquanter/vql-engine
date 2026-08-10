@@ -48,10 +48,17 @@ enum BoundFormula:
   case Forall(v: BoundVar, body: BoundFormula)
   case Exists(v: BoundVar, body: BoundFormula)
 
+/** The typed intermediate language for one vague query (ADR-001 §3).
+  *
+  * `range` is a sort-checked range formula: it selects the population the
+  * quantifier ranges over. A single-atom range is a `BoundFormula.Atom`; the
+  * range semantics — compound population, closed-world negation over the active
+  * domain — are specified in ADR-017.
+  */
 case class BoundQuery(
   quantifier: Quantifier,
   variable: BoundVar,
-  range: BoundAtom,
+  range: BoundFormula,
   scope: BoundFormula,
   answerVars: List[BoundVar] = Nil
 )

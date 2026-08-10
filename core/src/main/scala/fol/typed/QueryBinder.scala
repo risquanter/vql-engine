@@ -21,7 +21,7 @@ object QueryBinder:
       BoundQuery(
         quantifier = query.quantifier,
         variable = BoundVar(query.variable, quantifiedVarSort),
-        range = boundRange,
+        range = BoundFormula.Atom(boundRange),
         scope = boundScope,
         answerVars = boundAnswers
       )

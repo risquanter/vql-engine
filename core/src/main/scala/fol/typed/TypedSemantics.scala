@@ -58,7 +58,7 @@ object TypedSemantics:
     rootDomain.foldLeft[Either[QueryError, Set[Value]]](Right(Set.empty)) { (acc, candidate) =>
       for
         accepted <- acc
-        inRange <- evalAtom(query.range, baseEnv + (query.variable.name -> candidate), model)
+        inRange <- evalFormula(query.range, baseEnv + (query.variable.name -> candidate), model)
       yield if inRange then accepted + candidate else accepted
     }
 

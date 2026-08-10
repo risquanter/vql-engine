@@ -264,7 +264,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val boundQuery = BoundQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = BoundVar("l", loss),
-      range = BoundAtom(SymbolName("hasloss"), List(BoundTerm.VarRef(BoundVar("l", loss)))),
+      range = BoundFormula.Atom(BoundAtom(SymbolName("hasloss"), List(BoundTerm.VarRef(BoundVar("l", loss))))),
       scope = BoundFormula.True,
       answerVars = Nil
     )
@@ -307,7 +307,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val boundQuery = BoundQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable   = x,
-      range      = BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x))),
+      range      = BoundFormula.Atom(BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x)))),
       scope      = scope
     )
     val model = RuntimeModel(
@@ -330,7 +330,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val boundQuery = BoundQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable   = x,
-      range      = BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x))),
+      range      = BoundFormula.Atom(BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x)))),
       scope      = scope
     )
     val model = RuntimeModel(
@@ -353,7 +353,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val boundQuery = BoundQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable   = x,
-      range      = BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x))),
+      range      = BoundFormula.Atom(BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x)))),
       scope      = scope
     )
     val model = RuntimeModel(
