@@ -182,3 +182,50 @@ and satisfying-set features land, so the demo exercises the complete API.
 **Why deferred:** Writing it now would demo an API that Phases 3–5 change.
 Deferring to post-Phase-5 lets the demo cover formula ranges and
 `satisfyingSet` in one pass.
+
+---
+
+## T-008 — Prune dead `QueryError` variants
+
+**Status:** PENDING — standalone task, **not** part of the range-formula
+workstream. Sequence as its own commit; coordinate with a register upgrade
+(breaking change).
+
+**Goal:** `fol.error.QueryError` declares 19 variants; **10 are raised by no
+main-source code** — dead public surface, much of it generic scaffolding that
+predates the current typed pipeline. Remove them so the type honestly reflects
+what the engine returns.
+
+**Variants to remove** (zero main raisers as of 2026-08-10):
+`LexicalError, QueryStructureError, QuantifierError, ScopeEvaluationError,
+UninterpretedSymbolError, TypeMismatchError, ResourceError, ConnectionError,
+TimeoutError, ConfigError`.
+
+**Before removing — verify (the earlier-work method):**
+1. Re-confirm zero main raisers:
+   `grep -rn "QueryError\.<Variant>(" core/src/main` (skip the `case class` def).
+   A variant with a surviving raiser stays.
+2. Check test-only raisers in this repo and delete/adjust those tests.
+3. **Register is the gate.** Register's `AppError.scala` defensively maps **all
+   10** variants (`case e: QE.<Variant> => …`), and
+   `FolQueryFailureFromQueryErrorSpec.scala` constructs several. Pruning is a
+   coordinated breaking change: the corresponding register `case` arms + test
+   cases must be removed in the same register upgrade. Exact register
+   lines/arms are catalogued in
+   `docs/scratch/register-breaking-changes-2026-08-10.md` §5.
+
+**Caveats / not in scope:**
+- Breaking change to a published type → changelog note + minor version bump
+  (early-semver pre-1.0). Do it in its own release, ideally bundled with the
+  register upgrade that already adapts to the 0.11.0 error changes.
+- The related smell — `BindError` / `ModelValidationError` carry `List[String]`
+  rather than structured typed errors, due to the `fol.error → fol.typed`
+  package constraint — is a **separate, larger** change (it means deciding that
+  dependency direction). Do not bundle it here.
+- Cross-layer / cross-phase error-hierarchy consolidation is a non-goal: it
+  would break ADR-004 (foundation must not import vague; this is why
+  `parser.ParseError` is foundation-local) and the `fol.error → fol.typed`
+  boundary.
+
+**Context:** analysis of 2026-08-10 (after PLAN-range Phase 1). See also
+`docs/scratch/register-breaking-changes-2026-08-10.md`.
