@@ -80,16 +80,16 @@ Q[operator]^{k/n}[tolerance] variable (range, scope)(answer_vars)
 | Quantifier | `~`, `~#`, `>=`, `≥`, `<=`, `≤` | Always |
 | Logical | `/\` (and), `\/` (or), `~` (not), `==>` (implies), `<=>` (iff) | Always |
 | Quantifiers | `forall x . P(x)`, `exists x . P(x)` | Always |
-| Comparison | `=`, `<`, `<=`, `>`, `>=` | Requires `NumericAugmenter` |
-| Arithmetic | `+`, `-`, `*`, `^` (in terms) | Requires model augmenter with arithmetic functions |
+| Comparison | `=`, `<`, `<=`, `>`, `>=` | Requires dispatcher support |
+| Arithmetic | `+`, `-`, `*`, `^` (in terms) | Requires dispatcher support |
 
-**Availability note:** The parser accepts all operators. KB-backed models
-(built by `KnowledgeSourceModel.toModel`) provide only relation-membership
-predicates and identity constants. Comparison predicates, arithmetic
-operations, numeric literal resolution, and consumer-specific functions
-require a `ModelAugmenter` passed to `VagueSemantics.holds/evaluate`.
-`NumericAugmenter` provides the built-in comparisons and numeric
-literals. See [ADR-005](ADR-005.md).
+**Availability note:** The parser accepts all operators. At evaluation, every
+predicate and function is resolved by the consumer-supplied
+`RuntimeDispatcher` (ADR-001). Comparison predicates, arithmetic operations,
+numeric literal resolution, and domain-specific functions are provided by the
+dispatcher's `evalPredicate` / `evalFunction`; an operator the dispatcher does
+not implement returns a `Left` at evaluation. There is no separate
+model-augmentation step.
 
 ### Examples
 
@@ -120,7 +120,7 @@ Q[<=]^{1/3} x (critical_asset(x),
 | R(x, y') | `range: FOL` (in `ParsedQuery`) | `fol.logic` |
 | φ(x, y) | `scope: Formula[FOL]` (in `ParsedQuery`) | `fol.logic` |
 | (y) | `answerVars: List[String]` | `fol.logic` |
-| D_R | `RangeExtractor.extractRange()` result | `fol.semantics` |
+| D_R | `TypedSemantics.collectRangeElements()` result | `fol.typed` |
 | Prop_D(S, φ) | `ProportionEstimator.estimateWithSampling()` | `fol.sampling` |
 | VagueQuantifier threshold | `VagueQuantifier.AtLeast(threshold)` etc. | `fol.quantifier` |
 
@@ -129,13 +129,14 @@ Q[<=]^{1/3} x (critical_asset(x),
 | Paper Step | Code Location | Method |
 |---|---|---|
 | Parse query | `fol.parser.VagueQueryParser` | `parse(s): Either[QueryError, ParsedQuery]` |
-| Extract D_R | `fol.semantics.RangeExtractor` | `extractRange(source, query, subst)` |
-| Build model | `fol.bridge.KnowledgeSourceModel` | `toModel[D](source): Model[D]` |
-| Compile scope | `fol.bridge.FOLBridge` | `scopeToPredicate[D](scope, var, source, augmenter)` |
+| Build model | `fol.typed.FolModel` | `apply(catalog, runtimeModel): Either[QueryError, FolModel]` |
+| Type-check query | `fol.typed.QueryBinder` | `bind(query, catalog): Either[…, BoundQuery]` |
+| Extract D_R | `fol.typed.TypedSemantics` | `collectRangeElements(query, model, env)` |
+| Evaluate scope | `fol.typed.TypedSemantics` | `evalFormula(scope, env, model)` |
 | Sample S ⊆ D_R | `fol.sampling.HDRSampler` | `sample(population, n): Set[A]` |
 | Calculate Prop_D | `fol.sampling.ProportionEstimator` | `estimateWithSampling(…)` |
 | Check quantifier | `fol.result.VagueQueryResult` | `fromEstimate(vq, estimate, N)` |
-| Full pipeline | `fol.semantics.VagueSemantics` | `holds(q, src, …)` / `evaluate(q, src, …)` |
+| Full pipeline | `fol.semantics.VagueSemantics` | `evaluateTyped(q, folModel, …)` |
 
 ---
 

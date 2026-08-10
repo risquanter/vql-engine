@@ -14,26 +14,52 @@ libraryDependencies += "com.risquanter" %%% "vql-engine" % "0.10.2"
 
 ## Quick start
 
-Parse a query in the paper's syntax and evaluate it against a knowledge source. The public API is `Either`-based: parse and evaluation errors come back as typed `QueryError` values, never exceptions.
+Parse a query in the paper's syntax and evaluate it through the typed, many-sorted pipeline. Declare the sorts and predicate signatures in a `TypeCatalog`, provide the runtime data (domains plus a dispatcher that decides each predicate) in a `RuntimeModel`, and combine them into a validated `FolModel`. The public API is `Either`-based: parse, model-construction, and evaluation errors come back as typed `QueryError` values, never exceptions.
 
 ```scala
 import fol.parser.VagueQueryParser
 import fol.semantics.VagueSemantics
-import fol.datastore.KnowledgeSource
-import fol.examples.CyberSecurityDomain
+import fol.sampling.SamplingParams
+import fol.typed.{FolModel, RuntimeModel, RuntimeDispatcher, TypeCatalog, PredicateSig, TypeId, SymbolName, Value}
+import fol.typed.TypeDecl.DomainType
 
-// "At least 3/4 of assets have critical risks"
-val queryStr = """Q[>=]^{3/4} x (asset(x), exists r . (has_risk(x, r) /\ critical_risk(r)))"""
+// 1. Declare the sort and predicate signatures.
+val asset = TypeId("Asset")
+val catalog = TypeCatalog.unsafe(
+  types = Set(DomainType(asset)),
+  predicates = Map(
+    SymbolName("monitored") -> PredicateSig(List(asset)),
+    SymbolName("critical")  -> PredicateSig(List(asset))
+  )
+)
 
-val source = KnowledgeSource.fromKnowledgeBase(CyberSecurityDomain.kb)
+// 2. Provide the runtime data: the domain of each sort plus a dispatcher.
+val values = Set(Value(asset, "a1"), Value(asset, "a2"), Value(asset, "a3"), Value(asset, "a4"))
+val dispatcher = new RuntimeDispatcher:
+  def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
+    name.value match
+      case "monitored" => Right(true)
+      case "critical"  => Right(args.headOption.exists(v => v.raw == "a1" || v.raw == "a2" || v.raw == "a3"))
+      case other       => Left(s"no predicate: $other")
+  def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] =
+    Left(s"no function: ${name.value}")
+  def predicateSymbols: Set[SymbolName] = Set(SymbolName("monitored"), SymbolName("critical"))
+  def functionSymbols: Set[SymbolName] = Set.empty
+
+val runtimeModel = RuntimeModel(domains = Map(asset -> values), dispatcher = dispatcher)
+
+// 3. Parse, build the model, evaluate — every step returns Either[QueryError, _].
+// "At least 3/4 of monitored assets are critical"
+val queryStr = """Q[>=]^{3/4} x (monitored(x), critical(x))"""
 
 val outcome = for
-  query  <- VagueQueryParser.parse(queryStr)
-  result <- VagueSemantics.holds(query, source)
-yield result
+  query    <- VagueQueryParser.parse(queryStr)
+  folModel <- FolModel(catalog, runtimeModel)
+  output   <- VagueSemantics.evaluateTyped(query, folModel, samplingParams = SamplingParams.exact)
+yield output
 
 outcome match
-  case Right(r) => println(s"satisfied=${r.satisfied} proportion=${r.proportion} (${r.satisfyingCount}/${r.domainSize})")
+  case Right(o) => println(s"satisfied=${o.satisfied} proportion=${o.proportion} (${o.satisfyingElements.size}/${o.rangeElements.size})")
   case Left(e)  => println(e.formatted)
 ```
 
@@ -44,18 +70,17 @@ Supported quantifier operators: About (`~`), AtLeast (`>=`), AtMost (`<=`), each
 Two layers in `core/src/main/scala`:
 
 - **FOL foundation** (`logic`, `lexer`, `parser`, `printer`, `semantics`, `util`): terms, formulas, parser combinators with precedence and associativity, pretty printing with round-trip fidelity, Tarski model semantics.
-- **Vague quantifier extension** (`fol.*`): query parser, `ResolvedQuery` intermediate representation, exact and sampling evaluation (`VagueSemantics.holds` / `evaluate`), HDR-based samplers with confidence intervals, a relational `KnowledgeBase[D]` / `KnowledgeSource[D]` datastore, FOL bridge with model augmenters, and typed `QueryError`s. The extension imports the foundation, never the reverse.
+- **Vague quantifier extension** (`fol.*`): the query parser (`fol.parser`), the typed intermediate representation and pipeline (`fol.typed`: `TypeCatalog`, `QueryBinder` → `BoundQuery`, `TypedSemantics`, `FolModel`, `RuntimeModel`), HDR-based samplers with confidence intervals (`fol.sampling`), the `VagueSemantics` facade, and typed `QueryError`s (`fol.error`). The extension imports the foundation, never the reverse.
 
 [docs/Architecture.md](docs/Architecture.md) has the full package map, layer diagram, and integration flow.
 
-## Tests and examples
+## Tests
 
 ```bash
-sbt +test                                  # full suite, JVM + Scala.js
-sbt "folEngineJVM/runMain fol.examples.demo"   # cybersecurity demo: Boolean, unary, and complex queries
+sbt +test    # full suite, JVM + Scala.js
 ```
 
-Example domain and queries live in `core/src/main/scala/fol/examples/`.
+`core/src/test/scala/fol/semantics/VagueSemanticsTypedSpec.scala` exercises the typed pipeline end to end and is the most complete worked example of the API above.
 
 ## Documentation
 

@@ -1,8 +1,8 @@
 # Implementation Plan: Untyped-Path Retirement + Formula Ranges + Satisfying-Set API
 
 **Status:** Draft — awaiting user review (per `docs/WORKING-INSTRUCTIONS.md`
-§ "Mandatory Review Halt"). All rulings are recorded (§2); awaiting the
-user's signal to begin Phase 0.
+§ "Mandatory Review Halt"). All rulings recorded (§2); awaiting the user's
+signal to begin Phase 0.
 **Date:** 2026-08-10
 **Source contract:** `PROMPT-VQL-RANGE-AND-TARGETING.md` (repo root) — the
 acceptance criteria AC-1 … AC-10 defined there are the interface contract the
@@ -175,6 +175,58 @@ Recorded decisions:
   its HTTP boundary) map the foundation parse error with a one-line
   `.left.map` — no vague-layer parse wrapper is added.
 
+- **Ruling of 2026-08-10 — external-API `Either` audit required:** the plan
+  must prove the entire external-facing surface is `Either`-based and that no
+  vague-layer code relies on the exception-based form. Added as the §10.1
+  audit (Phase 6) and a §3 hard constraint. Grounded against register's actual
+  call sites: register reaches the library only through `Either`-returning
+  entries (`VagueQueryParser.parse`, `evaluateTyped`), never through a
+  throwing one.
+
+- **Ruling of 2026-08-10 — error-channel policy (refines ADR-012):**
+  1. The Harrison OCaml-ported core (ADR-007 Tiers 1–3) keeps its ported
+     style, including internal exception backtracking.
+  2. All other vague-layer code uses `Either` internally, not throwing.
+  3. `Either` is enforced at boundaries: the FOL→vague boundary is `Either`
+     (vague code calls only `Either`-returning FOL entries — Phase 1 makes
+     `FOLParser` such an entry); vague internals are `Either`-only; FOL code
+     that is *not* Harrison-ported is decided per individual ruling.
+
+  Consequences already satisfied by the plan: the foundation `FOLParser` edge
+  becomes `Either` (Phase 1); `VagueSemantics`/`fol.typed` are `Either`
+  throughout once Phase 0 removes `holds`/`evaluate[D]`; `TypeCatalog.unsafe`
+  remains the ADR-012 construction-invariant / programming-error channel with
+  its `Either` sibling `apply` (covered by "use `Either` elsewhere", not a
+  violation).
+
+- **Ruling of 2026-08-10 — D-1: `VagueQueryParser`/`mk` error style.**
+  `VagueQueryParser` (and its helper `ParsedQuery.mk`) keeps its
+  throw-internally / convert-at-the-edge style; ADR-002 grandfathers it. Not
+  merely for consistency: `VagueQueryParser` composes with the ADR-007-frozen
+  foundation parsers, which select grammar alternatives by exception
+  backtracking; an `Either`-internal vague parser would have to catch and
+  convert the foundation's exceptions at every call, the exact "Re-wrapping
+  Exceptions Mid-Flight" smell ADR-002 rejects. `mk`'s only caller is
+  `VagueQueryParser.parseTokens`, behind `parse`'s `Either` boundary; register
+  never calls `mk`. ADR-002 Context and a new Cross-ADR Relationship section
+  (with ADR-007) record this. The §10.1 audit keeps these sites on the
+  allowlist.
+
+- **Ruling of 2026-08-10 — Phase 0 scaladoc cleanup in preserved files.**
+  A comment-only staleness fix inside an ADR-007-preserved file that follows
+  directly from a session-ruled deletion is approved as part of that deletion,
+  provided it keeps the file consistent and breaks no C1–C13 characteristic.
+  Applied in Phase 0 to `semantics/FOLSemantics.scala` (removed a scaladoc
+  paragraph on `integerModel` referencing the deleted `NumericAugmenter`).
+
+- **Ruling of 2026-08-10 — Phase 0 residual ADR illustrations.** The
+  Decision/Code-Smells example blocks in ADR-003 (`resolved.evaluate()`),
+  ADR-004 (`holdsVague`/`KnowledgeBase`, `RelationValue`/`DomainElement`), and
+  ADR-012 (`RelationName`/`KnowledgeBase`/`RangeExtractor`/`toResolved`) that
+  still reference retired types stay for now (they teach their principle with
+  historical vehicles) and are refreshed in the Phase 6 doc-consistency sweep
+  (§10).
+
 No rulings are pending.
 
 ---
@@ -230,6 +282,15 @@ No rulings are pending.
   through the typed path; single-atom ranges produce byte-identical
   results.
 - No `asInstanceOf` outside the boundaries ADR-015 sanctions.
+- **Either-based external API (verified, not assumed).** Every external-facing
+  entry point whose failure is data- or input-dependent returns
+  `Either[QueryError, A]` (or the foundation parse-error Either for
+  `FOLParser`). No vague-layer main source relies on the exception-based
+  form of any API: no `catch QueryException` trampoline and no call to the
+  throwing `FOLParser` form survives. The only sanctioned throwing surface is
+  the ADR-012 construction-invariant / programming-error channel, each member
+  of which has an `Either` sibling (see the allowlist in §10.1). This is
+  enforced by the audit in §10.1, run at Phase 6 when the full surface exists.
 - TDD: failing tests first, then implementation, per phase (Phase 0 is
   deletion-led; its test obligation is the surviving suite green plus the
   removal checks in §4.2).
@@ -381,6 +442,10 @@ small `parseOk`-style helper for mechanical adaptation:
 
 **Pass criterion:** `sbt test` green on both platforms; the
 no-escaping-exception tests green; ADR-007 and ADR-012 notes written.
+
+> This phase makes the `Either` form the only public form of `FOLParser`,
+> which is what lets the §10.1 external-API audit assert zero calls to a
+> throwing `FOLParser` form.
 
 **HARD STOP.**
 
@@ -593,9 +658,60 @@ binding; the version reflects the API change.
   `ParsedQuery.scopeVars` scaladoc (first line names `fvFOL` while the code
   uses `varFOL` — corrected to describe current behavior) and
   `VagueQueryParser` header examples.
+- Refresh the retained stale ADR illustrations (Ruling of 2026-08-10 — Phase 0
+  residual ADR illustrations): the Decision/Code-Smells example blocks in
+  ADR-003 (`resolved.evaluate()`), ADR-004 (`holdsVague`/`KnowledgeBase`,
+  `RelationValue`/`DomainElement`), and ADR-012
+  (`RelationName`/`KnowledgeBase`/`RangeExtractor`/`toResolved`) — restated
+  over surviving types while preserving each ADR's principle.
+
+### 10.1 External-API `Either` audit
+
+**Goal:** Prove — not assume — that after all phases the entire external-facing
+API is `Either`-based and no vague-layer code relies on the exception-based
+form. This is the cross-cutting verification the user requires; it runs here
+because the full public surface (parse boundary, formula ranges,
+`satisfyingSet`) exists only after Phase 5. Recorded in
+`docs/scratch/either-api-audit-<date>.md`.
+
+**Check 1 — external entry points return `Either`.** Enumerate the public
+surface consumers reach and assert each returns `Either` (or the foundation
+parse-error `Either` for `FOLParser`). The confirmed set, verified against
+register's actual call sites:
+
+| Entry point | Return | Consumer path |
+|---|---|---|
+| `parser.FOLParser.{parse, defaultParser, parseWithLexer}` | `Either[<foundation error>, Formula[FOL]]` (Phase 1) | targeting-predicate parsing |
+| `fol.parser.VagueQueryParser.parse` | `Either[QueryError, ParsedQuery]` | `QueryRequest.resolve`, SPA `AnalyzeQueryState` |
+| `fol.semantics.VagueSemantics.{bindTyped, evaluateTyped, satisfyingSet}` | `Either[QueryError, A]` | `QueryServiceLive` |
+| `fol.typed.QueryBinder.bind` | `Either[List[TypeCheckError], BoundQuery]` | internal, via facade |
+| `fol.typed.TypedSemantics.{evaluate, satisfyingSet}` | `Either[QueryError, A]` | internal, via facade |
+| `fol.typed.TypeCatalog.apply` | `Either[List[TypeCatalogError], TypeCatalog]` | model construction |
+| `fol.typed.FolModel.apply` | `Either[QueryError, FolModel]` | model construction |
+
+**Check 2 — no vague-layer reliance on the exception form.** Grep the surviving
+vague main sources (`core/src/main/scala/fol/**`) and assert:
+- zero `catch` of `QueryException` — the two trampolines in `VagueSemantics`
+  (`holds`, `evaluate[D]`) and those in `RangeExtractor` / `ResolvedQuery` are
+  gone with Phase 0; no new one is introduced;
+- zero call to the throwing `FOLParser` form (there are none today; Phase 1
+  makes the `Either` form the only public form, so this stays zero);
+- every remaining `throw` / `QueryException(` lies in the allowlist below.
+
+**Allowlist (sanctioned throwing — ADR-012 construction-invariant /
+programming-error channel; each has an `Either` sibling):**
+
+| Site | Why sanctioned | `Either` sibling |
+|---|---|---|
+| `TypeCatalog.unsafe` | Documented tests/startup-only; a catalog inconsistency is a programming error, not user input | `TypeCatalog.apply` |
+| `require(...)` construction guards | ADR-012 construction-invariant channel | — (invariant, not state) |
+| `VagueQueryParser` internal combinators + `ParsedQuery.mk` throw, caught once at `VagueQueryParser.parse` | ADR-002 combinator style, grandfathered (D-1 ruling, §2): composes with the ADR-007-frozen exception-backtracking foundation, so `Either`-internal would re-wrap exceptions at every foundation call; register never calls `mk` directly | `VagueQueryParser.parse` |
+
+**Pass criterion (audit):** Check 1 table fully `Either`; Check 2 greps return
+only allowlisted sites; audit file records the exact grep output.
 
 **Pass criterion:** `sbt test` green on both platforms; every listed doc
-updated; consistency walk recorded.
+updated; consistency walk recorded; §10.1 audit passes.
 
 **HARD STOP.**
 
@@ -615,6 +731,7 @@ updated; consistency walk recorded.
 | AC-8 docs | Phase 6 (untyped-path redirects in Phase 0) |
 | AC-9 untyped path | Superseded by user ruling 2026-08-10: untyped backend retired in Phase 0 (T-006) |
 | AC-10 versioning | Phase 6 (`0.11.0`, changelog note incl. removal, `FOLParser` signature change, pruned error variants) |
+| External-API `Either` audit (user-required, not an AC) | Phase 6 §10.1 (Either-only external surface; no vague-layer exception-form reliance; allowlist enforced) |
 
 ---
 

@@ -138,11 +138,12 @@ super-typeclass.
 
 ## T-006 — Retire the untyped evaluation backend
 
-**Status:** ✅ DECIDED — retirement (user ruling 2026-08-10). Executed as
-Phase 0 of `docs/PLAN-range-formula-and-satisfying-set.md` (deletion
-inventory in that plan's §4.1; ADR-005/008/009/010 move to Deprecated).
-Mark DONE when that phase lands. The evaluation context below is preserved
-for the record.
+**Status:** ✅ DONE (Phase 0 of
+`docs/PLAN-range-formula-and-satisfying-set.md`, 2026-08-10). The untyped
+backend and its demos/tests were deleted per that plan's §4.1 inventory;
+ADR-005/008/009/010 are Deprecated. The typed many-sorted backend
+(`VagueSemantics.evaluateTyped` → `fol.typed`) is the only evaluation path.
+The evaluation context below is preserved for the record.
 
 **Context:** The untyped evaluation backend — `fol.semantics.VagueSemantics.holds`/`evaluate`,
 `fol.semantics.RangeExtractor` (`buildPattern` / `DomainExtraction`), and the
@@ -161,3 +162,23 @@ only by tests and demos" is a dead-code smell.
   untyped path is not the place that extension would live either.
 
 **Reference:** register `docs/scratch/MITIGATION-PRE-PLANNING.md` §P-4, §P-5.
+
+---
+
+## T-007 — Fresh typed-path demo
+
+**Status:** PENDING — write after Phase 5 of
+`docs/PLAN-range-formula-and-satisfying-set.md`, against the finished API
+(formula ranges + `satisfyingSet`).
+
+**Context:** Phase 0 (T-006) deleted the untyped demos
+(`examples/VagueSemanticsDemo`, `fol/examples/*`) with no port. The library
+currently has no runnable demo of the typed pipeline; `README.md` points at
+`VagueSemanticsTypedSpec` as the worked example. A small runnable demo
+(`TypeCatalog` → `RuntimeModel` → `FolModel` → `evaluateTyped`, plus a
+compound-range and a `satisfyingSet` example) should be added once the range
+and satisfying-set features land, so the demo exercises the complete API.
+
+**Why deferred:** Writing it now would demo an API that Phases 3–5 change.
+Deferring to post-Phase-5 lets the demo cover formula ranges and
+`satisfyingSet` in one pass.
