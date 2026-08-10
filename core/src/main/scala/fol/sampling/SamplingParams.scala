@@ -72,9 +72,7 @@ object SamplingParams:
     * '''Service-level usage (register):'''
     * {{{val params = if exactMode then SamplingParams.exact
     *               else SamplingParams.default
-    * val output = VagueSemantics.evaluate(query, source, answerTuple, params, config)}}}
-    *
-    * See EVALUATION-PATH-UNIFICATION.md §D11 for design rationale.
+    * val output = VagueSemantics.evaluateTyped(query, folModel, answerTuple, params, config)}}}
     */
   val exact: SamplingParams = SamplingParams(
     epsilon = 1e-6,

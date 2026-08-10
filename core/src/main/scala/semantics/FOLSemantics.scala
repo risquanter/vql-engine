@@ -351,10 +351,6 @@ object FOLSemantics:
     * 
     * Note: Numeric constants are handled dynamically - any numeric string
     * can be used in formulas, but quantification only ranges over the domain.
-    *
-    * The operators here overlap with `NumericAugmenter` but operate on
-    * typed `Int` (not `Any`), preserving type safety for pure-FOL tests.
-    * `NumericAugmenter` is the KB-pipeline counterpart for `Model[Any]`.
     */
   def integerModel(range: Range = -10 to 10): Model[Int] =
     val domain = Domain(range.toSet)

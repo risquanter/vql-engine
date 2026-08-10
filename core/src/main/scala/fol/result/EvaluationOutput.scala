@@ -8,9 +8,7 @@ package fol.result
   * - `rangeElements`: the full candidate pool (D_R from the paper)
   * - `satisfyingElements`: the subset that passed the scope predicate
   * - In sampled mode, `satisfyingElements` contains only elements from
-  *   the sample (Decision D2B).
-  *
-  * See docs/EVALUATION-PATH-UNIFICATION.md §EvaluationOutput.
+  *   the sample.
   *
   * @tparam D              Domain element type
   * @param result             Statistics: satisfied, proportion, CI, counts

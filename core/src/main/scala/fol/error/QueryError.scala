@@ -1,7 +1,5 @@
 package fol.error
 
-import fol.datastore.RelationName
-
 /** Structured error types for vague quantifier evaluation.
   *
   * Encoded as a `sealed trait` with `case class` variants (not an `enum`) because
@@ -128,60 +126,6 @@ object QueryError:
     element: String
   ) extends QueryError:
     override val context = Map("formula" -> formula, "element" -> element)
-  
-  // ==================== Data Store Errors ====================
-  
-  /** Knowledge source/database errors */
-  case class DataStoreError(
-    message: String,
-    operation: String,
-    relation: Option[String] = None,
-    cause: Option[Throwable] = None
-  ) extends QueryError:
-    override val context = Map("operation" -> operation) ++ relation.map("relation" -> _)
-    override def formatted: String =
-      val rel = relation.map(r => s" on relation '$r'").getOrElse("")
-      val causeMsg = cause.map(c => s"\nCause: ${c.getMessage}").getOrElse("")
-      s"Data store error during $operation$rel: $message$causeMsg"
-  
-  /** Relation not found in schema */
-  case class RelationNotFoundError(
-    relationName: RelationName,
-    availableRelations: Set[RelationName]
-  ) extends QueryError:
-    def message = s"Relation '${relationName.value}' not found"
-    override val context = Map(
-      "relation" -> relationName.value,
-      "available" -> availableRelations.map(_.value).mkString(", ")
-    )
-    override def formatted: String =
-      s"Relation '${relationName.value}' not found. Available relations: ${availableRelations.map(_.value).mkString(", ")}"
-  
-  /** Schema validation error */
-  case class SchemaError(
-    message: String,
-    relationName: RelationName,
-    expectedArity: Int,
-    actualArity: Int
-  ) extends QueryError:
-    override val context = Map(
-      "relation" -> relationName.value,
-      "expected_arity" -> expectedArity.toString,
-      "actual_arity" -> actualArity.toString
-    )
-
-  /** Position out of bounds for a relation */
-  case class PositionOutOfBoundsError(
-    message: String,
-    relationName: RelationName,
-    arity: Int,
-    position: Int
-  ) extends QueryError:
-    override val context = Map(
-      "relation" -> relationName.value,
-      "arity" -> arity.toString,
-      "position" -> position.toString
-    )
   
   // ==================== FOL Semantics Errors ====================
   

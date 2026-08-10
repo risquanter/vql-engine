@@ -1,36 +1,24 @@
 package fol.semantics
 
-import fol.datastore.{KnowledgeSource, DomainElement, DomainCodec}
 import fol.logic.ParsedQuery
-import fol.quantifier.Quantifier
-import fol.quantifier.VagueQuantifier
-import fol.bridge.FOLBridge
-import fol.query.ResolvedQuery
-import fol.result.{VagueQueryResult, EvaluationOutput}
+import fol.result.EvaluationOutput
 import fol.sampling.{SamplingParams, HDRConfig}
-import fol.error.{QueryError, QueryException}
-import fol.typed.{FolModel, TypeCatalog, BoundQuery, QueryBinder, TypeCheckError, RuntimeModel, RuntimeModelError, Value, TypedSemantics}
-import semantics.ModelAugmenter
-import scala.util.control.NonFatal
-import scala.reflect.ClassTag
+import fol.error.QueryError
+import fol.typed.{FolModel, TypeCatalog, BoundQuery, QueryBinder, TypeCheckError, Value, TypedSemantics}
 
-/** Vague quantifier semantics evaluation — thin facade.
+/** Vague quantifier semantics evaluation — thin facade over the typed pipeline.
   *
-  * Evaluates string-parsed vague queries by compiling them to
-  * [[ResolvedQuery]] (the shared IL) and delegating evaluation:
+  * A string-parsed [[ParsedQuery]] is bound against a [[TypeCatalog]] and
+  * evaluated against a [[FolModel]] through the many-sorted typed backend:
   *
-  * 1. Extract range D_R using range predicate R   (RangeExtractor)
-  * 2. Convert scope formula to typed predicate     (FOLBridge.scopeToPredicate)
-  * 3. Convert Quantifier → VagueQuantifier         (VagueQuantifier.fromQuantifier)
-  * 4. Construct [[ResolvedQuery]] (single code path, D11)
-  * 5. Evaluate via ResolvedQuery.evaluate / evaluateWithOutput
+  * 1. `bindTyped` — type-check variable sorts against the catalog, producing a
+  *    [[BoundQuery]].
+  * 2. `evaluateTyped` — run the bound query against the model's dispatchers and
+  *    domains via [[fol.typed.TypedSemantics]].
   *
-  * '''One code path — no boolean toggle (D11).'''
-  * `SamplingParams` controls whether evaluation is exact or sampled.
-  * Default is `SamplingParams.exact` for backward compatibility.
-  *
-  * Internal implementation throws on error (OCaml style).
-  * Public API returns `Either[QueryError, A]` — single boundary.
+  * `SamplingParams` controls whether scope evaluation is exact or sampled;
+  * range extraction is always exact. The public API returns
+  * `Either[QueryError, A]`.
   *
   * Paper reference: Section 3, Definition 2
   * See also: [[fol.typed.TypedSemantics]] for the canonical typed evaluation path (ADR-001)
@@ -70,9 +58,6 @@ object VagueSemantics:
       case TypeCheckError.TypeNotQuantifiable(name)                 => s"type '$name' is not a domain type and cannot be quantified over"
     }
 
-  private def renderModelErrors(errors: List[RuntimeModelError]): List[String] =
-    errors.map(_.message)
-
   /** Evaluate a parsed query through the typed pipeline using a pre-validated [[FolModel]].
     *
     * Model validation (dispatcher coverage + domain registration) is guaranteed by
@@ -96,92 +81,3 @@ object VagueSemantics:
         hdrConfig    = hdrConfig
       )
     yield output
-
-  /** Compile a string-parsed query into a [[ResolvedQuery]].
-    *
-    * Private — returns Either.  Composes the Either from RangeExtractor
-    * with the remaining (throwing) compilation steps inside map.
-    */
-  private def toResolved[D: DomainElement: DomainCodec: ClassTag](
-    query: ParsedQuery,
-    source: KnowledgeSource[D],
-    answerTuple: Map[String, D],
-    samplingParams: SamplingParams,
-    hdrConfig: HDRConfig,
-    modelAugmenter: ModelAugmenter[D] = ModelAugmenter.identity[D]
-  ): Either[QueryError, ResolvedQuery[D]] =
-    RangeExtractor.extractRange(source, query, answerTuple).map { rangeElements =>
-      val predicate = FOLBridge.scopeToPredicate(
-        query.scope, query.variable, source, answerTuple, modelAugmenter
-      )
-      val vq = VagueQuantifier.fromQuantifier(query.quantifier)
-      ResolvedQuery(vq, rangeElements, predicate, samplingParams, hdrConfig)
-    }
-
-  /** Evaluate a vague quantifier query.
-    *
-    * Evaluates: D ⊨ Q[op]^{k/n} x (R, φ(x,c))
-    *
-    * Works with any KnowledgeSource implementation (in-memory, SQL, RDF, etc.).
-    *
-    * @param query          The string-parsed vague query
-    * @param source         The knowledge source to evaluate against
-    * @param answerTuple    Substitution for answer variables in φ
-    * @param samplingParams Controls precision. `SamplingParams.exact` (default)
-    *                       for full enumeration; any other for statistical sampling.
-    * @param hdrConfig      HDR PRNG configuration (relevant when sampling)
-    * @return Either[QueryError, VagueQueryResult]
-    */
-  def holds[D: DomainElement: DomainCodec: ClassTag](
-    query: ParsedQuery,
-    source: KnowledgeSource[D],
-    answerTuple: Map[String, D] = Map.empty[String, D],
-    samplingParams: SamplingParams = SamplingParams.exact,
-    hdrConfig: HDRConfig = HDRConfig.default,
-    modelAugmenter: ModelAugmenter[D] = ModelAugmenter.identity[D]
-  ): Either[QueryError, VagueQueryResult] =
-    try
-      toResolved(query, source, answerTuple, samplingParams, hdrConfig, modelAugmenter)
-        .map(_.evaluate())
-    catch
-      case e: QueryException => Left(e.error)
-      case NonFatal(e) =>
-        Left(QueryError.EvaluationError(
-          s"Unexpected error during query evaluation: ${e.getMessage}",
-          "query_evaluation",
-          Some(e),
-          Map("query" -> query.toString)
-        ))
-
-  /** Evaluate a vague quantifier query with element sets.
-    *
-    * Returns both statistical results and the concrete element sets
-    * needed for tree highlighting in register.
-    *
-    * @param query          The string-parsed vague query
-    * @param source         The knowledge source to evaluate against
-    * @param answerTuple    Substitution for answer variables in φ
-    * @param samplingParams Controls precision (see `holds`)
-    * @param hdrConfig      HDR PRNG configuration
-    * @return Either[QueryError, EvaluationOutput]
-    */
-  def evaluate[D: DomainElement: DomainCodec: ClassTag](
-    query: ParsedQuery,
-    source: KnowledgeSource[D],
-    answerTuple: Map[String, D] = Map.empty[String, D],
-    samplingParams: SamplingParams = SamplingParams.exact,
-    hdrConfig: HDRConfig = HDRConfig.default,
-    modelAugmenter: ModelAugmenter[D] = ModelAugmenter.identity[D]
-  ): Either[QueryError, EvaluationOutput[D]] =
-    try
-      toResolved(query, source, answerTuple, samplingParams, hdrConfig, modelAugmenter)
-        .map(_.evaluateWithOutput())
-    catch
-      case e: QueryException => Left(e.error)
-      case NonFatal(e) =>
-        Left(QueryError.EvaluationError(
-          s"Unexpected error during query evaluation: ${e.getMessage}",
-          "query_evaluation",
-          Some(e),
-          Map("query" -> query.toString)
-        ))

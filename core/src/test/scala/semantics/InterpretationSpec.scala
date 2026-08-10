@@ -122,9 +122,7 @@ class InterpretationSpec extends FunSuite:
 
   test("combine identity: i combine empty == i") {
     val empty = Interpretation[Int](Domain(Set(0)), Map.empty, Map.empty)
-    // We need at least one overlapping domain element for a valid "empty"
-    // In practice the identity is ModelAugmenter.identity, not Interpretation.combine
-    // But we verify the map-merge identity: x ++ Map.empty == x
+    // We verify the map-merge identity: x ++ Map.empty == x
     val combined = interpA.combine(Interpretation(domain3, Map.empty, Map.empty))
     assertEquals(combined.getFunction("a")(Nil), 1)
     assertEquals(combined.getFunction("shared")(Nil), 10)
