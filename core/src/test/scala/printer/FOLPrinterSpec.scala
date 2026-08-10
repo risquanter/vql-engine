@@ -14,6 +14,10 @@ import parser.FOLParser
   * - Round-trip parsing (parse then print should produce equivalent formula)
   */
 class FOLPrinterSpec extends FunSuite:
+
+  /** Unwrap a parse expected to succeed. */
+  private def parseOk(s: String): Formula[FOL] =
+    FOLParser.parse(s).fold(e => fail(s"parse failed: ${e.message}"), identity)
   
   // ==================== Term Printing Tests ====================
   
@@ -245,65 +249,65 @@ class FOLPrinterSpec extends FunSuite:
   
   test("round-trip: simple atom") {
     val input = "P(x)"
-    val parsed = FOLParser.parse(input)
+    val parsed = parseOk(input)
     val printed = printFormula(parsed)
-    val reparsed = FOLParser.parse(printed)
+    val reparsed = parseOk(printed)
     assertEquals(parsed, reparsed)
   }
   
   test("round-trip: conjunction") {
     val input = "P(x) /\\ Q(y)"
-    val parsed = FOLParser.parse(input)
+    val parsed = parseOk(input)
     val printed = printFormula(parsed)
-    val reparsed = FOLParser.parse(printed)
+    val reparsed = parseOk(printed)
     assertEquals(parsed, reparsed)
   }
   
   test("round-trip: implication") {
     val input = "P(x) ==> Q(x)"
-    val parsed = FOLParser.parse(input)
+    val parsed = parseOk(input)
     val printed = printFormula(parsed)
-    val reparsed = FOLParser.parse(printed)
+    val reparsed = parseOk(printed)
     assertEquals(parsed, reparsed)
   }
   
   test("round-trip: quantifiers") {
     val input = "forall x. exists y. x < y"
-    val parsed = FOLParser.parse(input)
+    val parsed = parseOk(input)
     val printed = printFormula(parsed)
-    val reparsed = FOLParser.parse(printed)
+    val reparsed = parseOk(printed)
     assertEquals(parsed, reparsed)
   }
   
   test("round-trip: complex formula") {
     val input = "forall x. P(x) ==> exists y. Q(x, y) /\\ R(y)"
-    val parsed = FOLParser.parse(input)
+    val parsed = parseOk(input)
     val printed = printFormula(parsed)
-    val reparsed = FOLParser.parse(printed)
+    val reparsed = parseOk(printed)
     assertEquals(parsed, reparsed)
   }
   
   test("round-trip: nested implications") {
     val input = "(P ==> Q) ==> R"
-    val parsed = FOLParser.parse(input)
+    val parsed = parseOk(input)
     val printed = printFormula(parsed)
-    val reparsed = FOLParser.parse(printed)
+    val reparsed = parseOk(printed)
     assertEquals(parsed, reparsed)
   }
   
   test("round-trip: equality with functions") {
     val input = "f(x) = g(y, z)"
-    val parsed = FOLParser.parse(input)
+    val parsed = parseOk(input)
     val printed = printFormula(parsed)
-    val reparsed = FOLParser.parse(printed)
+    val reparsed = parseOk(printed)
     assertEquals(parsed, reparsed)
   }
   
   test("round-trip: negation") {
     val input = "~(P(x) /\\ Q(x))"
-    val parsed = FOLParser.parse(input)
+    val parsed = parseOk(input)
     val printed = printFormula(parsed)
-    val reparsed = FOLParser.parse(printed)
+    val reparsed = parseOk(printed)
     assertEquals(parsed, reparsed)
   }
   

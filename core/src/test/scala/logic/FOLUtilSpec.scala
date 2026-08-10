@@ -7,6 +7,10 @@ import logic.FOLUtil.*
 import parser.FOLParser
 
 class FOLUtilSpec extends FunSuite:
+
+  /** Unwrap a parse expected to succeed. */
+  private def parseOk(s: String): Formula[FOL] =
+    FOLParser.parse(s).fold(e => fail(s"parse failed: ${e.message}"), identity)
   
   // ==================== Helper Function Tests ====================
   
@@ -68,20 +72,20 @@ class FOLUtilSpec extends FunSuite:
   // ==================== Variables in Formulas ====================
   
   test("varFOL: simple predicate") {
-    val fm = FOLParser.parse("P(x, y)")
+    val fm = parseOk("P(x, y)")
     val vars = varFOL(fm)
     assert(vars.contains("x"))
     assert(vars.contains("y"))
   }
   
   test("varFOL: includes bound variables") {
-    val fm = FOLParser.parse("forall x . P(x)")
+    val fm = parseOk("forall x . P(x)")
     val vars = varFOL(fm)
     assert(vars.contains("x"))
   }
   
   test("varFOL: conjunction") {
-    val fm = FOLParser.parse("P(x) /\\ Q(y)")
+    val fm = parseOk("P(x) /\\ Q(y)")
     val vars = varFOL(fm)
     assert(vars.contains("x"))
     assert(vars.contains("y"))
@@ -90,33 +94,33 @@ class FOLUtilSpec extends FunSuite:
   // ==================== Free Variables in Formulas ====================
   
   test("fvFOL: simple predicate") {
-    val fm = FOLParser.parse("P(x, y)")
+    val fm = parseOk("P(x, y)")
     val freeVars = fvFOL(fm)
     assert(freeVars.contains("x"))
     assert(freeVars.contains("y"))
   }
   
   test("fvFOL: forall removes bound variable") {
-    val fm = FOLParser.parse("forall x . P(x)")
+    val fm = parseOk("forall x . P(x)")
     val freeVars = fvFOL(fm)
     assert(!freeVars.contains("x"))
   }
   
   test("fvFOL: forall with free variable") {
-    val fm = FOLParser.parse("forall x . P(x, y)")
+    val fm = parseOk("forall x . P(x, y)")
     val freeVars = fvFOL(fm)
     assert(!freeVars.contains("x"))
     assert(freeVars.contains("y"))
   }
   
   test("fvFOL: exists removes bound variable") {
-    val fm = FOLParser.parse("exists x . P(x)")
+    val fm = parseOk("exists x . P(x)")
     val freeVars = fvFOL(fm)
     assert(!freeVars.contains("x"))
   }
   
   test("fvFOL: nested quantifiers") {
-    val fm = FOLParser.parse("forall x . exists y . P(x, y, z)")
+    val fm = parseOk("forall x . exists y . P(x, y, z)")
     val freeVars = fvFOL(fm)
     assert(!freeVars.contains("x"))
     assert(!freeVars.contains("y"))
@@ -124,7 +128,7 @@ class FOLUtilSpec extends FunSuite:
   }
   
   test("fvFOL: complex formula") {
-    val fm = FOLParser.parse("forall x . P(x) ==> exists y . Q(x, y, z)")
+    val fm = parseOk("forall x . P(x) ==> exists y . Q(x, y, z)")
     val freeVars = fvFOL(fm)
     assert(!freeVars.contains("x"))
     assert(!freeVars.contains("y"))
@@ -132,13 +136,13 @@ class FOLUtilSpec extends FunSuite:
   }
   
   test("fvFOL: no free variables") {
-    val fm = FOLParser.parse("forall x y . P(x, y)")
+    val fm = parseOk("forall x y . P(x, y)")
     val freeVars = fvFOL(fm)
     assertEquals(freeVars, List())
   }
   
   test("fvFOL: relation with arithmetic") {
-    val fm = FOLParser.parse("x + y < z")
+    val fm = parseOk("x + y < z")
     val freeVars = fvFOL(fm)
     assert(freeVars.contains("x"))
     assert(freeVars.contains("y"))
@@ -148,7 +152,7 @@ class FOLUtilSpec extends FunSuite:
   // ==================== Universal Closure ====================
   
   test("generalizeFOL: adds forall for free variables") {
-    val fm = FOLParser.parse("P(x, y)")
+    val fm = parseOk("P(x, y)")
     val closed = generalizeFOL(fm)
     // Should be: forall x y. P(x, y) or forall y x. P(x, y)
     closed match
@@ -158,13 +162,13 @@ class FOLUtilSpec extends FunSuite:
   }
   
   test("generalizeFOL: no change if already closed") {
-    val fm = FOLParser.parse("forall x y . P(x, y)")
+    val fm = parseOk("forall x y . P(x, y)")
     val closed = generalizeFOL(fm)
     assertEquals(closed, fm)
   }
   
   test("generalizeFOL: adds forall only for free vars") {
-    val fm = FOLParser.parse("forall x . P(x, y)")
+    val fm = parseOk("forall x . P(x, y)")
     val closed = generalizeFOL(fm)
     closed match
       case Forall("y", Forall("x", Atom(_))) => // OK
@@ -221,30 +225,30 @@ class FOLUtilSpec extends FunSuite:
   // ==================== Substitution in Formulas ====================
   
   test("subst: substitute in atom") {
-    val fm = FOLParser.parse("P(x)")
+    val fm = parseOk("P(x)")
     val substMap = Map("x" -> Var("y"))
     val result = subst(substMap, fm)
-    assertEquals(result, FOLParser.parse("P(y)"))
+    assertEquals(result, parseOk("P(y)"))
   }
   
   test("subst: substitute in relation") {
-    val fm = FOLParser.parse("x < y")
+    val fm = parseOk("x < y")
     val substMap = Map("x" -> Var("z"))
     val result = subst(substMap, fm)
-    assertEquals(result, FOLParser.parse("z < y"))
+    assertEquals(result, parseOk("z < y"))
   }
   
   test("subst: substitute in conjunction") {
-    val fm = FOLParser.parse("P(x) /\\ Q(y)")
+    val fm = parseOk("P(x) /\\ Q(y)")
     val substMap = Map("x" -> Var("a"), "y" -> Var("b"))
     val result = subst(substMap, fm)
-    assertEquals(result, FOLParser.parse("P(a) /\\ Q(b)"))
+    assertEquals(result, parseOk("P(a) /\\ Q(b)"))
   }
   
   test("subst: variable capture avoidance (OCaml example)") {
     // subst(Map("y" -> Var("x")), forall x. x = y)
     // Should rename bound x to avoid capture
-    val fm = FOLParser.parse("forall x . x = y")
+    val fm = parseOk("forall x . x = y")
     val substMap = Map("y" -> Var("x"))
     val result = subst(substMap, fm)
     
@@ -258,7 +262,7 @@ class FOLUtilSpec extends FunSuite:
   }
   
   test("subst: no renaming if no capture risk") {
-    val fm = FOLParser.parse("forall x . P(x)")
+    val fm = parseOk("forall x . P(x)")
     val substMap = Map("y" -> Var("z"))
     val result = subst(substMap, fm)
     // No y in formula, so no change
@@ -266,15 +270,15 @@ class FOLUtilSpec extends FunSuite:
   }
   
   test("subst: substitute under quantifier") {
-    val fm = FOLParser.parse("forall x . P(x, y)")
+    val fm = parseOk("forall x . P(x, y)")
     val substMap = Map("y" -> Var("z"))
     val result = subst(substMap, fm)
-    assertEquals(result, FOLParser.parse("forall x . P(x, z)"))
+    assertEquals(result, parseOk("forall x . P(x, z)"))
   }
   
   test("subst: complex example with nested quantifiers") {
-    val fm = FOLParser.parse("forall x . exists y . P(x, y, z)")
+    val fm = parseOk("forall x . exists y . P(x, y, z)")
     val substMap = Map("z" -> Var("w"))
     val result = subst(substMap, fm)
-    assertEquals(result, FOLParser.parse("forall x . exists y . P(x, y, w)"))
+    assertEquals(result, parseOk("forall x . exists y . P(x, y, w)"))
   }

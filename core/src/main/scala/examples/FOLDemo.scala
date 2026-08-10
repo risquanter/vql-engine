@@ -5,6 +5,10 @@ import parser.FOLParser
 import printer.FOLPrinter
 import semantics.{Domain, Interpretation, Valuation, Model, FOLSemantics}
 
+/** Demo helper: unwrap a known-valid parse, failing loudly on error. */
+private def parseFol(s: String): Formula[FOL] =
+  FOLParser.parse(s).fold(e => sys.error(s"parse failed: ${e.message}"), identity)
+
 /** Demonstration of First-Order Logic (FOL) System
   * 
   * This file demonstrates all features of the FOL implementation:
@@ -138,28 +142,28 @@ def parsingDemo(): Unit =
   
   // Simple atomic formula
   val input1 = "P(x)"
-  val parsed1 = FOLParser.parse(input1)
+  val parsed1 = parseFol(input1)
   println(s"Input:  $input1")
   println(s"Parsed: ${FOLPrinter.printFormula(parsed1)}")
   println()
   
   // Formula with negation
   val input2 = "~Q(x)"
-  val parsed2 = FOLParser.parse(input2)
+  val parsed2 = parseFol(input2)
   println(s"Input:  $input2")
   println(s"Parsed: ${FOLPrinter.printFormula(parsed2)}")
   println()
   
   // Formula with conjunction
   val input3 = "P(x) /\\ Q(y)"
-  val parsed3 = FOLParser.parse(input3)
+  val parsed3 = parseFol(input3)
   println(s"Input:  $input3")
   println(s"Parsed: ${FOLPrinter.printFormula(parsed3)}")
   println()
   
   // Quantified formula
   val input4 = "forall x. P(x) ==> Q(x)"
-  val parsed4 = FOLParser.parse(input4)
+  val parsed4 = parseFol(input4)
   println(s"Input:  $input4")
   println(s"Parsed: ${FOLPrinter.printFormula(parsed4)}")
   println()
@@ -197,7 +201,7 @@ def printingDemo(): Unit =
   
   // The formula can be parsed back
   val original = "forall x. human(x) ==> exists y. parent(y, x) /\\ human(y)"
-  val parsed = FOLParser.parse(original)
+  val parsed = parseFol(original)
   val roundtrip = FOLPrinter.printFormula(parsed)
   
   println(s"Original string: $original")
@@ -347,7 +351,7 @@ def arithmeticModelDemo(): Unit =
   println("Queries:")
   
   // Parse and evaluate: 2 + 3 = 5
-  val sum = FOLParser.parse("2 + 3 = 5")
+  val sum = parseFol("2 + 3 = 5")
   println(s"  2 + 3 = 5? ${FOLSemantics.holds(sum, model, Valuation(Map.empty))}")
   
   // 4 is even

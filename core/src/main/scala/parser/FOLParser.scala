@@ -1,15 +1,22 @@
 package parser
 
 import logic.{FOL, Formula}
-import lexer.{Lexer, Token}
-import lexer.Lexer.lex
+import lexer.{Lexer, Token, LexerError}
 import parser.Combinators.tokensLabel
 import util.StringUtil.explode
+import scala.util.control.NonFatal
 
-/** Complete FOL parser API
+/** Complete FOL parser API.
   *
   * Public entry point that wires together the lexer, term parser, formula
   * parser, and FOL atom parser.
+  *
+  * The string-input entries return `Either[ParseError, Formula[FOL]]`: a
+  * single `try/catch` at each entry converts the foundation's internal
+  * backtracking exceptions (ADR-007 C2/C12) into a typed value, so no
+  * exception escapes the public API. The failure is classified into a
+  * [[ParseError]] variant — `Lex`, `Trailing`, or `Syntax`. `parseTokens`
+  * keeps the combinator tuple shape (C1) for callers that lex themselves.
   *
   * OCaml equivalent:
   *   let parse = make_parser (parse_formula (parse_infix_atom,parse_atom) [])
@@ -17,22 +24,35 @@ import util.StringUtil.explode
   */
 object FOLParser:
 
-  /** Parse FOL formula from string. */
-  def parse(s: String): Formula[FOL] =
-    FOLAtomParser.parseFromString(s)
+  /** Parse an FOL formula from a string, using the default lexer. */
+  def parse(s: String): Either[ParseError, Formula[FOL]] =
+    parseWithLexer(s, Lexer.lex)
 
-  /** Alternative name for parse (for familiarity with OCaml code) */
-  def defaultParser(s: String): Formula[FOL] = parse(s)
+  /** Alternative name for [[parse]] (mirrors the OCaml `default_parser`). */
+  def defaultParser(s: String): Either[ParseError, Formula[FOL]] = parse(s)
 
-  /** Parse from token list (useful for testing or custom lexing) */
+  /** Parse from a token list — combinator entry, tuple shape (ADR-007 C1). */
   def parseTokens(tokens: List[Token]): (Formula[FOL], List[Token]) =
     FOLAtomParser.parse(tokens)
 
-  /** Parse with custom lexer (for advanced use cases) */
-  def parseWithLexer(s: String, lexer: List[Char] => List[Token]): Formula[FOL] =
-    val tokens = lexer(explode(s))
-    val (result, rest) = parseTokens(tokens)
-    if rest.isEmpty then
-      result
-    else
-      throw new Exception(s"Unparsed input: ${tokensLabel(rest)}")
+  /** Parse with a custom lexer.
+    *
+    * `Left(ParseError.Lex)` on a lexer error, `Left(ParseError.Trailing)` when
+    * a formula parses but tokens remain, `Left(ParseError.Syntax)` on any other
+    * parse failure.
+    */
+  def parseWithLexer(
+    s: String,
+    lexer: List[Char] => List[Token]
+  ): Either[ParseError, Formula[FOL]] =
+    try
+      val tokens = lexer(explode(s))
+      val (result, rest) = parseTokens(tokens)
+      if rest.isEmpty then Right(result)
+      else Left(ParseError.Trailing(tokensLabel(rest)))
+    catch
+      case e: LexerError => Left(ParseError.Lex(detailOf(e)))
+      case NonFatal(e)   => Left(ParseError.Syntax(detailOf(e)))
+
+  private def detailOf(e: Throwable): String =
+    Option(e.getMessage).getOrElse(e.getClass.getSimpleName)

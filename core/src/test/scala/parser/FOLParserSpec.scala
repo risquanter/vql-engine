@@ -7,32 +7,36 @@ import logic.Formula.*
 import parser.FOLParser
 
 class FOLParserSpec extends FunSuite:
-  
+
+  /** Unwrap a parse expected to succeed. */
+  private def parseOk(s: String): Formula[FOL] =
+    FOLParser.parse(s).fold(e => fail(s"parse failed: ${e.message}"), identity)
+
   test("parse simple predicate") {
-    val formula = FOLParser.parse("P(x)")
+    val formula = parseOk("P(x)")
     assertEquals(formula, Atom(FOL("P", List(Var("x")))))
   }
-  
+
   test("parse infix relation") {
-    val formula = FOLParser.parse("x < y")
+    val formula = parseOk("x < y")
     assertEquals(formula, Atom(FOL("<", List(Var("x"), Var("y")))))
   }
-  
+
   test("parse quantified formula") {
-    val formula = FOLParser.parse("forall x . P(x)")
+    val formula = parseOk("forall x . P(x)")
     assertEquals(formula, Forall("x", Atom(FOL("P", List(Var("x"))))))
   }
-  
+
   test("parse complex formula from documentation") {
-    val formula = FOLParser.parse("forall x. exists y. x < y")
+    val formula = parseOk("forall x. exists y. x < y")
     assertEquals(
       formula,
       Forall("x", Exists("y", Atom(FOL("<", List(Var("x"), Var("y"))))))
     )
   }
-  
+
   test("parse formula with conjunction and implication") {
-    val formula = FOLParser.parse("P(x) /\\ Q(y) ==> R(x, y)")
+    val formula = parseOk("P(x) /\\ Q(y) ==> R(x, y)")
     assertEquals(
       formula,
       Imp(
@@ -44,9 +48,9 @@ class FOLParserSpec extends FunSuite:
       )
     )
   }
-  
+
   test("parse arithmetic relation") {
-    val formula = FOLParser.parse("2 * x + 3 = y")
+    val formula = parseOk("2 * x + 3 = y")
     assertEquals(
       formula,
       Atom(FOL("=", List(
@@ -58,14 +62,14 @@ class FOLParserSpec extends FunSuite:
       )))
     )
   }
-  
+
   test("parse with true/false constants") {
-    val formula = FOLParser.parse("P(x) \\/ false")
+    val formula = parseOk("P(x) \\/ false")
     assertEquals(formula, Or(Atom(FOL("P", List(Var("x")))), False))
   }
-  
+
   test("parse nested quantifiers") {
-    val formula = FOLParser.parse("forall x y. exists z. x < z /\\ y < z")
+    val formula = parseOk("forall x y. exists z. x < z /\\ y < z")
     assertEquals(
       formula,
       Forall("x", Forall("y", Exists("z",
@@ -76,14 +80,14 @@ class FOLParserSpec extends FunSuite:
       )))
     )
   }
-  
+
   test("parse negation") {
-    val formula = FOLParser.parse("~ P(x)")
+    val formula = parseOk("~ P(x)")
     assertEquals(formula, Not(Atom(FOL("P", List(Var("x"))))))
   }
-  
+
   test("parse bi-implication") {
-    val formula = FOLParser.parse("P(x) <=> Q(x)")
+    val formula = parseOk("P(x) <=> Q(x)")
     assertEquals(
       formula,
       Iff(
@@ -92,12 +96,15 @@ class FOLParserSpec extends FunSuite:
       )
     )
   }
-  
-  test("defaultParser works") {
-    val formula = FOLParser.defaultParser("P(x)")
-    assertEquals(formula, Atom(FOL("P", List(Var("x")))))
+
+  test("parse returns Right for valid input") {
+    assertEquals(FOLParser.parse("P(x)"), Right(Atom(FOL("P", List(Var("x"))))))
   }
-  
+
+  test("defaultParser returns Right for valid input") {
+    assertEquals(FOLParser.defaultParser("P(x)"), Right(Atom(FOL("P", List(Var("x"))))))
+  }
+
   test("parseTokens returns remaining tokens") {
     import lexer.Token.*
     val tokens = List(Word("P"), LParen, Word("x"), RParen, Word("extra"))
@@ -105,7 +112,7 @@ class FOLParserSpec extends FunSuite:
     assertEquals(formula, Atom(FOL("P", List(Var("x")))))
     assertEquals(rest, List(Word("extra")))
   }
-  
+
   test("parseTokens with empty remaining") {
     import lexer.Token.*
     val tokens = List(Word("P"), LParen, Word("x"), RParen)
@@ -113,28 +120,53 @@ class FOLParserSpec extends FunSuite:
     assertEquals(formula, Atom(FOL("P", List(Var("x")))))
     assertEquals(rest, List())
   }
-  
-  test("fail on unparsed input") {
-    intercept[Exception] {
-      FOLParser.parse("P(x) )")
-    }
+
+  // ── Either error contract: no exception escapes the string entries ──
+
+  test("parse returns Left (Trailing) on unparsed trailing input") {
+    FOLParser.parse("P(x) )") match
+      case Left(ParseError.Trailing(rem)) => assert(rem.nonEmpty)
+      case other                          => fail(s"expected Left(Trailing), got $other")
   }
-  
-  test("fail on empty input") {
-    intercept[Exception] {
-      FOLParser.parse("")
-    }
+
+  test("parse returns Left (Syntax) on empty input") {
+    FOLParser.parse("") match
+      case Left(ParseError.Syntax(_)) => ()
+      case other                      => fail(s"expected Left(Syntax), got $other")
   }
-  
-  test("fail on incomplete quantifier") {
-    intercept[Exception] {
-      FOLParser.parse("forall x")
-    }
+
+  test("parse returns Left (Lex) on lexer error") {
+    FOLParser.parse("\"unterminated") match
+      case Left(ParseError.Lex(_)) => ()
+      case other                   => fail(s"expected Left(Lex), got $other")
   }
-  
+
+  test("parse returns Left on incomplete quantifier") {
+    assert(FOLParser.parse("forall x").isLeft)
+  }
+
+  test("defaultParser returns Left on malformed input") {
+    assert(FOLParser.defaultParser("forall x").isLeft)
+  }
+
+  test("parseWithLexer returns Right for valid input") {
+    val result = FOLParser.parseWithLexer("P(x)", lexer.Lexer.lex)
+    assertEquals(result, Right(Atom(FOL("P", List(Var("x"))))))
+  }
+
+  test("parseWithLexer returns Left (Trailing) with remaining on trailing input") {
+    FOLParser.parseWithLexer("P(x) extra", lexer.Lexer.lex) match
+      case Left(ParseError.Trailing(rem)) => assert(rem.nonEmpty)
+      case other                          => fail(s"expected Left(Trailing), got $other")
+  }
+
+  test("parseWithLexer returns Left on malformed input") {
+    assert(FOLParser.parseWithLexer("forall x", lexer.Lexer.lex).isLeft)
+  }
+
   test("parse real-world example: transitivity of less-than") {
     // forall x y z. x < y /\ y < z ==> x < z
-    val formula = FOLParser.parse("forall x y z . x < y /\\ y < z ==> x < z")
+    val formula = parseOk("forall x y z . x < y /\\ y < z ==> x < z")
     assertEquals(
       formula,
       Forall("x", Forall("y", Forall("z",
@@ -148,10 +180,10 @@ class FOLParserSpec extends FunSuite:
       )))
     )
   }
-  
+
   test("parse real-world example: existence of intermediate element") {
     // forall x y. x < y ==> exists z. x < z /\ z < y
-    val formula = FOLParser.parse("forall x y . x < y ==> exists z . x < z /\\ z < y")
+    val formula = parseOk("forall x y . x < y ==> exists z . x < z /\\ z < y")
     assertEquals(
       formula,
       Forall("x", Forall("y",
@@ -167,9 +199,9 @@ class FOLParserSpec extends FunSuite:
       ))
     )
   }
-  
+
   test("parse equality with function symbols") {
-    val formula = FOLParser.parse("f(x) = g(y, z)")
+    val formula = parseOk("f(x) = g(y, z)")
     assertEquals(
       formula,
       Atom(FOL("=", List(
@@ -178,9 +210,9 @@ class FOLParserSpec extends FunSuite:
       )))
     )
   }
-  
+
   test("parse complex arithmetic: (x + y) * z = w") {
-    val formula = FOLParser.parse("( x + y ) * z = w")
+    val formula = parseOk("( x + y ) * z = w")
     assertEquals(
       formula,
       Atom(FOL("=", List(

@@ -17,6 +17,10 @@ import parser.FOLParser
   * Uses integer arithmetic as the primary test domain.
   */
 class FOLSemanticsSpec extends FunSuite:
+
+  /** Unwrap a parse expected to succeed. */
+  private def parseOk(s: String): Formula[FOL] =
+    FOLParser.parse(s).fold(e => fail(s"parse failed: ${e.message}"), identity)
   
   // ==================== Helper: Setup Test Model ====================
   
@@ -111,37 +115,37 @@ class FOLSemanticsSpec extends FunSuite:
   
   test("holds: equality true") {
     val v = Valuation(Map("x" -> 5))
-    val fm = FOLParser.parse("x = 5")
+    val fm = parseOk("x = 5")
     assert(holds(fm, intModel, v))
   }
   
   test("holds: equality false") {
     val v = Valuation(Map("x" -> 5))
-    val fm = FOLParser.parse("x = 7")
+    val fm = parseOk("x = 7")
     assert(!holds(fm, intModel, v))
   }
   
   test("holds: less than true") {
     val v = Valuation(Map("x" -> 3, "y" -> 5))
-    val fm = FOLParser.parse("x < y")
+    val fm = parseOk("x < y")
     assert(holds(fm, intModel, v))
   }
   
   test("holds: less than false") {
     val v = Valuation(Map("x" -> 5, "y" -> 3))
-    val fm = FOLParser.parse("x < y")
+    val fm = parseOk("x < y")
     assert(!holds(fm, intModel, v))
   }
   
   test("holds: unary predicate") {
     val v = Valuation(Map("x" -> 4))
-    val fm = FOLParser.parse("even(x)")
+    val fm = parseOk("even(x)")
     assert(holds(fm, intModel, v))
   }
   
   test("holds: unary predicate false") {
     val v = Valuation(Map("x" -> 3))
-    val fm = FOLParser.parse("even(x)")
+    val fm = parseOk("even(x)")
     assert(!holds(fm, intModel, v))
   }
   
@@ -149,55 +153,55 @@ class FOLSemanticsSpec extends FunSuite:
   
   test("holds: negation") {
     val v = Valuation(Map("x" -> 5))
-    val fm = FOLParser.parse("~(x < 3)")
+    val fm = parseOk("~(x < 3)")
     assert(holds(fm, intModel, v))
   }
   
   test("holds: conjunction true") {
     val v = Valuation(Map("x" -> 4))
-    val fm = FOLParser.parse("x > 0 /\\ even(x)")
+    val fm = parseOk("x > 0 /\\ even(x)")
     assert(holds(fm, intModel, v))
   }
   
   test("holds: conjunction false") {
     val v = Valuation(Map("x" -> 3))
-    val fm = FOLParser.parse("x > 0 /\\ even(x)")
+    val fm = parseOk("x > 0 /\\ even(x)")
     assert(!holds(fm, intModel, v))
   }
   
   test("holds: disjunction true") {
     val v = Valuation(Map("x" -> 3))
-    val fm = FOLParser.parse("even(x) \\/ odd(x)")
+    val fm = parseOk("even(x) \\/ odd(x)")
     assert(holds(fm, intModel, v))
   }
   
   test("holds: implication true (consequent true)") {
     val v = Valuation(Map("x" -> 4))
-    val fm = FOLParser.parse("even(x) ==> x > 0")
+    val fm = parseOk("even(x) ==> x > 0")
     assert(holds(fm, intModel, v))
   }
   
   test("holds: implication true (antecedent false)") {
     val v = Valuation(Map("x" -> 3))
-    val fm = FOLParser.parse("even(x) ==> x < 0")
+    val fm = parseOk("even(x) ==> x < 0")
     assert(holds(fm, intModel, v))  // Vacuously true
   }
   
   test("holds: implication false") {
     val v = Valuation(Map("x" -> -2))
-    val fm = FOLParser.parse("even(x) ==> x > 0")
+    val fm = parseOk("even(x) ==> x > 0")
     assert(!holds(fm, intModel, v))
   }
   
   test("holds: iff true") {
     val v = Valuation(Map("x" -> 4))
-    val fm = FOLParser.parse("even(x) <=> ~odd(x)")
+    val fm = parseOk("even(x) <=> ~odd(x)")
     assert(holds(fm, intModel, v))
   }
   
   test("holds: iff false") {
     val v = Valuation(Map("x" -> 3))
-    val fm = FOLParser.parse("even(x) <=> odd(x)")
+    val fm = parseOk("even(x) <=> odd(x)")
     assert(!holds(fm, intModel, v))
   }
   
@@ -205,49 +209,49 @@ class FOLSemanticsSpec extends FunSuite:
   
   test("holds: forall true") {
     // forall x. x = x (everything equals itself)
-    val fm = FOLParser.parse("forall x. x = x")
+    val fm = parseOk("forall x. x = x")
     assert(holds(fm, intModel, emptyVal))
   }
   
   test("holds: forall false") {
     // forall x. x > 0 (not all numbers are positive in [-5, 5])
-    val fm = FOLParser.parse("forall x. x > 0")
+    val fm = parseOk("forall x. x > 0")
     assert(!holds(fm, intModel, emptyVal))
   }
   
   test("holds: exists true") {
     // exists x. x > 3 (there exists a number greater than 3)
-    val fm = FOLParser.parse("exists x. x > 3")
+    val fm = parseOk("exists x. x > 3")
     assert(holds(fm, intModel, emptyVal))
   }
   
   test("holds: exists false") {
     // exists x. x > 10 (no number in [-5, 5] is greater than 10)
-    val fm = FOLParser.parse("exists x. x > 10")
+    val fm = parseOk("exists x. x > 10")
     assert(!holds(fm, intModel, emptyVal))
   }
   
   test("holds: nested quantifiers") {
     // forall x. exists y. y > x (for every x, there's a larger y)
-    val fm = FOLParser.parse("forall x. exists y. y > x")
+    val fm = parseOk("forall x. exists y. y > x")
     assert(!holds(fm, intModel, emptyVal))  // False: 5 is max in our domain
   }
   
   test("holds: nested quantifiers 2") {
     // exists x. forall y. x <= y (exists a minimum)
-    val fm = FOLParser.parse("exists x. forall y. x <= y")
+    val fm = parseOk("exists x. forall y. x <= y")
     assert(holds(fm, intModel, emptyVal))  // True: -5 is minimum
   }
   
   test("holds: quantifier with conjunction") {
     // forall x. even(x) ==> x + 1 = x + 1
-    val fm = FOLParser.parse("forall x. even(x) ==> x + 1 = x + 1")
+    val fm = parseOk("forall x. even(x) ==> x + 1 = x + 1")
     assert(holds(fm, intModel, emptyVal))
   }
   
   test("holds: existential with bound variable") {
     // exists x. x > 0 /\\ even(x)
-    val fm = FOLParser.parse("exists x. x > 0 /\\ even(x)")
+    val fm = parseOk("exists x. x > 0 /\\ even(x)")
     assert(holds(fm, intModel, emptyVal))  // 2, 4 satisfy this
   }
   
@@ -255,32 +259,32 @@ class FOLSemanticsSpec extends FunSuite:
   
   test("holds: arithmetic properties") {
     // forall x. x + 0 = x
-    val fm = FOLParser.parse("forall x. x + 0 = x")
+    val fm = parseOk("forall x. x + 0 = x")
     assert(holds(fm, intModel, emptyVal))
   }
   
   test("holds: commutativity") {
     // forall x. forall y. x + y = y + x
-    val fm = FOLParser.parse("forall x. forall y. x + y = y + x")
+    val fm = parseOk("forall x. forall y. x + y = y + x")
     assert(holds(fm, intModel, emptyVal))
   }
   
   test("holds: transitivity of less than") {
     // forall x y z. (x < y /\\ y < z) ==> x < z
-    val fm = FOLParser.parse("forall x. forall y. forall z. (x < y /\\ y < z) ==> x < z")
+    val fm = parseOk("forall x. forall y. forall z. (x < y /\\ y < z) ==> x < z")
     assert(holds(fm, intModel, emptyVal))
   }
   
   test("holds: complex predicate logic") {
     // exists x. (x > 0 /\\ even(x) /\\ x < 5)
-    val fm = FOLParser.parse("exists x. (x > 0 /\\ even(x) /\\ x < 5)")
+    val fm = parseOk("exists x. (x > 0 /\\ even(x) /\\ x < 5)")
     assert(holds(fm, intModel, emptyVal))  // x = 2 or x = 4
   }
   
   test("holds: de Morgan's law (semantic version)") {
     val v = Valuation(Map("x" -> 3))
-    val fm1 = FOLParser.parse("~(even(x) /\\ x > 5)")
-    val fm2 = FOLParser.parse("~even(x) \\/ ~(x > 5)")
+    val fm1 = parseOk("~(even(x) /\\ x > 5)")
+    val fm2 = parseOk("~even(x) \\/ ~(x > 5)")
     assertEquals(holds(fm1, intModel, v), holds(fm2, intModel, v))
   }
   
@@ -288,9 +292,9 @@ class FOLSemanticsSpec extends FunSuite:
   
   test("entailment: simple case") {
     // P(x), P(x) ==> Q(x) ⊨ Q(x)
-    val p1 = FOLParser.parse("even(x)")
-    val p2 = FOLParser.parse("even(x) ==> x > -10")
-    val conclusion = FOLParser.parse("x > -10")
+    val p1 = parseOk("even(x)")
+    val p2 = parseOk("even(x) ==> x > -10")
+    val conclusion = parseOk("x > -10")
     
     val v = Valuation(Map("x" -> 4))
     val model = Model(intModel.interpretation)
@@ -305,10 +309,10 @@ class FOLSemanticsSpec extends FunSuite:
     // If we have P and P ==> Q, then we can derive Q
     val v = Valuation(Map("x" -> 4))
     val premises = List(
-      FOLParser.parse("x = 4"),
-      FOLParser.parse("x = 4 ==> even(x)")
+      parseOk("x = 4"),
+      parseOk("x = 4 ==> even(x)")
     )
-    val conclusion = FOLParser.parse("even(x)")
+    val conclusion = parseOk("even(x)")
     
     // Check manually that premises imply conclusion
     assert(holds(premises(0), intModel, v))
@@ -337,9 +341,9 @@ class FOLSemanticsSpec extends FunSuite:
   test("integer model: predicates") {
     val v = Valuation(Map("x" -> 4))
     
-    assert(holds(FOLParser.parse("even(x)"), intModel, v))
-    assert(!holds(FOLParser.parse("odd(x)"), intModel, v))
-    assert(holds(FOLParser.parse("positive(x)"), intModel, v))
+    assert(holds(parseOk("even(x)"), intModel, v))
+    assert(!holds(parseOk("odd(x)"), intModel, v))
+    assert(holds(parseOk("positive(x)"), intModel, v))
   }
   
   // ==================== Boolean Model Tests ====================
@@ -369,7 +373,7 @@ class FOLSemanticsSpec extends FunSuite:
     )
     val singleModel = Model(singleInterp)
     
-    val fm = FOLParser.parse("forall x. P(x)")
+    val fm = parseOk("forall x. P(x)")
     assert(holds(fm, singleModel, emptyVal))
   }
   
@@ -387,12 +391,12 @@ class FOLSemanticsSpec extends FunSuite:
   test("formula with mixed bound and free variables") {
     val v = Valuation(Map("y" -> 3))
     // exists x. x + y = 5
-    val fm = FOLParser.parse("exists x. x + y = 5")
+    val fm = parseOk("exists x. x + y = 5")
     assert(holds(fm, intModel, v))  // x = 2, y = 3 satisfies this
   }
   
   test("double negation") {
     val v = Valuation(Map("x" -> 4))
-    val fm = FOLParser.parse("~(~even(x))")
-    assertEquals(holds(fm, intModel, v), holds(FOLParser.parse("even(x)"), intModel, v))
+    val fm = parseOk("~(~even(x))")
+    assertEquals(holds(fm, intModel, v), holds(parseOk("even(x)"), intModel, v))
   }
