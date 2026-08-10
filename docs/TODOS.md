@@ -229,3 +229,69 @@ TimeoutError, ConfigError`.
 
 **Context:** analysis of 2026-08-10 (after PLAN-range Phase 1). See also
 `docs/scratch/register-breaking-changes-2026-08-10.md`.
+
+---
+
+## T-009 — Evaluator short-circuit and dispatcher-error masking under non-total models (investigation)
+
+**Status:** PENDING — investigation. Surfaced by the Phase 3 complex review
+(2026-08-10, `PLAN-range-formula-and-satisfying-set.md`).
+
+**Observation:** `TypedSemantics.evalFormula` short-circuits `And`/`Or`/`Imp`
+and the `∀`/`∃` folds. When a dispatcher raises `Left(EvaluationError)` for some
+atom or binding, whether that error surfaces depends on whether short-circuiting
+reaches it:
+- In `And(p, q)` the error on `q(d)` is masked when `p(d)` is false — driven by a
+  model value, so deterministic per `(model, element)`: the same model always
+  yields the same result. Not a cross-client discrepancy.
+- In an inner quantifier `∃a . r(x, a)`, whether an erroring binding of `a`
+  surfaces depends on the iteration order of `a`'s domain (`domain.toList`, i.e.
+  `Set` order) — a non-semantic detail. Deterministic and cross-platform stable
+  for content-`hashCode` carriers (`String`/`Long`/`Double`, all register uses);
+  an identity-`hashCode` carrier would make it order-unstable (shared root cause
+  with [T-010]).
+
+**Why it is not a bug today:** every range/scope predicate register uses is
+total (error-free) over the active domain, and its carriers are content-hashed.
+The set-algebra reading of a range formula is exact precisely on total models.
+
+**To investigate:** whether to add an "error-strict" evaluation mode that
+surfaces any dispatcher error regardless of short-circuit (making a non-total
+model a hard failure rather than a data- or order-dependent one), or to keep the
+current short-circuit contract and document range/scope-predicate totality as a
+precondition. ADR-017 §7 records the current behavior; this task decides whether
+to change it.
+
+**Context:** Phase 3 complex review findings 3 and 4;
+`fol/typed/TypedSemantics.scala` `evalFormula`. See also T-010.
+
+---
+
+## T-010 — HDR sample subset determinism depends on `Set` iteration order (investigation, low priority)
+
+**Status:** PENDING — investigation, LOW priority. Sampling is not exercised in
+practice today (register evaluates with `SamplingParams.exact`), but the gap
+should be known and fixed. Surfaced by the Phase 3 complex review (2026-08-10).
+
+**Observation:** `HDRSampler.sample` builds `population.toArray` and runs a
+partial Fisher-Yates shuffle with the deterministic HDR PRNG. The PRNG is
+reproducible, but the array is materialised in `Set` iteration order, so the
+*selected subset* is reproducible only when the element `hashCode` is
+content-based. With a `Value.raw` carrier using identity `hashCode`, two runs on
+identical inputs can select different subsets — contradicting `HDRSampler`'s
+scaladoc ("reproducible … across all platforms") and ADR-003's cross-platform
+reproducibility guarantee.
+
+**Why low priority:** the only sampled path is scope estimation under non-exact
+`SamplingParams`, which no current consumer uses; and the carriers in use
+(`String`/`Long`/`Double`) are content-hashed, so the guarantee holds for them.
+It bites only a future consumer that both samples and uses an identity-`hashCode`
+carrier.
+
+**To investigate / fix:** impose a stable total order on the population before
+`toArray` (e.g. sort by a stable key derived from `Value`), or document and
+enforce a hard precondition that sampled carriers have content-based `hashCode`.
+Shared root cause with T-009.
+
+**Context:** Phase 3 complex review finding 5; `fol/sampling/HDRSampler.scala`
+`sample`/`toArray`; ADR-003 (reproducibility claim). See also T-009.

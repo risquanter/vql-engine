@@ -106,3 +106,18 @@ Plus the matching cases in `FolQueryFailureFromQueryErrorSpec.scala`
 (~45, 67, 160, 167, 174, 181, 200, 207, 235, 242).
 
 When T-008 lands, register removes those arms + tests in the same upgrade.
+
+---
+
+## 6. `BoundQuery.range` widened to `BoundFormula` — NO register action
+
+Phase 3 changed the typed-IL field `BoundQuery.range` from `BoundAtom` to
+`BoundFormula` (a single-atom range is now `BoundFormula.Atom`). This is
+source-breaking only for a consumer that constructs or pattern-matches
+`BoundQuery` directly. Register does neither — it reaches the engine through
+`VagueQueryParser.parse` and `VagueSemantics.evaluateTyped`, and its one
+`QueryBinder.bind` test call uses the result opaquely — so nothing breaks.
+
+Listed here for the 0.11.0 changelog (AC-10): both this `BoundQuery.range` type
+change and the `ParsedQuery` single-atom construction break (lands in Phase 4)
+are source-breaking for direct IR consumers and must appear in the changelog.

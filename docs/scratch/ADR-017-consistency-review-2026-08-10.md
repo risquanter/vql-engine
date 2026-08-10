@@ -93,9 +93,12 @@ Line references are as of 2026-08-10 and may drift.
 3. **Query Syntax table (~line 72).** Row `| Range | FOL atom | country(x),
    risk_in_project(x, "Alpha") |` → `| Range | FOL formula | country(x),
    ~patched(x) /\ facing(x) |`.
-4. **Paper-to-code map (~line 120).** Row `| R(x, y') | range: FOL (in
-   ParsedQuery) | fol.logic |` → `range: Formula[FOL]`. The `D_R` /
-   `collectRangeElements` rows (~123, ~134) stay accurate.
+4. **Paper-to-code map (~lines 120, 134).** Row `| R(x, y') | range: FOL (in
+   ParsedQuery) | fol.logic |` → `range: Formula[FOL]`. The `D_R` row (~123)
+   stays accurate. The `collectRangeElements` row (~134) needs its argument
+   list corrected — it shows `collectRangeElements(query, model, env)` but the
+   actual signature is `collectRangeElements(query, model, baseEnv,
+   rootDomain)`, and Phase 3 switches its body from `evalAtom` to `evalFormula`.
 5. **Variable scoping rules (~lines 186–194).** Restate over free variables
    (`fvFOL`): (a) the quantified variable must occur **free** in the range;
    (b) other free range variables must be answer variables. Replace the
