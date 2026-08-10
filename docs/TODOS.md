@@ -136,9 +136,13 @@ super-typeclass.
 
 ---
 
-## T-006 — Evaluate retiring the untyped evaluation backend
+## T-006 — Retire the untyped evaluation backend
 
-**Status:** PROPOSED — needs evaluation (raised from register-side findings).
+**Status:** ✅ DECIDED — retirement (user ruling 2026-08-10). Executed as
+Phase 0 of `docs/PLAN-range-formula-and-satisfying-set.md` (deletion
+inventory in that plan's §4.1; ADR-005/008/009/010 move to Deprecated).
+Mark DONE when that phase lands. The evaluation context below is preserved
+for the record.
 
 **Context:** The untyped evaluation backend — `fol.semantics.VagueSemantics.holds`/`evaluate`,
 `fol.semantics.RangeExtractor` (`buildPattern` / `DomainExtraction`), and the

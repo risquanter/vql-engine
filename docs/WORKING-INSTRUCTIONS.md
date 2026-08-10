@@ -1,6 +1,6 @@
 # Working Instructions
 
-This document defines the working protocol for implementing the ADR proposals.
+This document defines the working protocol for all changes in this repository.
 
 ---
 
@@ -24,20 +24,22 @@ This document defines the working protocol for implementing the ADR proposals.
 
 ## Code Standards
 
-### Scala / ZIO
+### Scala
 
-- Code must be **idiomatic Scala 3** with ZIO 2.x patterns
+- Code must be **idiomatic Scala 3** (except the OCaml-ported foundation
+  layer, which ADR-007 preserves in its ported style)
 - Follow existing codebase conventions (check existing files for style)
-- Use ZIO Prelude types where applicable (`Identity`, `Validation`, etc.)
-- Prefer `for` comprehensions for ZIO effect composition
-- Use Iron refined types for domain validation (per ADR-001)
+- Construction invariants via `require`, state-dependent failures via
+  `Either[QueryError, A]` (per ADR-012)
 
-### OCaml
+### OCaml-Ported Core (ADR-007)
 
-- **Minimize OCaml code** — prefer using Irmin as an external service
-- Only write OCaml if absolutely necessary for Irmin integration
-- **Notify user before generating OCaml** — will establish OCaml-specific preferences at that time
-- Goal: Irmin exposes GraphQL API; ZIO consumes it as a client
+- Files in ADR-007's scope tables (Tiers 1–3) keep their ported style:
+  exception backtracking, tuple-threaded parsers, list-as-set operations
+- Any change to those files is benchmarked against characteristics C1–C13;
+  breaking a characteristic requires explicit justification and user approval
+- Verbatim OCaml scaladoc comments are the traceability link to Harrison's
+  textbook — never delete or paraphrase them
 
 ---
 
@@ -101,37 +103,38 @@ After implementing changes, agent must:
 
 At each phase, validate implementation against:
 
-1. **Accepted ADRs** (currently implemented):
-   - ADR-001: Validation with Iron types & smart constructors
-   - ADR-002: Logging strategy (ZIO logging + OpenTelemetry)
-   - ADR-003: Provenance & reproducibility (HDR seeds)
-   - ADR-009: Compositional Risk Aggregation via Identity
-   - ADR-010: Error Handling Strategy (hybrid error channels)
-   - ADR-011: Import Conventions (top-level imports, no FQNs)
+1. **Accepted ADRs**:
+   - ADR-001: Many-Sorted Query Binding — typed IL compilation
+   - ADR-002: Parser-Combinator Style
+   - ADR-003: HDR Deterministic Sampling
+   - ADR-004: Tagless Initial Architecture
+   - ADR-005: Model Augmentation via Functional Composition
+   - ADR-006: ADT Encoding (`enum` vs `sealed trait`)
+   - ADR-007: Preserve OCaml-Ported Parser Combinator Core
+   - ADR-008: Domain Type Safety — Generic `KnowledgeBase[D]`
+   - ADR-009: Symmetric Relation Support via Schema Metadata
+   - ADR-010: Typed Relation Names — `RelationName` Opaque Type
+   - ADR-012: Error Channel Policy — `require` vs `Either`
+   - ADR-014: Domain Type Quantifiability
+   - ADR-015: Symmetric Value Boundaries
 
-2. **Proposals being implemented** (validate as they're accepted):
-   - ADR-004a-proposal: Persistence Architecture (SSE)
-   - ADR-004b-proposal: Persistence Architecture (WebSocket)
-   - ADR-005-proposal: Cached Subtree Aggregates
-   - ADR-006-proposal: Real-Time Collaboration
-   - ADR-007-proposal: Scenario Branching
-   - ADR-008-proposal: Error Handling & Resilience
-   - ADR-012: Service Mesh Strategy (Istio Ambient Mode)
+2. **Proposed ADRs** (validate once accepted):
+   - ADR-016: Carrier Witness on Symmetric Value Typeclasses
+
+   (ADR-00X is the meta template governing ADR structure.)
 
 ### ADR Lifecycle
 
 ```
 Proposal → Implementation → Review → Accepted
                 ↓
-         (rename -proposal.md to .md)
-         (update Status: Accepted)
+         (update Status: Accepted, add date)
 ```
 
 When a phase completes and its ADR is validated:
-1. Remove `-proposal` suffix from filename
-2. Update status from "Proposed" to "Accepted"
-3. Add acceptance date
-4. Include in validation set for subsequent phases
+1. Update status from "Proposed" to "Accepted" in the ADR header (per ADR-00X)
+2. Add the acceptance date
+3. Include in validation set for subsequent phases
 
 ---
 
@@ -146,19 +149,12 @@ When a phase completes and its ADR is validated:
 
 ### Dependency Order
 
-Implement in order of dependencies:
-1. Foundation (error types, data models)
-2. Infrastructure (clients, connections)
-3. Services (business logic)
-4. API layer (endpoints, SSE/WebSocket)
-5. Frontend integration
-
-### Irmin Strategy
-
-- Treat Irmin as **external service** with GraphQL API
-- ZIO backend is a **GraphQL client** to Irmin
-- Avoid embedding OCaml in Scala build
-- If Irmin requires custom schema or resolvers → notify user for OCaml discussion
+Implement in order of dependencies (matches the ADR-004 layering):
+1. Foundation (`logic/`, `parser/`, `lexer/`, `semantics/`, `printer/` — ADR-007 scope; rarely touched)
+2. Vague-layer core (`fol/datastore`, `fol/quantifier`, `fol/sampling`, `fol/error`)
+3. Typed pipeline (`fol/typed`: catalog, binder, evaluator, model)
+4. Facade (`fol/semantics/VagueSemantics`) and examples
+5. Docs (ADRs, `VagueQuantifiers.md`, `README.md`)
 
 ---
 
@@ -176,17 +172,18 @@ Implement in order of dependencies:
 [Which proposals this implements]
 
 ### ADR Compliance Review (Planning Phase)
-**Reviewed ADRs:** ADR-001, ADR-002, ADR-003, ADR-009, ADR-010, ADR-011
+**Reviewed ADRs:** [all accepted ADRs; list those materially touched]
 **Deviations detected:** None / [List of deviations with decisions required]
 **Alignment notes:** [How this phase aligns with existing ADRs]
 
 ### Validation Checklist
-- [ ] Compliant with ADR-001 (Iron types)
-- [ ] Compliant with ADR-002 (Logging)
-- [ ] Compliant with ADR-003 (Provenance)
-- [ ] Compliant with ADR-009 (Identity aggregation)
-- [ ] Compliant with ADR-010 (Error handling)
-- [ ] Compliant with ADR-011 (Import conventions)
+- [ ] Compliant with ADR-001 (typed query binding)
+- [ ] Compliant with ADR-002/ADR-007 (parser style, OCaml core preservation)
+- [ ] Compliant with ADR-004 (layering: foundation never imports vague)
+- [ ] Compliant with ADR-006 (ADT encoding)
+- [ ] Compliant with ADR-012 (error channels)
+- [ ] Compliant with ADR-014 (quantifiability checks)
+- [ ] Compliant with ADR-015 (value boundaries, no `asInstanceOf`)
 - [ ] [Additional validations as ADRs are accepted]
 
 ### Tasks
@@ -207,32 +204,20 @@ Implement in order of dependencies:
 
 ### Integration Verification
 
-After implementation, verify that new components are **actually connected** to the application:
+After implementation, verify that new components are **actually reachable** through the library's public surface:
 
-#### For New Controllers:
-- [ ] Controller wired into `HttpApi.makeControllers`
-- [ ] Controller's routes included in `gatherRoutes` output
-- [ ] Required layers added to `Application.appLayer`
+#### For New Public API (facade methods, typeclasses, catalog parameters):
+- [ ] Reachable from a public entry point (`VagueSemantics`, `TypeCatalog`, `FolModel`, …) — not only from internals
+- [ ] Covered by at least one end-to-end test through the full pipeline (parse → bind → evaluate), not just a unit test of the new component
+- [ ] Documented where consumers look (`README.md` / `VagueQuantifiers.md` / scaladoc)
 
-#### For New Endpoints:
-- [ ] Endpoint accessible via curl or HTTP client
-- [ ] Endpoint appears in Swagger documentation (`/docs`)
-- [ ] At least one test hits the actual HTTP layer (not just unit test)
-
-#### For New Services:
-- [ ] Service layer added to `Application.appLayer`
-- [ ] Service injected into dependent components
-- [ ] Service tested via integration test (not just unit test)
+#### For New Internal Components:
+- [ ] Wired into the pipeline that uses them (binder, evaluator, sampler) — no dead code
+- [ ] Exercised transitively by an existing or new end-to-end spec
 
 #### Verification Commands:
 ```bash
-# List registered endpoints (after server starts)
-curl http://localhost:8090/docs/openapi.json | jq '.paths | keys'
-
-# Verify specific endpoint exists
-curl -I http://localhost:8090/w/{key}/events/tree/1
-
-# Run all tests including integration
+# Full cross-platform suite (root aggregates folEngine.jvm and folEngine.js)
 sbt test
 ```
 
@@ -253,7 +238,7 @@ sbt test
 - [Test file and coverage]
 
 ### ADR Compliance Review (Post-Implementation)
-**Re-validated ADRs:** ADR-001, ADR-002, ADR-003, ADR-009, ADR-010, ADR-011
+**Re-validated ADRs:** [all accepted ADRs; list those materially touched]
 **Compliance status:** ✅ All ADRs compliant / ⚠️ [Deviations found - see below]
 **Issues detected:** None / [List of compliance issues requiring user decision]
 
@@ -297,8 +282,8 @@ User will confirm at these points:
 
 **STOP and ASK the user before proceeding** when encountering ANY of these:
 
-1. **Schema/API changes** — Any change affecting OpenAPI/Swagger output
-2. **Workarounds** — Using `Schema.any`, `asInstanceOf`, unsafe casts, or "escape hatches"
+1. **Public API changes** — Any change to public signatures, published names, or behavior a library consumer would notice
+2. **Workarounds** — `asInstanceOf` or unsafe casts outside the boundaries ADR-015 sanctions, or any other "escape hatch"
 3. **New dependencies** — Adding imports from libraries not already in use
 4. **Type changes** — Modifying case class fields, adding/removing parameters
 5. **Behavioral changes** — Changing how existing code works (not just adding new code)
@@ -371,5 +356,5 @@ Format: "I propose to [ACTION]. Approve? (Y/N)"
 ---
 
 *Document created: 2026-01-17*  
-*Last updated: 2026-01-17*  
+*Last updated: 2026-08-10 (fully migrated to this repository's ADR corpus and library shape)*  
 *Status: Awaiting user approval*

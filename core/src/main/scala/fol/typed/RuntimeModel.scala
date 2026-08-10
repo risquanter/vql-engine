@@ -4,7 +4,7 @@ package fol.typed
   *
   * `raw` holds the actual JVM value. Its type is erased to `Any` because the
   * library evaluates over heterogeneous sorts without knowledge of consumer JVM
-  * types. The sort correctness guarantee from the bind phase (ADR-013) ensures
+  * types. The sort correctness guarantee from the bind phase (ADR-001) ensures
   * that `raw` is always the JVM type the consumer associated with `sort` at
   * model construction time. Recover the typed view via `value.extract[A]`
   * (ADR-015 §2, `Extract` typeclass).

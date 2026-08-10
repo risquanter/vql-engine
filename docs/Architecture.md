@@ -11,7 +11,7 @@ of the codebase and the integration flow between layers.
 core/src/main/scala/
 ├── logic/           Formula, Term, FOL, Model, Valuation
 ├── parser/          Combinators, FormulaParser, FOLAtomParser, TermParser
-├── lexer/           Lexer (String → List[String])
+├── lexer/           Lexer (List[Char] → List[Token]), Token
 ├── semantics/       FOLSemantics, EvaluationContext, ModelAugmenter
 ├── printer/         FOLPrinter, PrinterUtil
 ├── util/            StringUtil

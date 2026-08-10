@@ -7,7 +7,7 @@ import logic.{FOL, Formula, Term}
 import parser.{FOLAtomParser, FormulaParser}
 import parser.Combinators.{tokenLabel, tokensLabel}
 import lexer.{Lexer, Token, LexerError}
-import util.StringUtil.explode
+import util.StringUtil
 
 /** Parser for vague queries (paper Section 5.2)
   *
@@ -33,7 +33,7 @@ object VagueQueryParser:
   /** Parse a vague query string. */
   def parse(s: String): Either[QueryError, ParsedQuery] =
     try
-      val tokens = mergeDecimalTokens(Lexer.lex(explode(s)))
+      val tokens = mergeDecimalTokens(Lexer.lex(StringUtil.explode(s)))
       val (query, remaining) = parseTokens(tokens)
       if remaining.nonEmpty then
         Left(QueryError.ParseError(
@@ -268,13 +268,13 @@ object VagueQueryParser:
 
   /** Check if string is numeric (integer or decimal). */
   private def isNumeric(s: String): Boolean =
-    util.StringUtil.isNumeric(s) || util.StringUtil.isDecimalLiteral(s)
+    StringUtil.isNumeric(s) || StringUtil.isDecimalLiteral(s)
 
   /** Merge `Word(digits)` `Dot` `Word(digits)` triples into a single
     * `Word("d1.d2")` decimal token.
     *
-    * The OCaml-ported lexer would historically classify `.` as a symbolic
-    * character, splitting `0.05` into three tokens. Post-D1 the lexer emits
+    * The lexer treats `.` as punctuation (matching the OCaml source), so a
+    * decimal literal such as `0.05` lexes as
     * `[Token.Word("0"), Token.Dot, Token.Word("05")]`; this post-processor
     * collapses such triples to `[Token.Word("0.05")]` so [[TermParser]]'s
     * `isConstName` recognises the merged form.
