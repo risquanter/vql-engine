@@ -26,6 +26,31 @@ object QueryBinder:
         answerVars = boundAnswers
       )
 
+  /** Bind a bare formula for the satisfying-set entry point (ADR-017 §6).
+    *
+    * The formula is bound from an empty environment; the result is valid only
+    * when its free variables are exactly `variable`, and that variable's
+    * inferred sort is a domain type. Failure modes, in order: the variable is
+    * absent from the formula ([[TypeCheckError.UnconstrainedVar]]); some other
+    * free variable appears ([[TypeCheckError.UnexpectedFreeVar]]); the inferred
+    * sort is a value type ([[TypeCheckError.TypeNotQuantifiable]]).
+    */
+  def bindSatisfyingFormula(
+    formula: Formula[FOL],
+    variable: String,
+    catalog: TypeCatalog
+  ): Either[List[TypeCheckError], (BoundFormula, BoundVar)] =
+    for
+      result       <- bindFormula(formula, Map.empty, catalog)
+      (bound, env) = result
+      sort         <- env.get(variable).toRight(List(TypeCheckError.UnconstrainedVar(variable)))
+      _            <- (env.keySet - variable).toList match
+                        case Nil    => Right(())
+                        case extras => Left(extras.map(TypeCheckError.UnexpectedFreeVar.apply))
+      _            <- if catalog.domainTypes.contains(sort) then Right(())
+                      else Left(List(TypeCheckError.TypeNotQuantifiable(sort.value)))
+    yield (bound, BoundVar(variable, sort))
+
   private def bindAnswerVars(names: List[String], env: Env): Either[List[TypeCheckError], List[BoundVar]] =
     names.foldLeft[Either[List[TypeCheckError], List[BoundVar]]](Right(Nil)) { (acc, name) =>
       for

@@ -5,6 +5,7 @@ import fol.result.EvaluationOutput
 import fol.sampling.{SamplingParams, HDRConfig}
 import fol.error.QueryError
 import fol.typed.{FolModel, TypeCatalog, BoundQuery, QueryBinder, TypeCheckError, Value, TypedSemantics}
+import logic.{FOL, Formula}
 
 /** Vague quantifier semantics evaluation — thin facade over the typed pipeline.
   *
@@ -19,6 +20,10 @@ import fol.typed.{FolModel, TypeCatalog, BoundQuery, QueryBinder, TypeCheckError
   * `SamplingParams` controls whether scope evaluation is exact or sampled;
   * range extraction is always exact. The public API returns
   * `Either[QueryError, A]`.
+  *
+  * `satisfyingSet` is a separate entry point: it evaluates a bare formula with
+  * one free variable to its exact satisfying set over that variable's sort,
+  * with no quantifier and no sampling (ADR-017 §6).
   *
   * Paper reference: Section 3, Definition 2
   * See also: [[fol.typed.TypedSemantics]] for the canonical typed evaluation path (ADR-001)
@@ -56,6 +61,8 @@ object VagueSemantics:
       case TypeCheckError.UnconstrainedVar(name)                   => s"unconstrained quantifier variable: $name"
       case TypeCheckError.ConflictingTypes(name, left, right)      => s"conflicting inferred types for '$name': ${left.value} vs ${right.value}"
       case TypeCheckError.TypeNotQuantifiable(name)                 => s"type '$name' is not a domain type and cannot be quantified over"
+      case TypeCheckError.UnparseableConstant(_, sort, sourceText) => s"cannot parse '$sourceText' as ${sort.value}"
+      case TypeCheckError.UnexpectedFreeVar(name)                  => s"unexpected free variable '$name': a satisfying-set formula may only mention its one variable"
     }
 
   /** Evaluate a parsed query through the typed pipeline using a pre-validated [[FolModel]].
@@ -81,3 +88,26 @@ object VagueSemantics:
         hdrConfig    = hdrConfig
       )
     yield output
+
+  /** Evaluate a bare formula with one free variable to its exact satisfying set
+    * over that variable's sort (ADR-017 §6).
+    *
+    * The formula is bound from an empty environment; its free variables must be
+    * exactly `variable`, whose inferred sort must be a domain type. Enumeration
+    * over that domain is exhaustive and deterministic — there are no sampling
+    * parameters. Input is a pre-parsed [[logic.Formula]]; callers with query
+    * text parse it via `FOLParser.parse` and map the foundation parse error at
+    * their own boundary.
+    */
+  def satisfyingSet(
+    formula: Formula[FOL],
+    variable: String,
+    folModel: FolModel
+  ): Either[QueryError, Set[Value]] =
+    for
+      bound                    <- QueryBinder
+                                    .bindSatisfyingFormula(formula, variable, folModel.catalog)
+                                    .left.map(errors => QueryError.BindError(errors = renderTypeErrors(errors)))
+      (boundFormula, boundVar) = bound
+      result                   <- TypedSemantics.satisfyingSet(boundFormula, boundVar, folModel.model)
+    yield result

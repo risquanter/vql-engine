@@ -28,6 +28,32 @@ object TypedSemantics:
       output <- evaluateOverRange(query, model, baseEnv, rangeElements, quantifier, samplingParams, hdrConfig)
     yield output
 
+  /** Evaluate a bound formula with one free variable to its exact satisfying
+    * set over that variable's sort (ADR-017 §6).
+    *
+    * Enumerates `model.domains(variable.sort)` and keeps each element for which
+    * the formula holds with the variable bound to it. Exhaustive and
+    * deterministic; no sampling.
+    */
+  def satisfyingSet(
+    formula: BoundFormula,
+    variable: BoundVar,
+    model: RuntimeModel
+  ): Either[QueryError, Set[Value]] =
+    model.domains.get(variable.sort) match
+      case None =>
+        Left(QueryError.DomainNotFoundError(
+          typeName       = variable.sort.value,
+          availableTypes = model.domains.keySet.map(_.value)
+        ))
+      case Some(domain) =>
+        domain.foldLeft[Either[QueryError, Set[Value]]](Right(Set.empty)) { (acc, candidate) =>
+          for
+            sat <- acc
+            ok  <- evalFormula(formula, Map(variable.name -> candidate), model)
+          yield if ok then sat + candidate else sat
+        }
+
   private def validateAnswerTuple(
     query: BoundQuery,
     answerTuple: Map[String, Value]

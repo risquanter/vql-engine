@@ -24,3 +24,8 @@ enum TypeCheckError:
     * See ADR-014 §2.
     */
   case TypeNotQuantifiable(name: String)
+  /** A satisfying-set formula bound a free variable other than the single
+    * variable the set is evaluated over. The formula's free variables must be
+    * exactly that variable (ADR-017 §6).
+    */
+  case UnexpectedFreeVar(name: String)

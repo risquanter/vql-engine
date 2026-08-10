@@ -656,8 +656,10 @@ binding; the version reflects the API change.
   user-triggered; not part of this plan.
 - Doc-consistency sweep over files touched by the change, including:
   `ParsedQuery.scopeVars` scaladoc (first line names `fvFOL` while the code
-  uses `varFOL` — corrected to describe current behavior) and
-  `VagueQueryParser` header examples.
+  uses `varFOL` — corrected to describe current behavior),
+  `VagueQueryParser` header examples, and the `VagueSemantics.bindTyped`
+  scaladoc phase reference ("Phase-1 canonical entrypoint" →
+  de-historicized).
 - Comment-style cleanup in files Phase 3 brought into scope (deferred boyscout,
   Ruling of 2026-08-10, from the Phase 3 complex review): de-historicize the
   plan-phase / was-now comments while preserving their factual content — the
