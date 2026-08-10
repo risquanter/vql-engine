@@ -144,7 +144,7 @@ class QueryBinderSpec extends FunSuite:
     )
     assert(QueryBinder.bind(query, catalogWithValueType).isRight)
 
-  // ==================== Formula ranges (Phase 4, ADR-017) ====================
+  // ==================== Formula ranges (ADR-017) ====================
 
   test("bind fails with ConflictingTypes when a range uses the quantified variable at incompatible sorts"):
     // leaf expects Asset for x; gt_loss expects Loss for x — the merged range env conflicts.

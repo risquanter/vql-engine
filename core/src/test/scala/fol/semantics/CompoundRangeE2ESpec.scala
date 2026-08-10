@@ -7,9 +7,9 @@ import fol.typed.TypeDecl.DomainType
 import munit.FunSuite
 
 /** End-to-end tests for formula ranges: parse a compound-range query string and
-  * evaluate it, reproducing the Phase-3 IR-level results through the parser
-  * (AC-1), and pinning that range extraction stays exhaustive under scope
-  * sampling (AC-6, ADR-017 §2).
+  * evaluate it, reproducing the IR-level results through the parser (AC-1),
+  * and pinning that range extraction stays exhaustive under scope sampling
+  * (AC-6, ADR-017 §2).
   */
 class CompoundRangeE2ESpec extends FunSuite:
 
