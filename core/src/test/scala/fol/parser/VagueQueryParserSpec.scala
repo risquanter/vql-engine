@@ -12,6 +12,12 @@ class VagueQueryParserSpec extends munit.FunSuite:
     parse(input) match
       case Right(q) => q
       case Left(e)  => fail(s"Parse failed: ${e.formatted}")
+
+  // Helper: a single-atom range is Formula.Atom(fol) — extract the atom or fail.
+  def rangeAtom(q: ParsedQuery): FOL =
+    q.range match
+      case Formula.Atom(fol) => fol
+      case other             => fail(s"Expected atom range, got: $other")
   
   // Helper to check query structure
   def assertQueryStructure(
@@ -21,7 +27,7 @@ class VagueQueryParserSpec extends munit.FunSuite:
     expectedAnswerVars: List[String]
   ): Unit =
     assertEquals(query.variable, expectedVar)
-    assertEquals(query.range.predicate, expectedRangePred)
+    assertEquals(rangeAtom(query).predicate, expectedRangePred)
     assertEquals(query.answerVars, expectedAnswerVars)
   
   // ==================== Basic Parsing Tests ====================
@@ -77,14 +83,14 @@ class VagueQueryParserSpec extends munit.FunSuite:
     assertQueryStructure(q, "x", "capital", List("y"))
     
     // Verify range has two terms
-    assertEquals(q.range.terms.length, 2)
+    assertEquals(rangeAtom(q).terms.length, 2)
   }
   
   test("parse query with multiple answer variables") {
     val q = parseOk("Q[>=]^{2/3} x (borders(x, y, z), conflict(x))(y, z)")
     
     assertQueryStructure(q, "x", "borders", List("y", "z"))
-    assertEquals(q.range.terms.length, 3)
+    assertEquals(rangeAtom(q).terms.length, 3)
   }
   
   // ==================== Complex Formula Parsing ====================
@@ -269,6 +275,70 @@ class VagueQueryParserSpec extends munit.FunSuite:
     val q = parseOk("Q[~]^{1/2} x (capital(x, y), large(x))(y)")
     assertQueryStructure(q, "x", "capital", List("y"))
   }
+
+  // ==================== Formula Ranges (ADR-017) ====================
+
+  test("parse negation range ~p(x)") {
+    val q = parseOk("Q[~]^{1/2} x (~country(x), large(x))")
+    q.range match
+      case Formula.Not(Formula.Atom(fol)) => assertEquals(fol.predicate, "country")
+      case other => fail(s"Expected Not(Atom), got: $other")
+  }
+
+  test("parse conjunction range p(x) /\\ q(x)") {
+    val q = parseOk("Q[~]^{1/2} x (country(x) /\\ coastal(x), large(x))")
+    q.range match
+      case Formula.And(Formula.Atom(a), Formula.Atom(b)) =>
+        assertEquals(a.predicate, "country")
+        assertEquals(b.predicate, "coastal")
+      case other => fail(s"Expected And(Atom, Atom), got: $other")
+    // The formula parser stops at the range/scope comma — scope is the atom after it.
+    q.scope match
+      case Formula.Atom(fol) => assertEquals(fol.predicate, "large")
+      case other => fail(s"Expected atom scope, got: $other")
+  }
+
+  test("parse disjunction range p(x) \\/ q(x)") {
+    val q = parseOk("Q[>=]^{3/4} x (country(x) \\/ coastal(x), large(x))")
+    q.range match
+      case Formula.Or(Formula.Atom(_), Formula.Atom(_)) => // Success
+      case other => fail(s"Expected Or(Atom, Atom), got: $other")
+  }
+
+  test("parse existential range exists a . r(x, a)") {
+    val q = parseOk("Q[~]^{1/2} x (exists a . r(x, a), large(x))")
+    q.range match
+      case Formula.Exists("a", Formula.Atom(fol)) => assertEquals(fol.predicate, "r")
+      case other => fail(s"Expected Exists(a, Atom), got: $other")
+  }
+
+  test("parse parenthesized compound range") {
+    val q = parseOk("Q[>=]^{2/3} x ((country(x) /\\ coastal(x)) \\/ populous(x), large(x))")
+    q.range match
+      case Formula.Or(Formula.And(_, _), Formula.Atom(_)) => // Success
+      case other => fail(s"Expected Or(And, Atom), got: $other")
+  }
+
+  test("parse infix-comparison atom range") {
+    val q = parseOk("Q[~]^{1/2} x (x <= 20, large(x))")
+    q.range match
+      case Formula.Atom(fol) => assertEquals(fol.predicate, "<=")
+      case other => fail(s"Expected infix atom range, got: $other")
+  }
+
+  test("parse rejects range binding the quantified variable (not free)") {
+    // `exists x . p(x)` binds x, so x is not free in the range → validation error.
+    assert(parse("Q[~]^{1/2} x (exists x . country(x), large(x))").isLeft)
+  }
+
+  test("parse rejects range omitting the quantified variable") {
+    // x must occur free in the range; y is an answer var (rule 2 satisfied), isolating rule 1.
+    assert(parse("Q[~]^{1/2} x (country(y), large(x))(y)").isLeft)
+  }
+
+  test("parse rejects free range variable not among answer variables") {
+    assert(parse("Q[~]^{1/2} x (city_of(x, z), large(x))").isLeft)
+  }
   
   // ==================== Complex Nested Formulas ====================
   
@@ -355,29 +425,29 @@ class VagueQueryParserSpec extends munit.FunSuite:
 
   test("P1: quoted multi-word literal in range arg becomes Term.Const") {
     val q = parseOk("Q[>=]^{2/3} x (leaf_descendant_of(x, \"IT Risk\"), large(x))")
-    assertEquals(q.range.predicate, "leaf_descendant_of")
-    assertEquals(q.range.terms.length, 2)
+    assertEquals(rangeAtom(q).predicate, "leaf_descendant_of")
+    assertEquals(rangeAtom(q).terms.length, 2)
     // First arg is the bound variable x; second arg is the quoted literal.
-    assertEquals(q.range.terms.head, Term.Var("x"))
-    assertEquals(q.range.terms(1), Term.Const("IT Risk"))
+    assertEquals(rangeAtom(q).terms.head, Term.Var("x"))
+    assertEquals(rangeAtom(q).terms(1), Term.Const("IT Risk"))
   }
 
   test("P2: single-word quoted literal carries content without surrounding quotes") {
     val q = parseOk(
       "Q[~]^{1/2} x (child_of(x, \"Operations\"), gt_loss(p95(x), 5000000))"
     )
-    assertEquals(q.range.predicate, "child_of")
-    assertEquals(q.range.terms.length, 2)
-    assertEquals(q.range.terms(1), Term.Const("Operations"))
+    assertEquals(rangeAtom(q).predicate, "child_of")
+    assertEquals(rangeAtom(q).terms.length, 2)
+    assertEquals(rangeAtom(q).terms(1), Term.Const("Operations"))
   }
 
   test("P3: mixed bare + quoted args — bare stays Var, quoted becomes Const") {
     val q = parseOk(
       "Q[>=]^{1/2} x (capital(x, \"Vienna\"), large(x))(y)"
     )
-    assertEquals(q.range.predicate, "capital")
-    assertEquals(q.range.terms.length, 2)
-    assertEquals(q.range.terms.head, Term.Var("x"))
-    assertEquals(q.range.terms(1), Term.Const("Vienna"))
+    assertEquals(rangeAtom(q).predicate, "capital")
+    assertEquals(rangeAtom(q).terms.length, 2)
+    assertEquals(rangeAtom(q).terms.head, Term.Var("x"))
+    assertEquals(rangeAtom(q).terms(1), Term.Const("Vienna"))
   }
 

@@ -72,9 +72,13 @@ object VagueQueryParser:
     // 2. x
     val (variable, t2) = parseVariable(t1)
     // 3. (
-    val t3 = expect(Token.LParen, t2, "range predicate")
-    // 4. R(x,y') — delegate to FOL atom parser (OCaml style)
-    val (range, t4) = FOLAtomParser.parseAtom(List(), t3)
+    val t3 = expect(Token.LParen, t2, "range formula")
+    // 4. R(x,y') range formula — delegate to the formula parser (OCaml style).
+    //    `,` is not an infix operator, so parsing stops at the range/scope comma.
+    val (range, t4) = FormulaParser.parse(
+      FOLAtomParser.parseInfixAtom,
+      FOLAtomParser.parseAtom
+    )(t3)
     // 5. ,
     val t5 = expect(Token.Comma, t4, "scope formula")
     // 6. φ(x,y) — delegate to formula parser (OCaml style)

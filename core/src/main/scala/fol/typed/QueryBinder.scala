@@ -9,7 +9,7 @@ object QueryBinder:
 
   def bind(query: ParsedQuery, catalog: TypeCatalog): Either[List[TypeCheckError], BoundQuery] =
     for
-      rangeResult <- bindAtom(query.range, Map.empty, catalog)
+      rangeResult <- bindFormula(query.range, Map.empty, catalog)
       (boundRange, envAfterRange) = rangeResult
       quantifiedVarSort <- envAfterRange.get(query.variable).toRight(List(TypeCheckError.UnconstrainedVar(query.variable)))
       _ <- if catalog.domainTypes.contains(quantifiedVarSort) then Right(())
@@ -21,7 +21,7 @@ object QueryBinder:
       BoundQuery(
         quantifier = query.quantifier,
         variable = BoundVar(query.variable, quantifiedVarSort),
-        range = BoundFormula.Atom(boundRange),
+        range = boundRange,
         scope = boundScope,
         answerVars = boundAnswers
       )

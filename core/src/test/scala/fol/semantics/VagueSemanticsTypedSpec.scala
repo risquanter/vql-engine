@@ -28,7 +28,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
   private val query = ParsedQuery(
     quantifier = Quantifier.About(1, 2, 0.01),
     variable = "x",
-    range = FOL("leaf", List(Term.Var("x"))),
+    range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
     scope = Formula.Atom(FOL("coastal", List(Term.Var("x")))),
     answerVars = Nil
   )
@@ -133,7 +133,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val badQuery = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = "x",
-      range = FOL("nonexistent_predicate", List(Term.Var("x"))),
+      range = Formula.Atom(FOL("nonexistent_predicate", List(Term.Var("x")))),
       scope = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
       answerVars = Nil
     )
@@ -149,7 +149,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val badQuery = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = "x",
-      range = FOL("nonexistent_predicate", List(Term.Var("x"))),
+      range = Formula.Atom(FOL("nonexistent_predicate", List(Term.Var("x")))),
       scope = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
       answerVars = Nil
     )
@@ -201,7 +201,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val queryOverLoss = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = "l",
-      range = FOL("hasloss", List(Term.Var("l"))),
+      range = Formula.Atom(FOL("hasloss", List(Term.Var("l")))),
       scope = Formula.True,
       answerVars = Nil
     )
@@ -218,7 +218,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val queryWithInnerForall = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = "x",
-      range = FOL("leaf", List(Term.Var("x"))),
+      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
       scope = Formula.Forall("l", Formula.Atom(FOL("hasloss", List(Term.Var("l"))))),
       answerVars = Nil
     )
@@ -234,7 +234,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val queryWithInnerExists = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = "x",
-      range = FOL("leaf", List(Term.Var("x"))),
+      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
       scope = Formula.Exists("l", Formula.Atom(FOL("hasloss", List(Term.Var("l"))))),
       answerVars = Nil
     )

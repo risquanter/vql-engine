@@ -5,46 +5,45 @@ import fol.quantifier.Quantifier
 import logic.{FOL, Formula, Term, FOLUtil}
 
 /** Vague quantifier query from paper Definition 1 (Section 5.2)
-  * 
+  *
   * Syntax: Q x (R(x,y'), φ(x,y))
-  * 
+  *
   * OCaml-style: case class for product type (like FOL)
   * OCaml reference: fol.ml has "type fol = R of string * term list"
-  * 
+  *
   * Paper reference: Definition 1 (Section 5.2)
   * "A vague query is of the form Q x (R(x,y'), φ(x,y)) where:
   *  - Q is a vague quantifier Q[op]^{k/n}
   *  - x is the quantified variable
-  *  - R(x,y') is the range predicate (FOL atom)
+  *  - R(x,y') is the range formula
   *  - φ(x,y) is the scope predicate (FOL formula)
   *  - y are answer variables (y' ⊆ y)"
-  * 
+  *
+  * The range is a full FOL formula (ADR-017): its satisfying set over the
+  * quantified variable's sort is the population the quantifier ranges over.
+  * A single-atom range is `Formula.Atom(R(x, y'))`.
+  *
   * @param quantifier Type of vague quantifier (Q[op]^{k/n})
   * @param variable Quantified variable (x)
-  * @param range Range predicate R(x,y') as FOL atom
+  * @param range Range formula R(x,y') as a FOL formula
   * @param scope Scope predicate φ(x,y) as FOL formula
   * @param answerVars Free variables y (answer variables)
   */
 case class ParsedQuery(
   quantifier: Quantifier,
   variable: String,
-  range: FOL,
+  range: Formula[FOL],
   scope: Formula[FOL],
   answerVars: List[String] = Nil
 ):
-  /** Extract variables from range atom R(x,y') 
-    * 
-    * OCaml pattern: module-level function operating on data
-    * OCaml reference: fol.ml has fvt for variable extraction
+  /** Free variables of the range formula R(x,y').
+    *
+    * Inner range quantifiers bind their own variables, so those are excluded
+    * (ADR-017 §4): validation is stated over the free variables via
+    * `FOLUtil.fvFOL`.
     */
   def rangeVars: Set[String] =
-    def extractFromTerms(terms: List[Term]): Set[String] = 
-      terms.flatMap {
-        case Term.Var(name) => Set(name)
-        case Term.Fn(_, args) => extractFromTerms(args)
-        case Term.Const(_) => Set.empty[String]
-      }.toSet
-    extractFromTerms(range.terms)
+    FOLUtil.fvFOL(range).toSet
   
   /** Extract all variables from scope formula φ(x,y)
     * 
@@ -67,14 +66,18 @@ case class ParsedQuery(
   def isUnary: Boolean = answerVars.length == 1
 
 object ParsedQuery:
-  /** Smart constructor with validation.
+  /** Smart constructor with validation (ADR-017 §4).
     *
     * OCaml reference: formulas.ml has mk_* constructors
     * OCaml pattern: let mk_and p q = And(p,q)
     *
+    * Validation, stated over the range formula's free variables:
+    *  1. the quantified variable `x` must occur free in `r`;
+    *  2. every other free range variable must be an answer variable (`y' ⊆ y`).
+    *
     * @param q Quantifier Q[op]^{k/n}
     * @param x Quantified variable
-    * @param r Range predicate R(x,y')
+    * @param r Range formula R(x,y')
     * @param phi Scope predicate φ(x,y)
     * @param y Answer variables
     * @return Validated ParsedQuery
@@ -83,25 +86,24 @@ object ParsedQuery:
   def mk(
     q: Quantifier,
     x: String,
-    r: FOL,
+    r: Formula[FOL],
     phi: Formula[FOL],
-    y: List[String] = Nil
+    y: List[String]
   ): ParsedQuery =
     val query = ParsedQuery(q, x, r, phi, y)
 
-    // Validation: x should appear in range
+    // Validation: x must occur free in the range formula
     if !query.rangeVars.contains(x) then
       throw fol.error.QueryException(QueryError.ValidationError(
-        s"Quantified variable '$x' must appear in range predicate ${r.predicate}",
+        s"Quantified variable '$x' must occur free in the range formula",
         "quantified_variable",
         Map(
           "variable" -> x,
-          "range_predicate" -> r.predicate,
           "range_vars" -> query.rangeVars.mkString(", ")
         )
       ))
 
-    // Paper constraint: y' ⊆ y (range vars minus x ⊆ answer vars)
+    // Paper constraint: y' ⊆ y (free range vars minus x ⊆ answer vars)
     val rangeVarsMinusX = query.rangeVars - x
     if !rangeVarsMinusX.subsetOf(y.toSet) then
       throw fol.error.QueryException(QueryError.ValidationError(
@@ -115,6 +117,18 @@ object ParsedQuery:
       ))
 
     query
+
+  /** Single-atom source-compatibility overload: wraps a bare range atom in
+    * `Formula.Atom` before validation (ADR-017 §5).
+    */
+  def mk(
+    q: Quantifier,
+    x: String,
+    r: FOL,
+    phi: Formula[FOL],
+    y: List[String] = Nil
+  ): ParsedQuery =
+    mk(q, x, Formula.Atom(r), phi, y)
   
   /** Example: q₁ from paper (Boolean query)
     * 
@@ -128,7 +142,7 @@ object ParsedQuery:
     ParsedQuery(
       quantifier = Quantifier.mkAtLeast(3, 4),
       variable = "x",
-      range = FOL("country", List(Var("x"))),
+      range = Atom(FOL("country", List(Var("x")))),
       scope = Exists("y", And(
         Atom(FOL("hasGDP_agr", List(Var("x"), Var("y")))),
         Atom(FOL("<=", List(Var("y"), Const("20"))))
@@ -148,7 +162,7 @@ object ParsedQuery:
     ParsedQuery(
       quantifier = Quantifier.mkAbout(1, 2),
       variable = "x",
-      range = FOL("capital", List(Var("x"))),
+      range = Atom(FOL("capital", List(Var("x")))),
       scope = True,  // Placeholder - would be complex formula
       answerVars = List("y")
     )
@@ -159,7 +173,7 @@ object ParsedQuery:
     ParsedQuery(
       quantifier = Quantifier.aboutHalf,
       variable = "x",
-      range = FOL("country", List(Var("x"))),
+      range = Atom(FOL("country", List(Var("x")))),
       scope = Atom(FOL("large", List(Var("x")))),
       answerVars = Nil
     )

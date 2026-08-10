@@ -359,7 +359,7 @@ class MapDispatcherSpec extends FunSuite:
   private val lecQuery = ParsedQuery(
     quantifier = Quantifier.About(1, 2, 0.01),
     variable   = "x",
-    range      = FOL(symLeaf.value, List(Term.Var("x"))),
+    range      = Formula.Atom(FOL(symLeaf.value, List(Term.Var("x")))),
     scope      = Formula.Atom(FOL(symGtProb.value, List(
       Term.Fn(symLec.value, List(Term.Var("x"), Term.Const("10000000"))),
       Term.Const("0.05")
