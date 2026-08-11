@@ -13,10 +13,13 @@ import util.StringUtil
   *
   * Syntax: Q[op]^{k/n} x (R(x,y'), φ(x,y))(y₁, ..., yₘ)
   *
+  * The range `R(x,y')` is a full FOL formula (ADR-017), so it may be a single
+  * atom or a compound of `/\`, `\/`, `~`, and inner quantifiers.
+  *
   * Examples:
   *   Q[>=]^{3/4} x (country(x), exists y (hasGDP_agr(x,y) /\ y<=20))
   *   Q[~]^{1/2} x (capital(x, y), large(x))(y)
-  *   Q[<=]^{1/3} x (city(x), populous(x))
+  *   Q[<=]^{1/3} x (server(x) /\ ~patched(x), exploitable(x))
   *
   * OCaml-style: parsers are `List[Token] => (A, List[Token])` (ADR-007 C13).
   * Exceptions signal parse failure — mirrors OCaml's

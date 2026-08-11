@@ -665,8 +665,12 @@ binding; the version reflects the API change.
   plan-phase / was-now comments while preserving their factual content — the
   `BoundQuery.scala` `LiteralRef` scaladoc ("After ADR-015 §4 / ADR-016 / PLAN
   Phase 5a …", "deferred (T-005)"), `TypedSemantics.scala` `ConstRef` comment
-  ("see TODOS T-002"), and `QueryBinderSpec.scala` ("was a `LiteralValue`
-  stopgap … PLAN Phase 5a" plus the "Phase 3/5a:" test names).
+  ("see TODOS T-002"), `QueryBinderSpec.scala` ("was a `LiteralValue`
+  stopgap … PLAN Phase 5a" plus the "Phase 3/5a:" test names), and
+  `TypeCheckError.scala` `UnparseableConstant` scaladoc ("Introduced by
+  ADR-015 §4 / PLAN-symmetric-value-boundaries Phase 3 (closes T-002)" →
+  drop the provenance sentence, keep the distinction-from-`UnknownConstantOrLiteral`
+  text).
 - Refresh the retained stale ADR illustrations (Ruling of 2026-08-10 — Phase 0
   residual ADR illustrations): the Decision/Code-Smells example blocks in
   ADR-003 (`resolved.evaluate()`), ADR-004 (`holdsVague`/`KnowledgeBase`,

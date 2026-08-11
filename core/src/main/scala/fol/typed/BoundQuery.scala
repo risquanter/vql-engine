@@ -23,12 +23,10 @@ enum BoundTerm:
     * @param sourceText The original source token (e.g. "10000000", "0.05").
     * @param sort       The sort the literal was validated against.
     * @param value      The parsed literal carrier produced by the sort's
-    *                   validator. After ADR-015 §4 / ADR-016 / PLAN Phase 5a
-    *                   this is the consumer's chosen carrier as `Any`
-    *                   (e.g. `Long`, `Double`) and flows into `Value.raw`
-    *                   at evaluation time. Dispatcher lambdas recover the
-    *                   typed view via `Extract[A]` (ADR-015 §2).
-    *                   The `Carrier[A]` GADT refinement is deferred (T-005).
+    *                   validator, held as `Any` (the consumer's chosen carrier,
+    *                   e.g. `Long`, `Double`); it flows into `Value.raw` at
+    *                   evaluation time. Dispatcher lambdas recover the typed
+    *                   view via `Extract[A]` (ADR-015 §2 / ADR-016).
     */
   case LiteralRef(sourceText: String, sort: TypeId, value: Any)
 

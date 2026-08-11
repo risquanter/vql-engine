@@ -193,14 +193,11 @@ class QueryBinderSpec extends FunSuite:
     )
     assert(QueryBinder.bind(query, catalog).isRight)
 
-  // ==================== Phase 3: named-constant rewrite (closes T-002) ====================
-  // PLAN-symmetric-value-boundaries.md §5; ADR-015 §4.
+  // ==================== Inline-literal binding (ADR-015 §4) ====================
   //
-  // Validators now carry a parsed `Any` carrier into `LiteralRef.value` (was a
-  // `LiteralValue` stopgap, since folded into a dedicated literal IR node in
-  // PLAN Phase 5a). A validator returning `None` produces
-  // `TypeCheckError.UnparseableConstant`. Sorts with no validator continue
-  // to fall through to `UnknownConstantOrLiteral`.
+  // Validators carry a parsed `Any` carrier into `LiteralRef.value`. A validator
+  // returning `None` produces `TypeCheckError.UnparseableConstant`. Sorts with no
+  // validator fall through to `UnknownConstantOrLiteral`.
 
   // Catalog wired with primitive-carrier validators via LiteralParser.asValidator.
   private val catalogPrim = TypeCatalog.unsafe(
@@ -240,7 +237,7 @@ class QueryBinderSpec extends FunSuite:
       .orElse(fromFormula(bq.range))
       .getOrElse(fail("no LiteralRef found in bound query"))
 
-  test("Phase 3/5a: validator parses inline literal, LiteralRef.value is parsed Any (Long)"):
+  test("validator parses inline literal, LiteralRef.value is parsed Any (Long)"):
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
@@ -260,7 +257,7 @@ class QueryBinderSpec extends FunSuite:
           s"expected Long carrier, got ${cr.value.getClass.getName}: ${cr.value}")
       case Left(errs) => fail(s"expected Right, got Left($errs)")
 
-  test("Phase 3/5a: validator parses Double literal, LiteralRef.value is Double"):
+  test("validator parses Double literal, LiteralRef.value is Double"):
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
@@ -284,7 +281,7 @@ class QueryBinderSpec extends FunSuite:
         assert(probArg.value.isInstanceOf[Double])
       case Left(errs) => fail(s"expected Right, got Left($errs)")
 
-  test("Phase 3: validator returns None -> UnparseableConstant(name, sort, sourceText)"):
+  test("validator returns None -> UnparseableConstant(name, sort, sourceText)"):
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
@@ -302,7 +299,7 @@ class QueryBinderSpec extends FunSuite:
         assertEquals(matched, List(("0.05", loss, "0.05")))
       case Right(_) => fail("expected Left(UnparseableConstant)")
 
-  test("Phase 3: sort with no validator falls through to UnknownConstantOrLiteral"):
+  test("sort with no validator falls through to UnknownConstantOrLiteral"):
     // Catalog with NO validator for `loss`.
     val noValidator = TypeCatalog.unsafe(
       types = Set(DomainType(asset), ValueType(loss), ValueType(prob), ValueType(bool)),

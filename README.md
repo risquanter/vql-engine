@@ -7,7 +7,7 @@ The FOL foundation (parser combinators, pretty printer, Tarski semantics) follow
 ## Installation
 
 ```scala
-libraryDependencies += "com.risquanter" %%% "vql-engine" % "0.10.2"
+libraryDependencies += "com.risquanter" %%% "vql-engine" % "0.11.0"
 ```
 
 (`%%%` resolves to `vql-engine_3` on the JVM and `vql-engine_sjs1_3` on Scala.js; use `%%` for JVM-only projects.)
@@ -65,6 +65,8 @@ outcome match
 
 Supported quantifier operators: About (`~`), AtLeast (`>=`), AtMost (`<=`), each with a proportion `k/n` and an optional custom tolerance (`Q[~]^{1/2}[0.05]`). Queries with answer variables return answer sets; queries without are Boolean.
 
+The range `R(x, y')` is a full FOL formula, so the quantified population can be a compound set — `Q[<=]^{1/3} x (server(x) /\ ~patched(x), exploitable(x))`. Negation is closed-world over the sort's active domain (see [docs/VagueQuantifiers.md](docs/VagueQuantifiers.md) and [docs/ADR-017.md](docs/ADR-017.md)). A separate `VagueSemantics.satisfyingSet(formula, variable, folModel)` entry point evaluates a bare single-free-variable formula to its exact satisfying set, with no quantifier or sampling.
+
 ## Architecture
 
 Two layers in `core/src/main/scala`:
@@ -88,6 +90,7 @@ sbt +test    # full suite, JVM + Scala.js
 - [docs/VagueQuantifiers.md](docs/VagueQuantifiers.md) — theory, semantics, API reference
 - [docs/](docs/) — ADRs recording design decisions
 - [docs/RELEASE.md](docs/RELEASE.md) — CI, signing, and release procedure
+- [CHANGELOG.md](CHANGELOG.md) — released versions and breaking changes
 
 ## Release verification
 

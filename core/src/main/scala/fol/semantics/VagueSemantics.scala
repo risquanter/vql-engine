@@ -32,7 +32,7 @@ object VagueSemantics:
 
   /** Bind a parsed query into the typed IL (type-checks variable sorts against the catalog).
     *
-    * Phase-1 canonical entrypoint. Runtime evaluation follows in evaluateTyped.
+    * Canonical bind entrypoint; runtime evaluation follows in `evaluateTyped`.
     */
   def bindTyped(
     query: ParsedQuery,

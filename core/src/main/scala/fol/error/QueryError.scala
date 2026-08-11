@@ -266,35 +266,3 @@ object QueryError:
   */
 case class QueryException(error: QueryError) extends Exception(error.formatted):
   def getError: QueryError = error
-
-/** Helper functions for error handling */
-object ErrorOps:
-  
-  /** Lift exception to QueryError */
-  def fromThrowable(t: Throwable, phase: String = "unknown"): QueryError =
-    QueryError.EvaluationError(
-      message = t.getMessage,
-      phase = phase,
-      cause = Some(t)
-    )
-  
-  /** Try block that returns Either */
-  def attempt[A](phase: String)(f: => A): Either[QueryError, A] =
-    try Right(f)
-    catch
-      case e: QueryException => Left(e.error)
-      case e: IllegalArgumentException => Left(QueryError.ValidationError(e.getMessage, "input"))
-      case e: Throwable => Left(fromThrowable(e, phase))
-  
-  /** Validate a condition */
-  def validate(condition: Boolean, error: => QueryError): Either[QueryError, Unit] =
-    if condition then Right(()) else Left(error)
-  
-  /** Require a condition (returns Unit on success, error on failure) */
-  def require(condition: Boolean, field: String, message: String): Either[QueryError, Unit] =
-    if condition then Right(())
-    else Left(QueryError.ValidationError(message, field))
-  
-  /** Convert Option to Either with error */
-  def fromOption[A](opt: Option[A], error: => QueryError): Either[QueryError, A] =
-    opt.toRight(error)

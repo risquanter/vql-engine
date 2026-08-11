@@ -32,7 +32,7 @@ Q[op]^{k/n} x (R(x, y'), φ(x, y))(y)
 Where:
 - `Q[op]^{k/n}`: Vague quantifier
 - `x`: Quantified variable (bound)
-- `R(x, y')`: **Range predicate** — defines domain D_R
+- `R(x, y')`: **Range formula** — defines domain D_R (a full FOL formula)
 - `φ(x, y)`: **Scope formula** — condition to check
 - `(y)`: **Answer variables** (optional)
 
@@ -69,7 +69,7 @@ Q[operator]^{k/n}[tolerance] variable (range, scope)(answer_vars)
 |---|---|---|
 | Quantifier | `Q[op]^{k/n}[tol]` | `Q[>=]^{3/4}`, `Q[~]^{1/2}[0.05]` |
 | Variable | identifier | `x` |
-| Range | FOL atom | `country(x)`, `risk_in_project(x, "Alpha")` |
+| Range | FOL formula | `country(x)`, `server(x) /\ ~patched(x)` |
 | Scope | FOL formula | `large(x)`, `exists r . (has_risk(x, r) /\ critical(r))` |
 | Answer vars | `(y)` or `(y1, y2)` | Optional |
 
@@ -108,6 +108,53 @@ Q[<=]^{1/3} x (critical_asset(x),
 
 ---
 
+## Range Formulas and Closed-World Negation
+
+The range `R(x, y')` is a full FOL formula, so the population `D_R` the
+quantifier ranges over can be a compound set, not just one predicate's
+extension:
+
+```
+Q[<=]^{1/3} x (server(x) /\ ~patched(x), exploitable(x))
+```
+
+Here `D_R` is the intersection "servers that are not patched". The connectives
+read as set algebra over the quantified variable's sort `S`:
+
+- `p(x) /\ q(x)` → intersection of the two extensions
+- `p(x) \/ q(x)` → union
+- `~p(x)` → complement of `p`'s extension **within `domain(S)`**
+- `exists a . r(x, a)` → the `x` for which some `a` satisfies `r(x, a)`
+
+`~p(x)` is a **closed-world** reading: the complement is taken over the
+registered element set of the sort, not an open universe. This is sound only
+because range extraction enumerates the full active domain exactly and is never
+sampled — sampling applies only to scope evaluation (see [ADR-017](ADR-017.md)
+and [ADR-003](ADR-003.md)). The proportion's denominator is `|D_R|`, the size of
+the compound population.
+
+---
+
+## Satisfying Sets
+
+A separate entry point evaluates a bare formula with one free variable to its
+exact satisfying set over that variable's sort — no quantifier, no answer
+variables, no sampling:
+
+```scala
+// φ is a pre-parsed Formula[FOL] with exactly one free variable `v`
+VagueSemantics.satisfyingSet(phi, "x", folModel)
+  // Either[QueryError, Set[Value]]
+  //   = { d ∈ domain(sort(x)) | evalFormula(phi, { x → d }) == true }
+```
+
+The formula's free variables must be exactly `{x}`, and `x`'s inferred sort must
+be a domain type. Input is a parsed `Formula[FOL]`; callers with query text
+parse it via `FOLParser.parse` and map the foundation parse error at their own
+boundary. See [ADR-017](ADR-017.md) §6.
+
+---
+
 ## Paper-to-Code Mapping
 
 ### Types
@@ -117,7 +164,7 @@ Q[<=]^{1/3} x (critical_asset(x),
 | Q[~]^{k/n} | `Quantifier.About(k, n, ε)` | `fol.logic` |
 | Q[≥]^{k/n} | `Quantifier.AtLeast(k, n, ε)` | `fol.logic` |
 | Q[≤]^{k/n} | `Quantifier.AtMost(k, n, ε)` | `fol.logic` |
-| R(x, y') | `range: FOL` (in `ParsedQuery`) | `fol.logic` |
+| R(x, y') | `range: Formula[FOL]` (in `ParsedQuery`) | `fol.logic` |
 | φ(x, y) | `scope: Formula[FOL]` (in `ParsedQuery`) | `fol.logic` |
 | (y) | `answerVars: List[String]` | `fol.logic` |
 | D_R | `TypedSemantics.collectRangeElements()` result | `fol.typed` |
@@ -183,15 +230,18 @@ Result: `VagueQueryResult(satisfied=false, proportion=0.5, domainSize=4, sampleS
 
 ## Variable Scoping Rules
 
-- Quantified variable `x` must appear in range predicate
-- Answer variables must be bound in range predicate
-- `forall`/`exists` in scope formula bind their own variables
+Validation is stated over the **free** variables of the range formula
+(`FOLUtil.fvFOL`), so inner range quantifiers bind their own variables:
+
+- Quantified variable `x` must occur free in the range formula
+- Every other free range variable must be an answer variable (`y' ⊆ y`)
+- `forall`/`exists` in the range or scope formula bind their own variables
 
 ```
-✓ Q[~]^{1/2} x (country(x), large(x))         — x in range
-✗ Q[~]^{1/2} x (country(y), large(x))         — x not in range
-✓ Q[~]^{1/2} x (capital(x, y), large(x))(y)   — y bound in range
-✗ Q[~]^{1/2} x (capital(x, y), large(x))(z)   — z not in range
+✓ Q[~]^{1/2} x (country(x), large(x))         — x free in range
+✗ Q[~]^{1/2} x (country(y), large(x))         — x not free in range
+✓ Q[~]^{1/2} x (capital(x, y), large(x))(y)   — y free in range, an answer var
+✗ Q[~]^{1/2} x (capital(x, y), large(x))(z)   — y free in range, not an answer var
 ```
 
 ---

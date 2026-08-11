@@ -45,13 +45,11 @@ case class ParsedQuery(
   def rangeVars: Set[String] =
     FOLUtil.fvFOL(range).toSet
   
-  /** Extract all variables from scope formula φ(x,y)
-    * 
-    * Uses FOLUtil.fvFOL to get free variables, consistent with FOL infrastructure.
-    * Returns all variables (free and bound) by using varFOL which includes quantified variables.
-    * 
-    * Note: We want ALL variables here (including bound ones) since this is used for
-    * determining which variables appear in the scope formula, regardless of binding.
+  /** All variables occurring in the scope formula φ(x,y), free and bound.
+    *
+    * Uses `FOLUtil.varFOL`, which includes variables bound by inner
+    * `forall`/`exists` — this reports every variable appearing in the scope
+    * regardless of binding.
     */
   def scopeVars: Set[String] =
     FOLUtil.varFOL(scope).toSet

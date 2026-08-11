@@ -233,9 +233,8 @@ object TypedSemantics:
         }
 
       case BoundTerm.ConstRef(name, sort) =>
-        // Named constant: resolved by the runtime model. The IR carries no
-        // payload. Projects the name as raw carrier until a dedicated
-        // evalConstant lands on RuntimeDispatcher (see TODOS T-002).
+        // Named constant: the IR carries no payload, so the name itself is the
+        // raw carrier, resolved by the runtime model.
         Right(Value(sort, name))
 
       case BoundTerm.LiteralRef(_, sort, value) =>
