@@ -11,8 +11,7 @@ package fol.typed
   *
   * `TypedFunctionImpl.of[A]` documents the consumer's native return type at
   * the registration site without forcing the consumer to write the `: Any`
-  * widening manually. The combinator is identity-shaped; a normalizer may
-  * later give inline literals and function returns the same shape.
+  * widening manually. The combinator is identity-shaped.
   *
   * == Usage ==
   *

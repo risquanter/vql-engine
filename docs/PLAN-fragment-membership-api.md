@@ -1,6 +1,6 @@
 # PLAN — Fragment-Membership API (T-011, 0.12.0)
 
-**Status:** In progress.
+**Status:** Implemented; ADR-018 accepted (2026-08-12). Remaining gate: the release push.
 **Workstream:** register-facing fragment-membership check on the FOL parse tree.
 **Tracks:** [TODOS.md T-011](TODOS.md). Ships as the additive, non-breaking Central
 release **0.12.0**, ahead of the T-000 package rename (0.13.0).

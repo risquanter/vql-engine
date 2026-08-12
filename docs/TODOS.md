@@ -306,7 +306,7 @@ Shared root cause with T-009.
 **Status:** IMPLEMENTED (2026-08-12) — awaiting release. `fol.fragment`
 (`Fragment`, `FragmentViolation`, `FragmentCheck`) is in main with unit and
 parse-through tests; both fragments (`Targeting`, `Screening(k)`) ship.
-[ADR-018](ADR-018.md) records the design (Proposed until user sign-off);
+[ADR-018](ADR-018.md) records the design (Accepted 2026-08-12);
 [PLAN-fragment-membership-api.md](PLAN-fragment-membership-api.md) is the plan.
 Bundles as the additive (non-breaking) Central release **0.12.0**, ahead of the
 T-000 package rename (0.13.0). See "Release sequencing — T-011 and T-000" below.
@@ -414,7 +414,7 @@ and [ADR-018](ADR-018.md).** The code in `fol.fragment` follows the shape above:
 first-violation `Either[FragmentViolation, Unit]`, pre-order left-to-right
 traversal, `Term.Const`/`Term.Var` admitted and every `Term.Fn` rejected by
 `Targeting`, and 0-indexed quantifier-rank depth for `Screening(k)`. Ships in
-0.12.0; still gated on user acceptance of ADR-018 and the release itself.
+0.12.0 (ADR-018 accepted 2026-08-12); the release push is the remaining gate.
 
 ---
 
