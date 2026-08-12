@@ -7,23 +7,24 @@ on:
 permissions:
   contents: read
   id-token: write
+  attestations: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: '21'
           cache: sbt
 
       - name: Set up sbt
-        uses: sbt/setup-sbt@v1
+        uses: sbt/setup-sbt@8feba82adc7f01ddcf8165b86f778bdb5b82cebc # v1
 
       - name: Install tools
         run: sudo apt-get update -y && sudo apt-get install -y jq gpg zip
@@ -94,7 +95,7 @@ jobs:
           done
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@v4.0.0
+        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
 
       - name: Sign artifacts with Sigstore
         env:
@@ -106,6 +107,65 @@ jobs:
             echo "sigstore-signed: $f"
           done
 
+      - name: Generate SLSA build provenance
+        id: provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: 'target/bundle/**/*.jar'
+
+      - name: Ship provenance next to each main jar
+        env:
+          PROVENANCE_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          # Decision 7B: the SLSA provenance attestation travels to Maven Central
+          # next to each main jar so a consumer can verify it offline against our
+          # pinned workflow identity (cosign verify-blob-attestation
+          # --new-bundle-format --type slsaprovenance). One attestation bundle
+          # covers every variant's jar; a copy sits next to each variant's main
+          # jar and verification matches that jar's own digest inside it.
+          if [ ! -f "$PROVENANCE_BUNDLE" ]; then
+            echo "❌ Attestation bundle not found at $PROVENANCE_BUNDLE"
+            exit 1
+          fi
+          find target/bundle -type f -name '*.jar' \
+            ! -name '*-sources.jar' ! -name '*-javadoc.jar' | while read -r jar; do
+            cp "$PROVENANCE_BUNDLE" "${jar}.intoto.jsonl"
+            echo "provenance shipped: ${jar}.intoto.jsonl"
+          done
+
+      - name: Assert both platform variants are present
+        run: |
+          set -euo pipefail
+          # Decision 4B: a dropped platform variant is a valid upload to Maven
+          # Central (it just ships fewer artifacts), so Central never catches it;
+          # it is the one completeness failure nothing downstream detects. Assert
+          # both variants exist, each with its pom, main jar, and shipped
+          # provenance file. Sources/javadoc completeness stays Central's job.
+          BUNDLE=target/bundle
+
+          check_variant() {
+            label="$1"; dir="$2"
+            if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+              echo "❌ Missing $label platform variant under $BUNDLE"
+              exit 1
+            fi
+            pom=$(find "$dir" -maxdepth 1 -type f -name '*.pom' | head -1)
+            mainjar=$(find "$dir" -maxdepth 1 -type f -name '*.jar' \
+              ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -1)
+            prov=$(find "$dir" -maxdepth 1 -type f -name '*.intoto.jsonl' | head -1)
+            [ -n "$pom" ]     || { echo "❌ $label variant missing its .pom"; exit 1; }
+            [ -n "$mainjar" ] || { echo "❌ $label variant missing its main jar"; exit 1; }
+            [ -n "$prov" ]    || { echo "❌ $label variant missing its provenance file"; exit 1; }
+            echo "✅ $label variant complete: $dir"
+          }
+
+          # Version-leaf directory of each variant (the dir holding the .pom).
+          jvm_dir=$(find "$BUNDLE" -type f -name '*.pom' -path '*_3/*' ! -path '*_sjs1_3/*' -printf '%h\n' | sort -u | head -1)
+          js_dir=$(find "$BUNDLE" -type f -name '*.pom' -path '*_sjs1_3/*' -printf '%h\n' | sort -u | head -1)
+          check_variant "JVM (_3)" "$jvm_dir"
+          check_variant "Scala.js (_sjs1_3)" "$js_dir"
+
       - name: Create deployment bundle ZIP
         run: |
           set -euo pipefail
@@ -115,7 +175,7 @@ jobs:
           unzip -l maven-central-artifacts.zip
 
       - name: Upload Maven deployment bundle
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: deployment-${{ github.run_id }}
           path: maven-central-artifacts.zip

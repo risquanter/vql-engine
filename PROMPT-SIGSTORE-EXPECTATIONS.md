@@ -48,17 +48,18 @@ issued by `https://token.actions.githubusercontent.com`.
    format (currently v0.3). Do not switch to cosign's legacy
    `.bundle` JSON for the files uploaded to Central.
 
-4. **Pin GitHub Actions by commit SHA.** The workflows currently pin by
-   tag (`actions/checkout@v5`, `actions/setup-java@v5`, `sbt/setup-sbt@v1`,
-   `sigstore/cosign-installer@v4.0.0`, `actions/upload-artifact@v5`). A tag
-   is mutable; a compromised action in this repository compromises every
-   downstream consumer. Replace each tag with the full commit SHA (keep the
-   tag as a comment).
+4. **Pin GitHub Actions by commit SHA.** Every action in every workflow is
+   pinned to a full commit SHA with the moving tag kept as a trailing comment.
+   A tag is mutable; a compromised action in this repository would reach every
+   downstream consumer. Dependabot (`.github/dependabot.yml`, `github-actions`
+   ecosystem) opens a review-and-approve pull request when a new version ships,
+   so the pins stay current under review.
 
-5. **Optional hardening, not required by register:** `release.yml` checks
-   that a `.asc` file exists for each artifact but does not run
-   `gpg --verify` on it. Either verify it or note that the Sigstore check
-   is the effective control.
+5. **GPG signature: presence-checked, not verified.** `release.yml` confirms
+   a `.asc` exists for each artifact but deliberately does not run
+   `gpg --verify`. Maven Central's keyserver validation is the effective GPG
+   control for the binary; the Sigstore identity check is the
+   binary-authenticity control register relies on.
 
 ## How register verifies (for reference)
 
