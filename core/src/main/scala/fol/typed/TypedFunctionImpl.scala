@@ -4,17 +4,15 @@ package fol.typed
   *
   * == Motivation ==
   *
-  * `RuntimeDispatcher.evalFunction` returns `Either[String, Any]` after
-  * ADR-015 §1 / PLAN-symmetric-value-boundaries Phase 4. The consumer's
-  * native return type `A` is widened to `Any` at the dispatcher boundary;
-  * downstream lambdas recover a typed view via `value.extract[A]`
-  * (`Extract[A]` instance, ADR-015 §2).
+  * `RuntimeDispatcher.evalFunction` returns `Either[String, Any]`
+  * (ADR-015 §1). The consumer's native return type `A` is widened to `Any`
+  * at the dispatcher boundary; downstream lambdas recover a typed view via
+  * `value.extract[A]` (`Extract[A]` instance, ADR-015 §2).
   *
   * `TypedFunctionImpl.of[A]` documents the consumer's native return type at
   * the registration site without forcing the consumer to write the `: Any`
-  * widening manually. The combinator is currently identity-shaped; a
-  * follow-up plan (T-003) may introduce a normalizer to give inline literals
-  * and function returns the same shape.
+  * widening manually. The combinator is identity-shaped; a normalizer may
+  * later give inline literals and function returns the same shape.
   *
   * == Usage ==
   *
@@ -39,7 +37,7 @@ package fol.typed
   * )
   * }}}
   *
-  * See ADR-015 §1–§2 and PLAN-symmetric-value-boundaries.md for design rationale.
+  * See ADR-015 §1–§2 for design rationale.
   */
 object TypedFunctionImpl:
 

@@ -1,6 +1,6 @@
 # External-API `Either` audit — 2026-08-10
 
-Cross-cutting verification (`PLAN-range-formula-and-satisfying-set.md` §10.1)
+Cross-cutting verification (`DONE_PLAN-range-formula-and-satisfying-set.md` §10.1)
 that after all phases the external-facing API is `Either`-based and no
 vague-layer code relies on the exception form on any live path. Run against the
 `0.11.0` source. Suite green both platforms.

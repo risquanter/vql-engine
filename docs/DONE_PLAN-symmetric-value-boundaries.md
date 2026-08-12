@@ -1,7 +1,9 @@
 # Implementation Plan: Symmetric `Value` Boundaries (ADR-015 refactor)
 
-**Status:** Draft — awaiting user review (per `docs/WORKING-INSTRUCTIONS.md`
-§ "Mandatory Review Halt").
+**Status:** DONE (2026-05-02) — all phases complete. Phases 0–5b and 6
+executed (ADR-015 Accepted, artifact renamed to `vql-engine`); Phase 5c
+superseded by the recorded decision to defer the `Carrier[A]` GADT to
+`docs/TODOS.md` T-005.
 **Date:** 2026-05-01
 **Parent ADRs:** [ADR-015](ADR-015.md) (Proposed; under refactor),
 [ADR-001](ADR-001.md), [ADR-008](ADR-008.md),
@@ -25,17 +27,17 @@ symmetric typeclasses — `LiteralParser[A]` for the injection side,
 `literalValidators: Map[TypeId, String => Option[Any]]` registry. This
 plan executes that ADR in seven phases:
 
-| Phase | Output | Agent | Halt |
-|---|---|---|---|
-| 0 | ADR-015 internal-consistency review (pass/fail) | **Opus 4.7** | HARD STOP |
-| 1 | `LiteralParser[A]`, `Extract[A]`, library givens, `Value.extract[A]` | **Opus 4.7** | HARD STOP |
-| 2 | `TypeCatalog.literalValidators: Map[TypeId, String => Option[Any]]` | **Opus 4.7** | HARD STOP |
-| 3 | `QueryBinder` named-constant branch routes through validator (closes T-002) | **Opus 4.7** | HARD STOP |
-| 4 | Threading `Any` through `TypedSemantics` / `MapDispatcher` / `TypedFunctionImpl` | **Opus 4.7** | HARD STOP |
-| 5a | Split `BoundTerm.ConstRef` → `ConstRef` + `LiteralRef` (ADR-016) | **Opus 4.7** | HARD STOP |
-| 5b | Removal of `LiteralValue` enum and `TypeRepr`; full test green | **Opus 4.7** | HARD STOP |
-| 5c | _DEFERRED_ — `Carrier[A]` GADT for `LiteralRef.value` (ADR-016 Decision §2, §5); follow-up TODO | n/a | — |
-| 6 | Artifact rename (`fol-engine` → `vql-engine`), publish, code-consistency review, ADR-015 → `Accepted` | **Opus 4.7** | HARD STOP |
+| Phase | Output | Agent | Halt | Status |
+|---|---|---|---|---|
+| 0 | ADR-015 internal-consistency review (pass/fail) | **Opus 4.7** | HARD STOP | ✅ DONE |
+| 1 | `LiteralParser[A]`, `Extract[A]`, library givens, `Value.extract[A]` | **Opus 4.7** | HARD STOP | ✅ DONE |
+| 2 | `TypeCatalog.literalValidators: Map[TypeId, String => Option[Any]]` | **Opus 4.7** | HARD STOP | ✅ DONE |
+| 3 | `QueryBinder` named-constant branch routes through validator (closes T-002) | **Opus 4.7** | HARD STOP | ✅ DONE |
+| 4 | Threading `Any` through `TypedSemantics` / `MapDispatcher` / `TypedFunctionImpl` | **Opus 4.7** | HARD STOP | ✅ DONE |
+| 5a | Split `BoundTerm.ConstRef` → `ConstRef` + `LiteralRef` (ADR-016) | **Opus 4.7** | HARD STOP | ✅ DONE |
+| 5b | Removal of `LiteralValue` enum and `TypeRepr`; full test green | **Opus 4.7** | HARD STOP | ✅ DONE |
+| 5c | _DEFERRED_ — `Carrier[A]` GADT for `LiteralRef.value` (ADR-016 Decision §2, §5); follow-up TODO | n/a | — | ✅ SUPERSEDED (deferred → T-005) |
+| 6 | Artifact rename (`fol-engine` → `vql-engine`), publish, code-consistency review, ADR-015 → `Accepted` | **Opus 4.7** | HARD STOP | ✅ DONE |
 
 > ⚠️ **Per WORKING-INSTRUCTIONS § Mandatory Review Halt**, after every
 > phase the agent halts and waits for explicit user continuation. The
@@ -82,7 +84,7 @@ plan executes that ADR in seven phases:
 
 ---
 
-## 2. Phase 0 — ADR-015 Internal-Consistency Review
+## 2. Phase 0 — ADR-015 Internal-Consistency Review — ✅ DONE
 
 **Goal:** Verify ADR-015 (2026-05-01) is internally consistent before
 any code changes. If gaps or contradictions are found, the ADR is
@@ -128,7 +130,7 @@ mechanical edits.)
 
 ---
 
-## 3. Phase 1 — `LiteralParser[A]` + `Extract[A]` + Library Givens
+## 3. Phase 1 — `LiteralParser[A]` + `Extract[A]` + Library Givens — ✅ DONE
 
 **Goal:** Introduce the two typeclasses and the library-provided given
 instances. No changes to `TypeCatalog`, `QueryBinder`, or
@@ -187,7 +189,7 @@ carrier)".)
 
 ---
 
-## 4. Phase 2 — `TypeCatalog.literalValidators` Signature Change
+## 4. Phase 2 — `TypeCatalog.literalValidators` Signature Change — ✅ DONE
 
 **Goal:** Change `TypeCatalog`'s validator map from
 `Map[TypeId, String => Boolean]` (or whatever the current shape is —
@@ -239,7 +241,7 @@ hierarchy.)
 
 ---
 
-## 5. Phase 3 — `QueryBinder` Named-Constant Branch Rewrite (closes T-002)
+## 5. Phase 3 — `QueryBinder` Named-Constant Branch Rewrite (closes T-002) — ✅ DONE
 
 **Goal:** In `QueryBinder.bindTermExpected` (line ~131–141 today),
 replace the existing `Term.Const(name)` → `ConstRef(name, expected,
@@ -291,7 +293,7 @@ discipline.)
 
 ---
 
-## 6. Phase 4 — Thread `Any` Through Semantics / Dispatcher / Function Impl
+## 6. Phase 4 — Thread `Any` Through Semantics / Dispatcher / Function Impl — ✅ DONE
 
 **Goal:** Update `TypedSemantics.evalTerm`, `MapDispatcher`, and
 `TypedFunctionImpl` so the runtime carrier is `raw: Any` end-to-end and
@@ -354,7 +356,7 @@ Phase 5 is split into three sub-phases. 5a and 5b are mandatory and
 mechanical. 5c is **optional** and gated on a user decision at the
 Phase 5b HARD STOP.
 
-### 7.1 Phase 5a — Split `BoundTerm.ConstRef` into `ConstRef` + `LiteralRef`
+### 7.1 Phase 5a — Split `BoundTerm.ConstRef` into `ConstRef` + `LiteralRef` — ✅ DONE
 
 **Goal:** Separate the two unrelated jobs the current `ConstRef` node
 does (named constant vs parsed literal). Compiler best-practice; see
@@ -385,7 +387,7 @@ ADR-016 Decision §3.
 
 **HARD STOP** — Recommended agent for next step: **Opus 4.7**.
 
-### 7.2 Phase 5b — Remove `LiteralValue` and `TypeRepr`
+### 7.2 Phase 5b — Remove `LiteralValue` and `TypeRepr` — ✅ DONE
 
 **Goal:** Complete the design by removing the two abstractions ADR-015
 declares dead.
@@ -411,7 +413,7 @@ and `register` migrates in the same release window.
 
 **HARD STOP** — Recommended agent for next step: **Opus 4.7**.
 
-### 7.3 Phase 5c — `Carrier[A]` GADT for `LiteralRef.value` (DEFERRED)
+### 7.3 Phase 5c — `Carrier[A]` GADT for `LiteralRef.value` (DEFERRED) — ✅ SUPERSEDED (deferred → T-005)
 
 **Status:** **DEFERRED** to follow-up TODO (decision recorded
 2026-05-02; see Decision block below). Not executed as part of this
@@ -461,7 +463,7 @@ matches design or whether the ADR must be amended.)
 
 ---
 
-## 8. Phase 6 — Artifact Rename, Publish, ADR-015 Acceptance
+## 8. Phase 6 — Artifact Rename, Publish, ADR-015 Acceptance — ✅ DONE
 
 **Goal:** Finish the refactor with a publishable artifact under the
 correct name and a binding ADR-015.
@@ -550,5 +552,6 @@ the published `vql-engine:0.10.0-SNAPSHOT`.
 
 ## 10. Halt Marker
 
-> 🛑 **Per WORKING-INSTRUCTIONS § Mandatory Review Halt, the agent now stops.**
-> Awaiting explicit user signal to begin Phase 0.
+> ✅ **Plan complete (2026-05-02).** Phases 0–5b and 6 executed with the
+> full cross-platform suite green; Phase 5c superseded by the recorded
+> deferral to `docs/TODOS.md` T-005; ADR-015 is Accepted.

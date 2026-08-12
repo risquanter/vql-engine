@@ -66,8 +66,8 @@ class TypeCatalogSpec extends FunSuite:
     assertEquals(catalog.domainTypes, Set(asset))
     assertEquals(catalog.typeIds, Set(asset, loss))
 
-  // PLAN-symmetric-value-boundaries §4 (Phase 2) regression: name-collision
-  // detection must not be sensitive to the validator-map signature change.
+  // Name-collision detection must not be sensitive to the shape of the
+  // validator map (ADR-015 §4).
   test("nameCollisions detected even when validators are present"):
     val asset = TypeId("Asset")
     val loss  = TypeId("Loss")
@@ -85,8 +85,8 @@ class TypeCatalogSpec extends FunSuite:
       case _                                     => false
     }))
 
-  // PLAN-symmetric-value-boundaries §4 (Phase 2): validators may now produce
-  // any consumer carrier; e.g. parse Long literals into Long carriers.
+  // Validators may produce any consumer carrier (ADR-015 §4); e.g. parse
+  // Long literals into Long carriers.
   test("validator returning Some(parsedValue: Any) is accepted"):
     val asset = TypeId("Asset")
     val loss  = TypeId("Loss")

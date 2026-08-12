@@ -1,5 +1,14 @@
 # Implementation Plan: Paper-Compliant Vague Quantifier Queries
 
+**Status:** DONE (2026-08-11) — all phases complete. Phases 1–6 shipped as
+implemented; Phase 7 (documentation) is complete: README and
+`docs/VagueQuantifiers.md` cover the vague-quantifier layer,
+`docs/Architecture.md` carries the layer diagram, and the remaining items
+were superseded by the untyped-backend retirement (T-006,
+`docs/DONE_PLAN-range-formula-and-satisfying-set.md`), which deleted the
+demo examples this plan built and rewrote the docs around the typed
+pipeline.
+
 ## Goal
 Implement the paper's approach from Section 5.2: Extend FOL queries with vague quantifiers where the scope predicate is a FOL formula, not a Scala function.
 
@@ -1139,12 +1148,12 @@ src/test/scala/              # Test structure mirrors main/
 - ✅ End-to-end: Parser → Evaluation → Results
 - ✅ Working demo: `sbt "runMain fol.examples.VagueQuantifierDemo"`
 
-### 📋 **Phase 7: Documentation** - PENDING
-- [ ] README.md updated with vague quantifier section
-- [ ] Detailed guide in docs/VagueQuantifiers.md
-- [ ] Scaladoc review and completion
-- [ ] Examples README with usage instructions
-- [ ] Architecture diagram
+### ✅ **Phase 7: Documentation** - COMPLETE
+- [x] README.md updated with vague quantifier section (later rewritten around the typed pipeline)
+- [x] Detailed guide in docs/VagueQuantifiers.md
+- [x] Scaladoc review and completion — completed via the doc-consistency sweeps of the follow-up plans
+- [x] Examples README with usage instructions — SUPERSEDED: the demo examples were deleted with the untyped backend (T-006); README points to `VagueSemanticsTypedSpec` as the worked example
+- [x] Architecture diagram — docs/Architecture.md § Layer Diagram
 
 ---
 
@@ -1244,10 +1253,11 @@ Core FOL infrastructure: 358+ tests (all passing)
 
 ---
 
-### 🔄 Current Phase
+### ✅ Final Phase
 
-#### **Phase 7: Documentation** 📋 IN PROGRESS
+#### **Phase 7: Documentation** ✅ COMPLETE
 **Goal:** Comprehensive documentation for users and developers
+(The parser requirements below were already delivered in Phase 5.)
 
 **Files to create:**
 - `src/main/scala/vague/parser/VagueQueryParser.scala`
@@ -1283,7 +1293,7 @@ Core FOL infrastructure: 358+ tests (all passing)
 
 ---
 
-#### **Phase 6: Paper Examples with MONDIAL-Style Data** 📋 PENDING
+#### **Phase 6: Paper Examples with MONDIAL-Style Data** ✅ SUPERSEDED — the cybersecurity examples (above) filled this role; those demos were later deleted with the untyped backend (T-006), so no MONDIAL dataset is built
 **Goal:** Implement complete examples from paper Section 5.2 with realistic data
 
 **Files to create:**
@@ -1322,7 +1332,7 @@ Core FOL infrastructure: 358+ tests (all passing)
 
 ---
 
-#### **Phase 7: Documentation and Polish** 📋 PENDING
+#### **Phase 7: Documentation and Polish** ✅ COMPLETE — README and docs/VagueQuantifiers.md written; examples documentation superseded by the demo deletion (T-006)
 **Goal:** Comprehensive documentation for vague quantifier extension
 
 **Files to update/create:**
@@ -1369,13 +1379,8 @@ Phase 5: Parser ✅ COMPLETE (41 tests passing)
     ↓
 Phase 6: Examples ✅ COMPLETE (cybersecurity domain + 4 demo queries)
     ↓
-Phase 7: Documentation 📋 NEXT
+Phase 7: Documentation ✅ COMPLETE
 ```
 
-**Recommended Next Steps:**
-1. **Immediate**: Phase 7 (Documentation) — update README, `docs/VagueQuantifiers.md`, scaladoc review
-2. **After T-000**: Package rename `fol.*` → `vql.*` — see `docs/TODOS.md` T-000
-
----
-
-## Success Criteria (Updated)
+**Follow-up outside this plan:** package rename `fol.*` → `vql.*` — see
+`docs/TODOS.md` T-000.

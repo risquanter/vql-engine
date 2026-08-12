@@ -1,8 +1,9 @@
 # Multi-Sorted Type System for fol-engine — V2 (Constraint-Aligned)
 
-**Status:** Implemented (0.8.0-SNAPSHOT) — all D1-D6 decisions locked and in production  
-**Date:** 2026-03-26  
-**Scope:** fol-engine design for register query-pane integration  
+**Status:** CLOSED — design record. Decisions D1–D6 are codified in
+[ADR-001](ADR-001.md) (many-sorted query binding) and [ADR-014](ADR-014.md)
+(domain-type quantifiability); the typed path in `fol.typed` is their shipped
+realization. Kept for the decision rationale and rejected alternatives.  
 
 ---
 

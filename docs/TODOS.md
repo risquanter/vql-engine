@@ -1,36 +1,39 @@
 # TODOs
 
-## T-000 — Scala-package rename `fol.*` → `vql.*` (post-Phase 6 follow-up)
+## T-000 — Scala-package rename `fol.*` → `vql.*`
 
-**Status:** PENDING — sequence as a separate single-purpose commit
-*after* `PLAN-symmetric-value-boundaries.md` Phase 6 lands the artifact
-rename (`fol-engine` → `vql-engine`, version unchanged at
-`0.10.0-SNAPSHOT`).
+**Status:** PENDING — breaking change, sequenced into its own Central release.
+Baseline is `vql-engine 0.11.0` (published to Central; the `fol-engine` →
+`vql-engine` artifact rename already shipped). Target release: **0.13.0**, after
+the fragment-membership API ships in 0.12.0. See "Release sequencing — T-011 and
+T-000" below and [T-011](#t-011--fragment-membership-api-register-facing-targeting-0120).
 
-**Scope:**
-- Rename Scala packages across `core/src/**`:
-  `fol.typed` → `vql.typed`,
-  `fol.parser` → `vql.parser`,
-  `fol.semantics` → `vql.semantics`,
+**Scope:** rename every `fol.*` package across `core/src/**` — the complete set,
+not a subset:
   `fol.error` → `vql.error`,
-  and any other top-level `fol.*` package surface.
+  `fol.logic` → `vql.logic`,
+  `fol.parser` → `vql.parser`,
+  `fol.quantifier` → `vql.quantifier`,
+  `fol.result` → `vql.result`,
+  `fol.sampling` → `vql.sampling`,
+  `fol.semantics` → `vql.semantics`,
+  `fol.typed` → `vql.typed`,
+  and `fol.fragment` → `vql.fragment` once T-011 lands.
 - Update all `import` statements within VQL.
-- Update register's `import fol.*` references accordingly
-  (`register/modules/server/src/main/scala/com/risquanter/register/foladapter/**`
-  imports `fol.typed.{Value, TypeId, TypeRepr, ...}` today — see e.g.
-  `QueryResponseBuilder.scala`).
+- Downstream: register's entire `import fol.*` surface across the foladapter
+  module rewrites in lockstep (RiskTreeKnowledgeBase, QueryServiceLive,
+  QueryRequest, AppError, the foladapter specs). register consumes this only as
+  a Central binary, so it adopts the rename as a published-release pin bump.
 
-**Why deferred:** Mechanical but breaking — both the artifact rename
-(Phase 6) and the package rename in the same commit would conflate
-two concerns. Sequencing as a separate commit keeps the diff
-reviewable and lets the artifact rename ship cleanly first.
+**Why its own release:** the rename touches register's whole import surface. Kept
+apart from the fragment-membership API (T-011) so register absorbs one bounded
+breaking change per pin bump — a pure mechanical import rewrite here, with no new
+API to integrate in the same diff.
 
-**Why not bumped to a major version:** `0.10.0-SNAPSHOT` is a
-pre-1.0 SNAPSHOT; we are explicitly not stabilising the public API
-yet (per user direction; see register `PLAN-QUERY-NODE-NAME-LITERALS.md`
-§9 F-R4 and ADR-020).
+**Why not a major version:** pre-1.0 early-semver; the public API is deliberately
+not stabilised yet.
 
-**Reference:** `docs/PLAN-symmetric-value-boundaries.md` §1 (Out of
+**Reference:** `docs/DONE_PLAN-symmetric-value-boundaries.md` §1 (Out of
 scope) and §8 Phase 6 (Step 6.1).
 
 ---
@@ -44,7 +47,7 @@ scope) and §8 Phase 6 (Step 6.1).
 
 ## T-002 — Named constants: design review and correctness gap
 
-**Status:** ✅ RESOLVED by ADR-015 §4 + Phase 3 of `PLAN-symmetric-value-boundaries.md` (2026-05-02). `BoundTerm.ConstRef.raw` is now `Any` and inline literals carry the parsed primitive (or consumer-chosen wrapper) produced by the registered `literalValidator`, not `TextLiteral` of the source text. A validator returning `None` produces the new `TypeCheckError.UnparseableConstant(name, sort, sourceText)`. Named constants registered via `catalog.constants` (option (a)/(c) of the original design space) are still treated as a separate path; the design space below is preserved for the historical record.
+**Status:** ✅ RESOLVED by ADR-015 §4 + Phase 3 of `DONE_PLAN-symmetric-value-boundaries.md` (2026-05-02). `BoundTerm.ConstRef.raw` is now `Any` and inline literals carry the parsed primitive (or consumer-chosen wrapper) produced by the registered `literalValidator`, not `TextLiteral` of the source text. A validator returning `None` produces the new `TypeCheckError.UnparseableConstant(name, sort, sourceText)`. Named constants registered via `catalog.constants` (option (a)/(c) of the original design space) are still treated as a separate path; the design space below is preserved for the historical record.
 
 **Original status (2026-04-03):** DEFERRED.
 
@@ -116,7 +119,7 @@ T-004 is resolved.
 
 ## T-005 — `Carrier[A]` GADT for `LiteralRef.value` (deferred from PLAN Phase 5c)
 
-**Status:** Deferred (recorded 2026-05-02 at PLAN-symmetric-value-boundaries.md
+**Status:** Deferred (recorded 2026-05-02 at DONE_PLAN-symmetric-value-boundaries.md
 Phase 5b HARD STOP). Re-evaluate when a second literal-walking consumer appears.
 
 **Trigger to re-open:** introduction of any consumer that walks `LiteralRef`
@@ -132,14 +135,14 @@ super-typeclass.
 
 **Authoritative design:** [ADR-016](ADR-016-carrier-witness-on-symmetric-value-typeclasses.md).
 
-**Implementation sketch:** see `PLAN-symmetric-value-boundaries.md` §7.3.
+**Implementation sketch:** see `DONE_PLAN-symmetric-value-boundaries.md` §7.3.
 
 ---
 
 ## T-006 — Retire the untyped evaluation backend
 
 **Status:** ✅ DONE (Phase 0 of
-`docs/PLAN-range-formula-and-satisfying-set.md`, 2026-08-10). The untyped
+`docs/DONE_PLAN-range-formula-and-satisfying-set.md`, 2026-08-10). The untyped
 backend and its demos/tests were deleted per that plan's §4.1 inventory;
 ADR-005/008/009/010 are Deprecated. The typed many-sorted backend
 (`VagueSemantics.evaluateTyped` → `fol.typed`) is the only evaluation path.
@@ -168,7 +171,7 @@ only by tests and demos" is a dead-code smell.
 ## T-007 — Fresh typed-path demo
 
 **Status:** PENDING — write after Phase 5 of
-`docs/PLAN-range-formula-and-satisfying-set.md`, against the finished API
+`docs/DONE_PLAN-range-formula-and-satisfying-set.md`, against the finished API
 (formula ranges + `satisfyingSet`).
 
 **Context:** Phase 0 (T-006) deleted the untyped demos
@@ -235,7 +238,7 @@ TimeoutError, ConfigError`.
 ## T-009 — Evaluator short-circuit and dispatcher-error masking under non-total models (investigation)
 
 **Status:** PENDING — investigation. Surfaced by the Phase 3 complex review
-(2026-08-10, `PLAN-range-formula-and-satisfying-set.md`).
+(2026-08-10, `DONE_PLAN-range-formula-and-satisfying-set.md`).
 
 **Observation:** `TypedSemantics.evalFormula` short-circuits `And`/`Or`/`Imp`
 and the `∀`/`∃` folds. When a dispatcher raises `Left(EvaluationError)` for some
@@ -295,3 +298,126 @@ Shared root cause with T-009.
 
 **Context:** Phase 3 complex review finding 5; `fol/sampling/HDRSampler.scala`
 `sample`/`toArray`; ADR-003 (reproducibility claim). See also T-009.
+
+---
+
+## T-011 — Fragment-membership API (register-facing, targeting 0.12.0)
+
+**Status:** PENDING — register-facing deliverable. Not present in 0.11.0. Ships
+in its own additive (non-breaking) Central release, **0.12.0**, ahead of the
+T-000 package rename (0.13.0). See "Release sequencing — T-011 and T-000" below.
+
+**Why it exists:** register's write-path validation
+(`PLAN-RISKTRANSFORM.md` §8.4-3, ruled 2026-08-10) needs to reject, at its HTTP
+boundary, any formula outside a declared fragment before that formula reaches
+typed bind. The check belongs on the engine's parse tree, not in register.
+
+**Contract (from register §8.4-3):**
+- A structural membership test over a parsed `Formula[FOL]` — the inert parse
+  tree `FOLParser.parse` returns as `Either[parser.ParseError, Formula[FOL]]`.
+  Runs on the parse tree only, before any typed bind. Does not reshape or fork
+  the parser.
+- One implementation, two fragment specs:
+  - **targeting**: no quantifier nodes, no function-application terms;
+  - **screening**: quantifier depth ≤ k.
+- **Structural / sort-agnostic** — embeds no sort logic. register enforces its
+  sort rule (P-1) separately at bind time. Pre-M3 the targeting fragment simply
+  admits no quantifiers; at M3 the bind-time sort rule takes over and this
+  machinery is unchanged.
+- The return value carries **which fragment rule was violated**, not a bare
+  boolean, so register can emit a specific 400.
+
+**Why here, not a restricted parser entry point:** the Harrison-port parser core
+is preserved verbatim (ADR-007, characteristics C1–C13); a restricted parser
+would fork that protected core for no gain. A membership test on the parse tree
+accepts exactly the same string set, and rejecting before typed bind keeps the
+"reject at the language boundary" property intact.
+
+**Proposed home + name** (engine's call; register left name and fragment-spec
+shape open): `fol.fragment.FragmentCheck` — a new sibling package of `fol.typed`.
+It walks a foundation `Formula[FOL]` and needs no `TypeCatalog`, so it stays
+independent of the typed machinery it sits beside. Alternative considered:
+place it directly in `fol.typed`.
+
+**Proposed shape:**
+```scala
+package fol.fragment
+
+enum Fragment:
+  case Targeting                            // no quantifiers, no function-application terms
+  case Screening(maxQuantifierDepth: Int)   // quantifier depth ≤ k
+
+enum FragmentViolation:
+  case QuantifierNotAllowed                          // targeting: a Forall/Exists node is present
+  case FunctionApplicationNotAllowed(function: String) // targeting: a Term.Fn is present
+  case QuantifierDepthExceeded(limit: Int, found: Int) // screening: depth > k
+
+object FragmentCheck:
+  /** Right(()) iff `formula` lies in `fragment`; Left carries the first
+    * violated rule. */
+  def check(formula: Formula[FOL], fragment: Fragment): Either[FragmentViolation, Unit]
+```
+
+**Feasibility of "which rule was violated": confirmed.** The parse tree carries
+every structural fact the two specs need:
+- quantifier nodes = `Formula.Forall` / `Formula.Exists`;
+- function-application terms = `Term.Fn` (distinct from `Term.Var` and
+  `Term.Const`; inline literals parse to `Term.Const`, so the targeting fragment
+  admits variables and literals and rejects only `Fn`);
+- quantifier depth = nesting depth of `Forall` / `Exists`.
+
+`FragmentViolation` names the specific rule, which register maps to a specific
+400. The `Either` return with a typed error mirrors `TypeCheckError` (the
+house style).
+
+**Return granularity — RULED (user, 2026-08-11):** first violation. `check`
+returns `Either[FragmentViolation, Unit]`, `Left` carrying the first violated
+rule. Membership is yes/no-with-reason; a single reason is enough for register's
+400. A future `Either[List[FragmentViolation], Unit]` (all offending nodes) is a
+strictly additive widening if register later wants it — not carried now.
+
+**Fixed parse-tree facts register absorbs (not choices):**
+- **`Term.Const` vs `Term.Fn`.** `FOLParser.parse` emits inline literals
+  (`42`, `"IT Risk"`, const-named bare identifiers) as `Term.Const`, and
+  everything applicative — `f(args)`, nullary `f()`, unary minus `-x`, and the
+  arithmetic operators `+ - * / ^ ::` — as `Term.Fn`. "No function-application
+  terms" therefore means "no `Term.Fn` node anywhere in the formula's terms":
+  the targeting fragment admits variables and literals and rejects every `Fn`,
+  including arithmetic operators. This is the engine's fixed representation;
+  register consumes it, it is not a knob register sets.
+- **Bare formula, not `ParsedQuery`.** The check is over a `Formula[FOL]` from
+  `FOLParser.parse` — register's write-path formula validation — not the
+  vague-query (`VagueQueryParser` → `ParsedQuery`) path. Consistent with §8.4-3.
+
+**Not implemented in this pass.** Sequencing places it in its own 0.12.0 release;
+implementation runs its own phased plan under `WORKING-INSTRUCTIONS.md` with user
+approval and a fragment ADR (it adds public API). This entry fixes the contract
+so it is not lost.
+
+---
+
+## Release sequencing — T-011 and T-000
+
+register consumes this engine only as Central binaries and absorbs one bounded
+breaking change per pin bump. Sequenced so each release is independently
+adoptable:
+
+| Version | Change | Breaking? | Rationale |
+|---|---|---|---|
+| 0.11.0 (shipped) | formula ranges + `satisfyingSet`; 4 `QueryError` variants removed | breaking (error surface) | on Central; register migrates AppError + prunes one server test |
+| **0.12.0** | fragment-membership API ([T-011](#t-011--fragment-membership-api-register-facing-targeting-0120)) | **no — additive** | register needs it for M2/M3 write-path validation; adds no import rewrite, adopted on register's schedule |
+| **0.13.0** | package rename `fol.*` → `vql.*` ([T-000](#t-000--scala-package-rename-fol--vql)) | **yes — import rewrite** | isolated so register's pin bump is a pure mechanical import rewrite, including `fol.fragment` → `vql.fragment`, with nothing else to reason about |
+
+**Order rationale:** fragment API first because register needs it sooner and it
+is non-breaking, so register adopts without a forced import rewrite. The rename
+lands last so register does the whole-surface import rewrite once, against the
+final package layout (fragment API included).
+
+**T-008** (prune 10 more dead `QueryError` variants) is a **third, separate**
+breaking release — never bundled with T-000 or T-011 — coordinated with the
+register AppError change it forces. Version TBD, after 0.13.0.
+
+**Open for register to confirm:** the order between 0.12.0 and 0.13.0 depends on
+register's M2/M3 timing versus its readiness to do the import rewrite. Engine
+recommends fragment-first as above; register may request the reverse given
+advance notice of the target versions.

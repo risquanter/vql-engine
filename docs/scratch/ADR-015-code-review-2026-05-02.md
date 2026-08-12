@@ -2,7 +2,7 @@
 
 **Reviewer:** Internal (Phase 6 automated review)  
 **VQL commit at review time:** `4d76d5b` (Phase 5b GREEN — `TypeRepr`/`LiteralValue` deleted)  
-**Plan:** `PLAN-symmetric-value-boundaries.md`, Phase 6 Step 6.3  
+**Plan:** `DONE_PLAN-symmetric-value-boundaries.md`, Phase 6 Step 6.3  
 **Outcome:** ADR-015 promoted to Accepted (2026-05-02) after one ⚠️ drift adopted back into §4.
 
 ---

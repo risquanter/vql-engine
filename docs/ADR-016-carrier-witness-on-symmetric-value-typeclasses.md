@@ -168,5 +168,5 @@ val x: Either[String, Long] = v.extract[Long]
 ## References
 
 - [ADR-015](ADR-015.md) — Symmetric `Value` boundaries (parent)
-- [PLAN-symmetric-value-boundaries.md](PLAN-symmetric-value-boundaries.md) — Phase 5a/5b/5c gating
+- [DONE_PLAN-symmetric-value-boundaries.md](DONE_PLAN-symmetric-value-boundaries.md) — Phase 5a/5b/5c gating
 - LLVM `llvm::Constant` hierarchy; Roslyn `BoundLiteral`; GHC `Literal`

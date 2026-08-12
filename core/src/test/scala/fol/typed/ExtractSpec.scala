@@ -4,7 +4,7 @@ import munit.FunSuite
 import scala.compiletime.testing.typeChecks
 
 /** Tests for [[Extract]] and the `Value.extract[A]` extension
-  * (ADR-015 §2 + PLAN-symmetric-value-boundaries §3).
+  * (ADR-015 §2).
   *
   * Coverage:
   *   - `Extract[Long]` accepts a `Value` whose `raw` is a `Long`; rejects

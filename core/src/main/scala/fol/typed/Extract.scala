@@ -3,10 +3,9 @@ package fol.typed
 /** Extraction-boundary typeclass: lift a `Value` into the consumer's
   * chosen JVM carrier `A`.
   *
-  * Per ADR-015 §2 and PLAN-symmetric-value-boundaries.md §3 (Phase 1):
-  * the library provides instances for primitive carriers (with numeric
+  * The library provides instances for primitive carriers (with numeric
   * widening from `Long` to `Double`); consumers provide instances for
-  * their own carriers as `given` declarations.
+  * their own carriers as `given` declarations (ADR-015 §2).
   *
   * The runtime carrier check inside an `Extract[A]` instance is the
   * **only** sanctioned cast site on the extraction side

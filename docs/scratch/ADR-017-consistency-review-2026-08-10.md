@@ -1,6 +1,6 @@
 # ADR-017 consistency review — 2026-08-10
 
-Phase 2 gate of `PLAN-range-formula-and-satisfying-set.md`. Design-only: no
+Phase 2 gate of `DONE_PLAN-range-formula-and-satisfying-set.md`. Design-only: no
 code changed this phase, so the suite state is the Phase 1 result (green, both
 platforms). `docs/ADR-017.md` is authored at status **Proposed**; it flips to
 **Accepted** in Phase 6 (§10) after the code-vs-ADR walk.

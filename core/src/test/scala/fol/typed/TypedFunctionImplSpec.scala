@@ -2,15 +2,12 @@ package fol.typed
 
 import munit.FunSuite
 
-/** Phase 4 (PLAN-symmetric-value-boundaries §6 / ADR-015 §1, §2).
+/** Tests for [[TypedFunctionImpl]] (ADR-015 §1, §2).
   *
-  * `TypedFunctionImpl.of[A]` no longer takes a `wrap: A => LiteralValue`
-  * parameter. The dispatcher boundary now carries `Any` end-to-end; the
-  * consumer's native `A` is widened at the registration site, and any
-  * downstream lambda recovers a typed view via `value.extract[A]`
-  * (`Extract[A]` instance, ADR-015 §2). The T-003 normalizer concern
-  * (uniform shape for inline literals vs function returns) is deferred
-  * to a separate plan.
+  * The dispatcher boundary carries `Any` end-to-end; the consumer's
+  * native `A` is widened at the registration site, and any downstream
+  * lambda recovers a typed view via `value.extract[A]` (`Extract[A]`
+  * instance, ADR-015 §2).
   */
 class TypedFunctionImplSpec extends FunSuite:
 

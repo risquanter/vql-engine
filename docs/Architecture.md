@@ -48,7 +48,7 @@ core/src/main/scala/
 │  ┌─────────────────────────┴──────────────────────────────────┐ │
 │  │ quantifier: Quantifier                                     │ │
 │  │ variable:   BoundVar (name, sort)                          │ │
-│  │ range:      BoundAtom                                       │ │
+│  │ range:      BoundFormula                                   │ │
 │  │ scope:      BoundFormula                                   │ │
 │  │ answerVars: List[BoundVar]                                 │ │
 │  └────────────────────────────────────────────────────────────┘ │
@@ -78,9 +78,9 @@ core/src/main/scala/
 
 ## Evaluation Pipeline
 
-A parsed query flows through the typed pipeline in three phases:
+A parsed query flows through the typed pipeline in three stages:
 
-| Phase | Step |
+| Stage | Step |
 |---|---|
 | Parse | `VagueQueryParser.parse(s)` → `ParsedQuery` |
 | Bind | `VagueSemantics.bindTyped(query, catalog)` → `BoundQuery` (via `QueryBinder.bind`) |
@@ -130,12 +130,12 @@ and [ADR-012](ADR-012.md).
 | [ADR-002](ADR-002.md) | Parser-Combinator Style — CPS, single Either boundary |
 | [ADR-003](ADR-003.md) | HDR Deterministic Sampling — Fisher-Yates, reproducibility |
 | [ADR-004](ADR-004.md) | Tagless Initial Architecture — ADTs + operations, layering |
-| [ADR-005](ADR-005.md) | Model Augmentation — endomorphism monoid, numeric infra (Deprecated, T-006) |
+| [ADR-006](ADR-006.md) | ADT Encoding — `enum` for pure-data sum types, `sealed trait` for behavioural hierarchies |
 | [ADR-007](ADR-007.md) | Preserve OCaml-Ported Parser Combinator Core |
-| [ADR-008](ADR-008.md) | Domain Type Safety — generic `KnowledgeBase[D]` (Deprecated, T-006) |
-| [ADR-009](ADR-009.md) | Symmetric Relation Support via Schema Metadata (Deprecated, T-006) |
-| [ADR-010](ADR-010.md) | Typed Relation Names — `RelationName` Opaque Type (Deprecated, T-006) |
 | [ADR-012](ADR-012.md) | Error Channel Policy — `require` vs `Either` |
+| [ADR-014](ADR-014.md) | Domain Type Quantifiability — two orthogonal validation checks |
+| [ADR-015](ADR-015.md) | Symmetric Value Boundaries — `LiteralParser` / `Extract` typeclasses |
+| [ADR-017](ADR-017.md) | Formula Ranges and the Satisfying-Set Boundary |
 
 ---
 
@@ -147,8 +147,8 @@ No external runtime dependencies beyond `com.risquanter::hdr-rng`.
 Test framework: munit 1.0.0.
 
 ```
-sbt test          # 732 tests (JVM + Scala.js)
-sbt publishLocal  # com.risquanter::vql-engine:0.10.2
+sbt test          # 770 tests (JVM + Scala.js)
+sbt publishLocal  # com.risquanter::vql-engine:0.11.0
 ```
 
 ---

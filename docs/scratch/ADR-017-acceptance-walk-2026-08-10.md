@@ -1,7 +1,7 @@
 # ADR-017 acceptance walk — 2026-08-10
 
 Code-vs-ADR consistency walk run before flipping ADR-017 status
-Proposed → Accepted (`PLAN-range-formula-and-satisfying-set.md` Phase 6).
+Proposed → Accepted (`DONE_PLAN-range-formula-and-satisfying-set.md` Phase 6).
 Each Implementation-table row checked against the actual source.
 
 | ADR-017 Implementation row | Verdict | Evidence |

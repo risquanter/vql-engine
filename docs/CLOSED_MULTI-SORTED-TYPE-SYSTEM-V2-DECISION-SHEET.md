@@ -1,5 +1,8 @@
 # Multi-Sorted Type System V2 — Decision Sheet
 
+**Status:** CLOSED — design record. Decisions D1–D6 are codified in
+[ADR-001](ADR-001.md) and [ADR-014](ADR-014.md) and shipped in `fol.typed`.
+Kept for the decision rationale and rejected alternatives.  
 **Purpose:** record locked V2 decisions with minimal context, examples, and trade-offs.  
 **Scope:** architectural decisions only; selected options are canonical unless explicitly marked compatibility-only.
 

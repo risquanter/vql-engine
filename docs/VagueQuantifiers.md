@@ -1,7 +1,7 @@
 # Vague Quantifiers: Theory and Paper Mapping
 
 Reference document mapping the mathematical framework from
-Fermüller et al. (2016) to the fol-engine implementation.
+Fermüller et al. (2016) to the vql-engine implementation.
 
 For architecture and code organization, see [Architecture.md](Architecture.md).  
 For evaluation pipeline details, see [ADR-001](ADR-001.md).

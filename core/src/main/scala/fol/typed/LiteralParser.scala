@@ -3,10 +3,9 @@ package fol.typed
 /** Injection-boundary typeclass: parse a query-string literal into the
   * consumer's chosen JVM carrier `A`.
   *
-  * Per ADR-015 §1 and PLAN-symmetric-value-boundaries.md §3 (Phase 1):
-  * the library provides instances for primitive carriers; consumers
+  * The library provides instances for primitive carriers; consumers
   * provide instances for their own carriers and register them in
-  * `TypeCatalog.literalValidators` (Phase 2).
+  * `TypeCatalog.literalValidators` (ADR-015 §1).
   *
   * The library-internal adapter that widens `LiteralParser[A].parse:
   * String => Either[String, A]` to the catalog's

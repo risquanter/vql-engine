@@ -1,8 +1,10 @@
 # Implementation Plan: Untyped-Path Retirement + Formula Ranges + Satisfying-Set API
 
-**Status:** Draft — awaiting user review (per `docs/WORKING-INSTRUCTIONS.md`
-§ "Mandatory Review Halt"). All rulings recorded (§2); awaiting the user's
-signal to begin Phase 0.
+**Status:** DONE (2026-08-11) — all phases 0–6 complete. Shipped as
+v0.11.0: untyped backend retired (T-006), `FOLParser` `Either` boundary,
+formula ranges, `satisfyingSet`, ADR-017 Accepted. AC-9 was superseded by
+the Ruling of 2026-08-10 (untyped-path retirement); every other acceptance
+criterion is satisfied per §11.
 **Date:** 2026-08-10
 **Source contract:** `PROMPT-VQL-RANGE-AND-TARGETING.md` (repo root) — the
 acceptance criteria AC-1 … AC-10 defined there are the interface contract the
@@ -43,15 +45,15 @@ Three pieces of work, in dependency order:
   formula (one free variable, no quantifier, no answer variables) to its
   exact satisfying set over that variable's sort domain.
 
-| Phase | Output | Halt |
-|---|---|---|
-| 0 | Untyped-path retirement: deletions per inventory (§4.1) incl. the untyped demos, ADR status sweep (ADR-005/008/009/010 → Deprecated), full markdown-corpus sweep per disposition table (§4.2) incl. README rewrite | HARD STOP |
-| 1 | FOL parse boundary: foundation-local parse-error type; `FOLParser.parse`/`defaultParser`/`parseWithLexer` return `Either`; call-site updates; ADR-007 deviation note; ADR-012 §Relationship finalized | HARD STOP |
-| 2 | ADR-017 draft (formula-range semantics + satisfying-set boundary) + consistency review; ADR-001 §3 edit staged | HARD STOP |
-| 3 | Typed IL widening: `BoundQuery.range: BoundFormula`; `collectRangeElements` via `evalFormula`; IR-level compound-range tests (AC-1, AC-2 at IR level) | HARD STOP |
-| 4 | Surface widening: `ParsedQuery.range: Formula[FOL]`, parser range production, binder reuses `bindFormula`; AC-1/2/3/4/6 tests | HARD STOP |
-| 5 | `satisfyingSet` entry point (accepts pre-parsed `Formula[FOL]`); AC-5 tests | HARD STOP |
-| 6 | Docs (AC-8), ADR-001 consistency edit, ADR-017 acceptance, version bump (AC-10), doc-consistency sweep | HARD STOP |
+| Phase | Output | Halt | Status |
+|---|---|---|---|
+| 0 | Untyped-path retirement: deletions per inventory (§4.1) incl. the untyped demos, ADR status sweep (ADR-005/008/009/010 → Deprecated), full markdown-corpus sweep per disposition table (§4.2) incl. README rewrite | HARD STOP | ✅ DONE |
+| 1 | FOL parse boundary: foundation-local parse-error type; `FOLParser.parse`/`defaultParser`/`parseWithLexer` return `Either`; call-site updates; ADR-007 deviation note; ADR-012 §Relationship finalized | HARD STOP | ✅ DONE |
+| 2 | ADR-017 draft (formula-range semantics + satisfying-set boundary) + consistency review; ADR-001 §3 edit staged | HARD STOP | ✅ DONE |
+| 3 | Typed IL widening: `BoundQuery.range: BoundFormula`; `collectRangeElements` via `evalFormula`; IR-level compound-range tests (AC-1, AC-2 at IR level) | HARD STOP | ✅ DONE |
+| 4 | Surface widening: `ParsedQuery.range: Formula[FOL]`, parser range production, binder reuses `bindFormula`; AC-1/2/3/4/6 tests | HARD STOP | ✅ DONE |
+| 5 | `satisfyingSet` entry point (accepts pre-parsed `Formula[FOL]`); AC-5 tests | HARD STOP | ✅ DONE |
+| 6 | Docs (AC-8), ADR-001 consistency edit, ADR-017 acceptance, version bump (AC-10), doc-consistency sweep | HARD STOP | ✅ DONE |
 
 > ⚠️ **Per WORKING-INSTRUCTIONS § Mandatory Review Halt**, the agent halts
 > after every phase and waits for explicit user continuation.
@@ -298,7 +300,7 @@ No rulings are pending.
 
 ---
 
-## 4. Phase 0 — Untyped-Path Retirement (T-006)
+## 4. Phase 0 — Untyped-Path Retirement (T-006) — ✅ DONE
 
 **Goal:** Remove the untyped evaluation backend so the engine has one
 evaluation path. No behavioral change to the typed path.
@@ -377,9 +379,9 @@ Left as records (content unchanged):
 
 | File | Reason |
 |---|---|
-| `IMPLEMENTATION_PLAN.md` | Historical build plan of the original implementation |
-| `docs/PLAN-symmetric-value-boundaries.md` | Completed-workstream plan record |
-| `docs/MULTI-SORTED-TYPE-SYSTEM-V2.md` + `-DECISION-SHEET.md` | Design records preceding ADR-001/014 |
+| `DONE_IMPLEMENTATION_PLAN.md` | Historical build plan of the original implementation |
+| `docs/DONE_PLAN-symmetric-value-boundaries.md` | Completed-workstream plan record |
+| `docs/CLOSED_MULTI-SORTED-TYPE-SYSTEM-V2.md` + `-DECISION-SHEET.md` | Design records preceding ADR-001/014 |
 | `PROMPT-VQL-RANGE-AND-TARGETING.md` | Source contract; AC-9 supersession is recorded in this plan |
 | `docs/PROMPT-CODE-QUALITY-REVIEW.md` | Procedure doc; no untyped references |
 | `docs/TECHNICAL-DEBT.md` | TD-001 is a closed-debt record |
@@ -397,7 +399,7 @@ result.
 
 ---
 
-## 5. Phase 1 — FOL Parse Boundary (`Either` at the Foundation Entry)
+## 5. Phase 1 — FOL Parse Boundary (`Either` at the Foundation Entry) — ✅ DONE
 
 **Goal:** Implement the boundary conversion the corpus already prescribes
 (ADR-007 C2: parser exceptions never escape the public API; ADR-012
@@ -451,7 +453,7 @@ no-escaping-exception tests green; ADR-007 and ADR-012 notes written.
 
 ---
 
-## 6. Phase 2 — ADR-017 Draft + Consistency Gate
+## 6. Phase 2 — ADR-017 Draft + Consistency Gate — ✅ DONE
 
 **Goal:** The semantic decisions are written down as ADR-017 and checked for
 consistency with the corpus before the code changes.
@@ -493,7 +495,7 @@ amended.
 
 ---
 
-## 7. Phase 3 — Typed IL Widening (no syntax change)
+## 7. Phase 3 — Typed IL Widening (no syntax change) — ✅ DONE
 
 **Goal:** Widen the IR and evaluator first, keeping the parser and
 `ParsedQuery` untouched. After this phase the engine can evaluate compound
@@ -535,7 +537,7 @@ assertion above green.
 
 ---
 
-## 8. Phase 4 — Surface Widening (parser + `ParsedQuery` + binder)
+## 8. Phase 4 — Surface Widening (parser + `ParsedQuery` + binder) — ✅ DONE
 
 **Goal:** The query language accepts formula ranges end-to-end.
 
@@ -588,7 +590,7 @@ report).
 
 ---
 
-## 9. Phase 5 — Satisfying-Set Entry Point
+## 9. Phase 5 — Satisfying-Set Entry Point — ✅ DONE
 
 **Goal:** Job 2's contract: evaluate a bare formula to its exact satisfying
 set over one sort's domain.
@@ -632,7 +634,7 @@ covered by the new spec.
 
 ---
 
-## 10. Phase 6 — Docs, ADR Acceptance, Version (AC-8, AC-10)
+## 10. Phase 6 — Docs, ADR Acceptance, Version (AC-8, AC-10) — ✅ DONE
 
 **Goal:** The documentation corpus describes the current state; ADR-017 is
 binding; the version reflects the API change.
@@ -750,6 +752,5 @@ updated; consistency walk recorded; §10.1 audit passes.
 
 ## 12. Halt Marker
 
-> 🛑 **Per WORKING-INSTRUCTIONS § Mandatory Review Halt, the agent now
-> stops.** This plan is design only. No rulings are pending. Awaiting
-> explicit user signal to begin Phase 0.
+> ✅ **Plan complete (2026-08-11).** All phases 0–6 executed and reviewed;
+> full suite green on both platforms at every phase; shipped as v0.11.0.

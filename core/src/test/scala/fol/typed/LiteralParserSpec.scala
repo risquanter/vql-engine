@@ -2,7 +2,7 @@ package fol.typed
 
 import munit.FunSuite
 
-/** Tests for [[LiteralParser]] (ADR-015 §1 + PLAN-symmetric-value-boundaries §3).
+/** Tests for [[LiteralParser]] (ADR-015 §1).
   *
   * Coverage:
   *   - Long parser: positive/negative integers; rejects non-numeric, rejects
@@ -34,8 +34,8 @@ class LiteralParserSpec extends FunSuite:
     assert(summon[LiteralParser[Double]].parse("abc").isLeft)
 
   // ----- asValidator: lift a LiteralParser[A] to TypeCatalog shape -----
-  // (PLAN-symmetric-value-boundaries §4: the only sanctioned A → Any
-  // widening on the injection side.)
+  // (The only sanctioned A → Any widening on the injection side,
+  // ADR-015 § Code Smells.)
 
   test("asValidator[Long] returns Some(parsed) for valid input"):
     val v: String => Option[Any] = LiteralParser.asValidator[Long]
