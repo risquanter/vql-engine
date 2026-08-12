@@ -25,6 +25,7 @@ core/src/main/scala/
     ├── semantics/   VagueSemantics (typed facade)
     ├── sampling/    HDRSampler, ProportionEstimator, SampleSizeCalculator, NormalApprox, SamplingParams
     ├── quantifier/  VagueQuantifier, Quantifier
+    ├── fragment/    Fragment, FragmentViolation, FragmentCheck
     ├── result/      VagueQueryResult, EvaluationOutput
     └── error/       QueryError, QueryException
 ```
@@ -116,6 +117,14 @@ domain D_R. Extraction is always exact (never sampled).
 `SamplingParams.exact` forces n = N for deterministic full-domain
 evaluation. See [ADR-003](ADR-003.md).
 
+**Fragment membership:**
+`fragment.FragmentCheck.check(formula, fragment)` decides, structurally, whether
+a parsed `Formula[FOL]` lies in a declared `Fragment` (`Targeting` or
+`Screening(k)`), returning the first `FragmentViolation` otherwise. It runs on
+the parse tree before any typed bind, needs no `TypeCatalog` or model, and forks
+no parser. Callers with text parse via `FOLParser.parse` and map the foundation
+`ParseError` at their own boundary. See [ADR-018](ADR-018.md).
+
 **Error handling:**
 Public methods return `Either[QueryError, A]`. See [ADR-002](ADR-002.md)
 and [ADR-012](ADR-012.md).
@@ -136,6 +145,7 @@ and [ADR-012](ADR-012.md).
 | [ADR-014](ADR-014.md) | Domain Type Quantifiability — two orthogonal validation checks |
 | [ADR-015](ADR-015.md) | Symmetric Value Boundaries — `LiteralParser` / `Extract` typeclasses |
 | [ADR-017](ADR-017.md) | Formula Ranges and the Satisfying-Set Boundary |
+| [ADR-018](ADR-018.md) | Structural Fragment Membership over the Parse Tree |
 
 ---
 
@@ -147,8 +157,8 @@ No external runtime dependencies beyond `com.risquanter::hdr-rng`.
 Test framework: munit 1.0.0.
 
 ```
-sbt test          # 770 tests (JVM + Scala.js)
-sbt publishLocal  # com.risquanter::vql-engine:0.11.0
+sbt test          # 795 tests (JVM + Scala.js)
+sbt publishLocal  # com.risquanter::vql-engine:0.12.0
 ```
 
 ---

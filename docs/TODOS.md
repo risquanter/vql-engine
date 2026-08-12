@@ -303,9 +303,15 @@ Shared root cause with T-009.
 
 ## T-011 — Fragment-membership API (register-facing, targeting 0.12.0)
 
-**Status:** PENDING — register-facing deliverable. Not present in 0.11.0. Ships
-in its own additive (non-breaking) Central release, **0.12.0**, ahead of the
+**Status:** IMPLEMENTED (2026-08-12) — awaiting release. `fol.fragment`
+(`Fragment`, `FragmentViolation`, `FragmentCheck`) is in main with unit and
+parse-through tests; both fragments (`Targeting`, `Screening(k)`) ship.
+[ADR-018](ADR-018.md) records the design (Proposed until user sign-off);
+[PLAN-fragment-membership-api.md](PLAN-fragment-membership-api.md) is the plan.
+Bundles as the additive (non-breaking) Central release **0.12.0**, ahead of the
 T-000 package rename (0.13.0). See "Release sequencing — T-011 and T-000" below.
+The contract and rulings below are retained as the specification of the shipped
+code.
 
 **Why it exists:** register's write-path validation
 (`PLAN-RISKTRANSFORM.md` §8.4-3, ruled 2026-08-10) needs to reject, at its HTTP
@@ -376,6 +382,20 @@ rule. Membership is yes/no-with-reason; a single reason is enough for register's
 400. A future `Either[List[FragmentViolation], Unit]` (all offending nodes) is a
 strictly additive widening if register later wants it — not carried now.
 
+**Fragment scope for 0.12.0 — RULED (user, 2026-08-12):** ship both fragments
+(`Targeting` and `Screening(k)`) in 0.12.0, not targeting-only.
+
+**Depth-counting convention — RULED (user, 2026-08-12):** maximum nesting depth
+(quantifier rank), 0-indexed. `Screening(k)` admits a formula when the largest
+number of quantifier nodes (`Forall` / `Exists`) on any single root-to-leaf path
+is ≤ `k`; side-by-side quantifiers do not add up, only nesting does. So
+`Screening(0)` admits no quantifiers (identical to targeting's quantifier rule),
+`Screening(1)` admits one level of nesting, and `∃` inside `∃` needs
+`Screening(2)`. This is the cost-relevant quantity (each nesting level multiplies
+domain enumeration) and matches the standard meaning of the API word "depth". A
+total-quantifier-count budget, if register ever needs one, is a separate named
+fragment added additively — not this one.
+
 **Fixed parse-tree facts register absorbs (not choices):**
 - **`Term.Const` vs `Term.Fn`.** `FOLParser.parse` emits inline literals
   (`42`, `"IT Risk"`, const-named bare identifiers) as `Term.Const`, and
@@ -389,10 +409,12 @@ strictly additive widening if register later wants it — not carried now.
   `FOLParser.parse` — register's write-path formula validation — not the
   vague-query (`VagueQueryParser` → `ParsedQuery`) path. Consistent with §8.4-3.
 
-**Not implemented in this pass.** Sequencing places it in its own 0.12.0 release;
-implementation runs its own phased plan under `WORKING-INSTRUCTIONS.md` with user
-approval and a fragment ADR (it adds public API). This entry fixes the contract
-so it is not lost.
+**Implemented under [PLAN-fragment-membership-api.md](PLAN-fragment-membership-api.md)
+and [ADR-018](ADR-018.md).** The code in `fol.fragment` follows the shape above:
+first-violation `Either[FragmentViolation, Unit]`, pre-order left-to-right
+traversal, `Term.Const`/`Term.Var` admitted and every `Term.Fn` rejected by
+`Targeting`, and 0-indexed quantifier-rank depth for `Screening(k)`. Ships in
+0.12.0; still gated on user acceptance of ADR-018 and the release itself.
 
 ---
 
