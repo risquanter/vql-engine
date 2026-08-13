@@ -118,9 +118,9 @@ jobs:
           PROVENANCE_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
         run: |
           set -euo pipefail
-          # Decision 7B: the SLSA provenance attestation travels to Maven Central
-          # next to each main jar so a consumer can verify it offline against our
-          # pinned workflow identity (cosign verify-blob-attestation
+          # The SLSA provenance attestation travels to Maven Central next to each
+          # main jar so a consumer can verify it offline against our pinned
+          # workflow identity (cosign verify-blob-attestation
           # --new-bundle-format --type slsaprovenance). One attestation bundle
           # covers every variant's jar; a copy sits next to each variant's main
           # jar and verification matches that jar's own digest inside it.
@@ -134,11 +134,29 @@ jobs:
             echo "provenance shipped: ${jar}.intoto.jsonl"
           done
 
+      - name: Checksum and GPG-sign the provenance files
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          # The Central Portal validates every bundle file it does not treat as a
+          # bare-tolerated companion. It tolerates .asc/.md5/.sha1/.sigstore.json
+          # unchecksummed, but rejects .intoto.jsonl without md5, sha1, and a GPG
+          # signature. Give each provenance file all three so the deployment
+          # passes validation; the checksums and .asc are themselves tolerated bare.
+          find target/bundle -type f -name '*.intoto.jsonl' | while read -r f; do
+            md5sum "$f"  | awk '{print $1}' > "$f.md5"
+            sha1sum "$f" | awk '{print $1}' > "$f.sha1"
+            gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
+              --local-user "$GPG_KEYID" --armor --detach-sign "$f"
+            echo "provenance signed + checksummed: $f"
+          done
+
       - name: Assert both platform variants are present
         run: |
           set -euo pipefail
-          # Decision 4B: a dropped platform variant is a valid upload to Maven
-          # Central (it just ships fewer artifacts), so Central never catches it;
+          # A dropped platform variant is a valid upload to Maven Central (it just
+          # ships fewer artifacts), so Central never catches it;
           # it is the one completeness failure nothing downstream detects. Assert
           # both variants exist, each with its pom, main jar, and shipped
           # provenance file. Sources/javadoc completeness stays Central's job.
