@@ -1,9 +1,9 @@
-package fol.typed
+package vql.typed
 
-import fol.error.QueryError
-import fol.quantifier.VagueQuantifier
-import fol.result.{EvaluationOutput, VagueQueryResult}
-import fol.sampling.{HDRConfig, HDRSampler, ProportionEstimate, ProportionEstimator, SampleSizeCalculator, SamplingParams}
+import vql.error.QueryError
+import vql.quantifier.VagueQuantifier
+import vql.result.{EvaluationOutput, VagueQueryResult}
+import vql.sampling.{HDRConfig, HDRSampler, ProportionEstimate, ProportionEstimator, SampleSizeCalculator, SamplingParams}
 
 object TypedSemantics:
 

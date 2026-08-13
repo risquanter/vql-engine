@@ -1,4 +1,4 @@
-package fol.typed
+package vql.typed
 
 /** Error produced by [[RuntimeModel.validateAgainst]].
   *
@@ -27,7 +27,7 @@ enum RuntimeModelError:
     */
   case MissingDomainForType(typeName: TypeId)
 
-  /** Human-readable summary of this error, used in [[fol.error.QueryError.ModelValidationError]]. */
+  /** Human-readable summary of this error, used in [[vql.error.QueryError.ModelValidationError]]. */
   def message: String = this match
     case MissingFunctionImplementation(n) => s"missing function: ${n.value}"
     case MissingPredicateImplementation(n) => s"missing predicate: ${n.value}"

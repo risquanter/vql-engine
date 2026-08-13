@@ -1,8 +1,8 @@
-package fol.quantifier
+package vql.quantifier
 
-// Quantifier is in the same package (fol.quantifier) after being moved from fol.logic.
+// Quantifier is in the same package (vql.quantifier) after being moved from vql.logic.
 // No import or alias needed.
-import fol.result.VagueQueryResult
+import vql.result.VagueQueryResult
 
 /** Vague quantifier for proportional reasoning over populations.
   * 
@@ -20,13 +20,13 @@ import fol.result.VagueQueryResult
   * - AtMost (Q[≤]): proportion ≤ threshold (e.g., "few", "hardly any")
   * 
   * This is the ergonomic Scala API (percentage-based). Internally,
-  * acceptance checking delegates to [[fol.quantifier.Quantifier.accepts]]
+  * acceptance checking delegates to [[vql.quantifier.Quantifier.accepts]]
   * which implements the paper's Definition 2 with ratio-based notation.
   * Use [[toQuantifier]] to convert to the canonical ratio form.
   */
 sealed trait VagueQuantifier:
   
-  /** Convert to the canonical ratio-based [[fol.quantifier.Quantifier]].
+  /** Convert to the canonical ratio-based [[vql.quantifier.Quantifier]].
     * 
     * The ratio form (k/n) is what the parser produces and what the paper
     * uses. This conversion enables the typed DSL and the string-parsed
@@ -36,7 +36,7 @@ sealed trait VagueQuantifier:
   
   /** Evaluate whether the proportion satisfies this quantifier.
     * 
-    * Delegates to [[fol.quantifier.Quantifier.accepts]] using the
+    * Delegates to [[vql.quantifier.Quantifier.accepts]] using the
     * quantifier's own tolerance as epsilon.
     * 
     * @param proportion Estimated proportion in [0, 1]
@@ -114,7 +114,7 @@ case class AtMost(threshold: Double, tolerance: Double = 0.0) extends VagueQuant
 /** Common vague quantifiers with sensible defaults. */
 object VagueQuantifier:
   
-  /** Convert from the canonical ratio-based [[fol.quantifier.Quantifier]]
+  /** Convert from the canonical ratio-based [[vql.quantifier.Quantifier]]
     * to the ergonomic percentage-based [[VagueQuantifier]].
     * 
     * This is the inverse of [[VagueQuantifier.toQuantifier]].

@@ -1,4 +1,4 @@
-package fol.fragment
+package vql.fragment
 
 /** A structural sub-language of FOL that a formula's parse tree may or may not
   * lie within. Membership is decided by [[FragmentCheck.check]] and depends only
@@ -22,7 +22,7 @@ enum Fragment:
 /** The specific fragment rule a formula broke. Returned as the `Left` of
   * [[FragmentCheck.check]], carrying the first violation in pre-order,
   * left-to-right traversal. Mirrors the typed-error house style of
-  * `fol.typed.TypeCheckError`.
+  * `vql.typed.TypeCheckError`.
   */
 enum FragmentViolation:
   /** Targeting: a `Forall`/`Exists` node is present. */

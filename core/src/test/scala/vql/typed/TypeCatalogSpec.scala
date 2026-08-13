@@ -1,4 +1,4 @@
-package fol.typed
+package vql.typed
 
 import TypeDecl.*
 import munit.FunSuite

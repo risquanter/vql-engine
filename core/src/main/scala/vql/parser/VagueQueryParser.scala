@@ -1,8 +1,8 @@
-package fol.parser
+package vql.parser
 
-import fol.logic.ParsedQuery
-import fol.quantifier.Quantifier
-import fol.error.{QueryError, QueryException}
+import vql.logic.ParsedQuery
+import vql.quantifier.Quantifier
+import vql.error.{QueryError, QueryException}
 import logic.{FOL, Formula, Term}
 import parser.{FOLAtomParser, FormulaParser}
 import parser.Combinators.{tokenLabel, tokensLabel}

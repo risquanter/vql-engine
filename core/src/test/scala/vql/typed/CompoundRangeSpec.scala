@@ -1,8 +1,8 @@
-package fol.typed
+package vql.typed
 
-import fol.quantifier.{Quantifier, VagueQuantifier}
-import fol.result.{EvaluationOutput, VagueQueryResult}
-import fol.sampling.{ProportionEstimator, SamplingParams}
+import vql.quantifier.{Quantifier, VagueQuantifier}
+import vql.result.{EvaluationOutput, VagueQueryResult}
+import vql.sampling.{ProportionEstimator, SamplingParams}
 import munit.FunSuite
 
 /** IR-level tests for formula ranges (ADR-017 §§1–3).

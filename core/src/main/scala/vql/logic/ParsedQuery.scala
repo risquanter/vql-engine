@@ -1,7 +1,7 @@
-package fol.logic
+package vql.logic
 
-import fol.error.QueryError
-import fol.quantifier.Quantifier
+import vql.error.QueryError
+import vql.quantifier.Quantifier
 import logic.{FOL, Formula, Term, FOLUtil}
 
 /** Vague quantifier query from paper Definition 1 (Section 5.2)
@@ -92,7 +92,7 @@ object ParsedQuery:
 
     // Validation: x must occur free in the range formula
     if !query.rangeVars.contains(x) then
-      throw fol.error.QueryException(QueryError.ValidationError(
+      throw vql.error.QueryException(QueryError.ValidationError(
         s"Quantified variable '$x' must occur free in the range formula",
         "quantified_variable",
         Map(
@@ -104,7 +104,7 @@ object ParsedQuery:
     // Paper constraint: y' ⊆ y (free range vars minus x ⊆ answer vars)
     val rangeVarsMinusX = query.rangeVars - x
     if !rangeVarsMinusX.subsetOf(y.toSet) then
-      throw fol.error.QueryException(QueryError.ValidationError(
+      throw vql.error.QueryException(QueryError.ValidationError(
         s"Range variables ${rangeVarsMinusX.mkString(",")} must be subset of answer variables ${y.mkString(",")}",
         "answer_variables",
         Map(

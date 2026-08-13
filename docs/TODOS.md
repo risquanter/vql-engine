@@ -2,11 +2,13 @@
 
 ## T-000 — Scala-package rename `fol.*` → `vql.*`
 
-**Status:** PENDING — breaking change, sequenced into its own Central release.
-Baseline is `vql-engine 0.11.0` (published to Central; the `fol-engine` →
-`vql-engine` artifact rename already shipped). Target release: **0.13.0**, after
-the fragment-membership API ships in 0.12.0. See "Release sequencing — T-011 and
-T-000" below and [T-011](#t-011--fragment-membership-api-register-facing-targeting-0120).
+**Status:** Implemented in the working tree — all nine `fol.*` packages renamed
+to `vql.*` (core main + test), live docs swept, `build.sbt`/README/Architecture
+at `0.13.0`, CHANGELOG `0.13.0` entry added; full suite green both platforms.
+Remaining gate: the user's commit + publish of the `0.13.0` release, and
+register's lockstep import rewrite. Sequenced after the fragment-membership API
+(0.12.x). See "Release sequencing — T-011 and T-000" below and
+[T-011](#t-011--fragment-membership-api-register-facing-targeting-0120).
 
 **Scope:** rename every `fol.*` package across `core/src/**` — the complete set,
 not a subset:
@@ -32,6 +34,9 @@ API to integrate in the same diff.
 
 **Why not a major version:** pre-1.0 early-semver; the public API is deliberately
 not stabilised yet.
+
+**Plan:** `docs/PLAN-package-rename-fol-to-vql.md` (drafted; preconditions §9
+before execution).
 
 **Reference:** `docs/DONE_PLAN-symmetric-value-boundaries.md` §1 (Out of
 scope) and §8 Phase 6 (Step 6.1).

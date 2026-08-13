@@ -1,9 +1,9 @@
-package fol.typed
+package vql.typed
 
 import TypeDecl.*
 import munit.FunSuite
-import fol.logic.ParsedQuery
-import fol.quantifier.Quantifier
+import vql.logic.ParsedQuery
+import vql.quantifier.Quantifier
 import logic.{FOL, Formula, Term}
 
 class QueryBinderSpec extends FunSuite:

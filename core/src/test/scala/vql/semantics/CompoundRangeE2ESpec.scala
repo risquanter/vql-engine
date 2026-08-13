@@ -1,9 +1,9 @@
-package fol.semantics
+package vql.semantics
 
-import fol.parser.VagueQueryParser
-import fol.sampling.SamplingParams
-import fol.typed.{FolModel, PredicateSig, RuntimeDispatcher, RuntimeModel, SymbolName, TypeCatalog, TypeId, Value}
-import fol.typed.TypeDecl.DomainType
+import vql.parser.VagueQueryParser
+import vql.sampling.SamplingParams
+import vql.typed.{FolModel, PredicateSig, RuntimeDispatcher, RuntimeModel, SymbolName, TypeCatalog, TypeId, Value}
+import vql.typed.TypeDecl.DomainType
 import munit.FunSuite
 
 /** End-to-end tests for formula ranges: parse a compound-range query string and

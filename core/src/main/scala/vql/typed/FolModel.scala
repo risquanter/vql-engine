@@ -1,6 +1,6 @@
-package fol.typed
+package vql.typed
 
-import fol.error.QueryError
+import vql.error.QueryError
 
 /** A validated pairing of [[TypeCatalog]] and [[RuntimeModel]].
   *

@@ -1,12 +1,12 @@
-package fol.typed
+package vql.typed
 
 import TypeDecl.*
-import fol.error.QueryError
-import fol.logic.ParsedQuery
-import fol.quantifier.Quantifier
-import fol.sampling.SamplingParams
-import fol.semantics.VagueSemantics
-import fol.typed.FolModel
+import vql.error.QueryError
+import vql.logic.ParsedQuery
+import vql.quantifier.Quantifier
+import vql.sampling.SamplingParams
+import vql.semantics.VagueSemantics
+import vql.typed.FolModel
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
 

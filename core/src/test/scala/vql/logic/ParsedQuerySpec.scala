@@ -1,9 +1,9 @@
-package fol.logic
+package vql.logic
 
 import munit.FunSuite
 import logic.{FOL, Formula, Term}
-import fol.error.QueryException
-import fol.quantifier.Quantifier
+import vql.error.QueryException
+import vql.quantifier.Quantifier
 
 class ParsedQuerySpec extends FunSuite:
   import ParsedQuery.*, Quantifier.*, Formula.*, Term.*

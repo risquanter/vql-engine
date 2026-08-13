@@ -1,4 +1,4 @@
-package fol.quantifier
+package vql.quantifier
 
 import munit.FunSuite
 

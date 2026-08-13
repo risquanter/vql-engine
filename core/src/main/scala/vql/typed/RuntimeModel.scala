@@ -1,4 +1,4 @@
-package fol.typed
+package vql.typed
 
 /** A sort-tagged runtime value produced by `TypedSemantics.evaluate`.
   *

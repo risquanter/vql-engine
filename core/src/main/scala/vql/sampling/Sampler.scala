@@ -1,4 +1,4 @@
-package fol.sampling
+package vql.sampling
 
 import scala.collection.immutable.Set
 import scala.reflect.ClassTag

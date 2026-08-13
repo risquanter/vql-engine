@@ -1,4 +1,4 @@
-package fol.sampling
+package vql.sampling
 
 /** Statistical precision parameters for proportion estimation.
   *

@@ -1,8 +1,8 @@
-package fol.semantics
+package vql.semantics
 
-import fol.error.QueryError
-import fol.typed.TypeDecl.*
-import fol.typed.{FolModel, PredicateSig, QueryBinder, RuntimeDispatcher, RuntimeModel, SymbolName, TypeCatalog, TypeCheckError, TypeId, Value}
+import vql.error.QueryError
+import vql.typed.TypeDecl.*
+import vql.typed.{FolModel, PredicateSig, QueryBinder, RuntimeDispatcher, RuntimeModel, SymbolName, TypeCatalog, TypeCheckError, TypeId, Value}
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
 

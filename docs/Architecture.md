@@ -16,7 +16,7 @@ core/src/main/scala/
 ├── printer/         FOLPrinter, PrinterUtil
 ├── util/            StringUtil
 │
-└── fol/             Vague quantifier extension (imports foundation ↑, never imported by it)
+└── vql/             Vague quantifier extension (imports foundation ↑, never imported by it)
     ├── parser/      VagueQueryParser
     ├── logic/       ParsedQuery
     ├── typed/       TypeCatalog, QueryBinder, BoundQuery, TypedSemantics,
@@ -151,14 +151,14 @@ and [ADR-012](ADR-012.md).
 
 ## Build
 
-Scala 3.7.4, sbt 1.12.0-RC1, GraalVM Java 25.
+Scala 3.7.4, sbt 1.12.14, GraalVM Java 25.
 
 No external runtime dependencies beyond `com.risquanter::hdr-rng`.
 Test framework: munit 1.0.0.
 
 ```
 sbt test          # 795 tests (JVM + Scala.js)
-sbt publishLocal  # com.risquanter::vql-engine:0.12.0
+sbt publishLocal  # com.risquanter::vql-engine:0.13.0
 ```
 
 ---

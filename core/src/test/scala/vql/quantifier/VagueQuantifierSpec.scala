@@ -1,8 +1,8 @@
-package fol.quantifier
+package vql.quantifier
 
 import munit.FunSuite
-import fol.sampling.{SamplingParams, HDRConfig, ProportionEstimator}
-import fol.result.VagueQueryResult
+import vql.sampling.{SamplingParams, HDRConfig, ProportionEstimator}
+import vql.result.VagueQueryResult
 
 /** Test suite for Vague Quantifiers
   * 

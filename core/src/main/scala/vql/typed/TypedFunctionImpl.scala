@@ -1,4 +1,4 @@
-package fol.typed
+package vql.typed
 
 /** Helpers for constructing type-safe [[RuntimeDispatcher]] function lambdas.
   *

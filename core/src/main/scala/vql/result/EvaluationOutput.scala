@@ -1,4 +1,4 @@
-package fol.result
+package vql.result
 
 /** Element-aware evaluation result.
   *

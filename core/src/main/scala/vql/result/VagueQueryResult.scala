@@ -1,14 +1,14 @@
-package fol.result
+package vql.result
 
-import fol.quantifier.{VagueQuantifier, Quantifier}
-import fol.sampling.ProportionEstimate
+import vql.quantifier.{VagueQuantifier, Quantifier}
+import vql.sampling.ProportionEstimate
 
 /** Unified result type for all vague quantifier evaluations.
   * 
   * Replaces the previous split between:
-  * - `fol.semantics.QueryResult` (flat 5-field, no CI)
+  * - `vql.semantics.QueryResult` (flat 5-field, no CI)
   * - `fol.query.QueryResult` (wrapper around QuantifierResult)
-  * - `fol.quantifier.QuantifierResult` (inner result type)
+  * - `vql.quantifier.QuantifierResult` (inner result type)
   * 
   * This single type is returned by all evaluation modes:
   * - Exact evaluation (full population enumeration)

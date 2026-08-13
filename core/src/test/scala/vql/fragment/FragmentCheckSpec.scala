@@ -1,4 +1,4 @@
-package fol.fragment
+package vql.fragment
 
 import logic.{FOL, Formula, Term}
 import parser.FOLParser

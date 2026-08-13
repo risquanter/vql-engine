@@ -1,12 +1,12 @@
-package fol.semantics
+package vql.semantics
 
-import fol.error.QueryError
-import fol.logic.ParsedQuery
-import fol.quantifier.Quantifier
-import fol.sampling.SamplingParams
-import fol.typed.{BoundAtom, BoundFormula, BoundQuery, BoundTerm, BoundVar, FolModel, PredicateSig, RuntimeDispatcher, RuntimeModel, TypeCatalog, TypedSemantics, TypeId, SymbolName, Value, extract}
-import fol.typed.Extract.*
-import fol.typed.TypeDecl.{DomainType, ValueType}
+import vql.error.QueryError
+import vql.logic.ParsedQuery
+import vql.quantifier.Quantifier
+import vql.sampling.SamplingParams
+import vql.typed.{BoundAtom, BoundFormula, BoundQuery, BoundTerm, BoundVar, FolModel, PredicateSig, RuntimeDispatcher, RuntimeModel, TypeCatalog, TypedSemantics, TypeId, SymbolName, Value, extract}
+import vql.typed.Extract.*
+import vql.typed.TypeDecl.{DomainType, ValueType}
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
 

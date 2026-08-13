@@ -1,4 +1,4 @@
-package fol.typed
+package vql.typed
 
 enum TypeCheckError:
   case UnknownPredicate(name: String)

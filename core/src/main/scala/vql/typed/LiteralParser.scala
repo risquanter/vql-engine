@@ -1,4 +1,4 @@
-package fol.typed
+package vql.typed
 
 /** Injection-boundary typeclass: parse a query-string literal into the
   * consumer's chosen JVM carrier `A`.

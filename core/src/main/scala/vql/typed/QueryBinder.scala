@@ -1,6 +1,6 @@
-package fol.typed
+package vql.typed
 
-import fol.logic.ParsedQuery
+import vql.logic.ParsedQuery
 import logic.{FOL, Formula, Term}
 
 object QueryBinder:

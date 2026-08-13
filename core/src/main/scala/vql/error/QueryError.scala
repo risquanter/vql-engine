@@ -1,4 +1,4 @@
-package fol.error
+package vql.error
 
 /** Structured error types for vague quantifier evaluation.
   *
@@ -143,9 +143,9 @@ object QueryError:
   
   /** Defensive fallback raised when evaluation reaches a type with no registered
     * domain, despite passing binding. In a correctly wired system this should
-    * not be reachable: [[fol.typed.RuntimeModel.validateAgainst]] enforces domain
+    * not be reachable: [[vql.typed.RuntimeModel.validateAgainst]] enforces domain
     * coverage before queries are served.
-    * See also: [[fol.typed.TypedSemantics]]
+    * See also: [[vql.typed.TypedSemantics]]
     */
   case class DomainNotFoundError(
     typeName: String,
@@ -175,7 +175,7 @@ object QueryError:
   /** Raised when a query fails the typed bind phase (type-check errors).
     * Indicates a user query error — all instances map to HTTP 400.
     * Individual error messages are rendered strings; raw TypeCheckError
-    * detail is not carried here due to fol.error → fol.typed package constraint.
+    * detail is not carried here due to vql.error → vql.typed package constraint.
     */
   case class BindError(
     errors: List[String]
@@ -186,7 +186,7 @@ object QueryError:
   /** Raised when RuntimeModel.validateAgainst fails (dispatcher or domain
     * coverage gaps). Indicates a wiring/infra error — all instances map to HTTP 500.
     * Individual error messages are rendered strings; raw RuntimeModelError
-    * detail is not carried here due to fol.error → fol.typed package constraint.
+    * detail is not carried here due to vql.error → vql.typed package constraint.
     */
   case class ModelValidationError(
     errors: List[String]

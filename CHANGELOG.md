@@ -3,6 +3,37 @@
 This project follows early-semver (pre-1.0): breaking changes bump the minor
 version.
 
+## 0.13.0
+
+### Changed (breaking)
+
+- **All `fol.*` packages renamed to `vql.*`.** Every vague-layer package —
+  `fol.error`, `fol.fragment`, `fol.logic`, `fol.parser`, `fol.quantifier`,
+  `fol.result`, `fol.sampling`, `fol.semantics`, `fol.typed` — now lives under
+  `vql.*`. Downstream imports rewrite mechanically (`import fol.X` →
+  `import vql.X`); there are no type, signature, or behaviour changes. The
+  package namespace now matches the published artifact name (`vql-engine`). The
+  FOL foundation packages (`logic`, `parser`, `semantics`, `printer`, `lexer`)
+  and every `FOL` identifier are unchanged.
+
+## 0.12.1
+
+- CI pipeline patch (release signing / provenance). No library or API changes.
+
+## 0.12.0
+
+### Added
+
+- **Fragment-membership API.** New package `fol.fragment`: a structural
+  membership test over a parsed `Formula[FOL]` that decides whether a formula
+  lies inside a declared fragment, returning the first violated rule when it does
+  not. `FragmentCheck.check(formula, fragment)` returns
+  `Either[FragmentViolation, Unit]`. Two fragments: `Fragment.Targeting` (no
+  quantifier nodes, no function-application terms) and `Fragment.Screening(k)`
+  (maximum quantifier nesting depth ≤ `k`, 0-indexed). The check walks the parse
+  tree only, needs no `TypeCatalog`, and forks no parser. Additive and
+  non-breaking. See ADR-018.
+
 ## 0.11.0
 
 ### Added

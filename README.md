@@ -7,7 +7,7 @@ The FOL foundation (parser combinators, pretty printer, Tarski semantics) follow
 ## Installation
 
 ```scala
-libraryDependencies += "com.risquanter" %%% "vql-engine" % "0.12.0"
+libraryDependencies += "com.risquanter" %%% "vql-engine" % "0.13.0"
 ```
 
 (`%%%` resolves to `vql-engine_3` on the JVM and `vql-engine_sjs1_3` on Scala.js; use `%%` for JVM-only projects.)
@@ -17,11 +17,11 @@ libraryDependencies += "com.risquanter" %%% "vql-engine" % "0.12.0"
 Parse a query in the paper's syntax and evaluate it through the typed, many-sorted pipeline. Declare the sorts and predicate signatures in a `TypeCatalog`, provide the runtime data (domains plus a dispatcher that decides each predicate) in a `RuntimeModel`, and combine them into a validated `FolModel`. The public API is `Either`-based: parse, model-construction, and evaluation errors come back as typed `QueryError` values, never exceptions.
 
 ```scala
-import fol.parser.VagueQueryParser
-import fol.semantics.VagueSemantics
-import fol.sampling.SamplingParams
-import fol.typed.{FolModel, RuntimeModel, RuntimeDispatcher, TypeCatalog, PredicateSig, TypeId, SymbolName, Value}
-import fol.typed.TypeDecl.DomainType
+import vql.parser.VagueQueryParser
+import vql.semantics.VagueSemantics
+import vql.sampling.SamplingParams
+import vql.typed.{FolModel, RuntimeModel, RuntimeDispatcher, TypeCatalog, PredicateSig, TypeId, SymbolName, Value}
+import vql.typed.TypeDecl.DomainType
 
 // 1. Declare the sort and predicate signatures.
 val asset = TypeId("Asset")
@@ -67,14 +67,14 @@ Supported quantifier operators: About (`~`), AtLeast (`>=`), AtMost (`<=`), each
 
 The range `R(x, y')` is a full FOL formula, so the quantified population can be a compound set — `Q[<=]^{1/3} x (server(x) /\ ~patched(x), exploitable(x))`. Negation is closed-world over the sort's active domain (see [docs/VagueQuantifiers.md](docs/VagueQuantifiers.md) and [docs/ADR-017.md](docs/ADR-017.md)). A separate `VagueSemantics.satisfyingSet(formula, variable, folModel)` entry point evaluates a bare single-free-variable formula to its exact satisfying set, with no quantifier or sampling.
 
-For consumers that admit only a restricted sub-language, `fol.fragment.FragmentCheck.check(formula, fragment)` tests a parsed `Formula[FOL]` for structural membership in a `Fragment` (`Targeting` — no quantifiers or function applications; `Screening(k)` — quantifier nesting depth ≤ k), returning the first `FragmentViolation` otherwise. It runs on the parse tree, needs no model, and forks no parser (see [docs/ADR-018.md](docs/ADR-018.md)).
+For consumers that admit only a restricted sub-language, `vql.fragment.FragmentCheck.check(formula, fragment)` tests a parsed `Formula[FOL]` for structural membership in a `Fragment` (`Targeting` — no quantifiers or function applications; `Screening(k)` — quantifier nesting depth ≤ k), returning the first `FragmentViolation` otherwise. It runs on the parse tree, needs no model, and forks no parser (see [docs/ADR-018.md](docs/ADR-018.md)).
 
 ## Architecture
 
 Two layers in `core/src/main/scala`:
 
 - **FOL foundation** (`logic`, `lexer`, `parser`, `printer`, `semantics`, `util`): terms, formulas, parser combinators with precedence and associativity, pretty printing with round-trip fidelity, Tarski model semantics.
-- **Vague quantifier extension** (`fol.*`): the query parser (`fol.parser`), the typed intermediate representation and pipeline (`fol.typed`: `TypeCatalog`, `QueryBinder` → `BoundQuery`, `TypedSemantics`, `FolModel`, `RuntimeModel`), HDR-based samplers with confidence intervals (`fol.sampling`), the structural fragment-membership check (`fol.fragment`), the `VagueSemantics` facade, and typed `QueryError`s (`fol.error`). The extension imports the foundation, never the reverse.
+- **Vague quantifier extension** (`vql.*`): the query parser (`vql.parser`), the typed intermediate representation and pipeline (`vql.typed`: `TypeCatalog`, `QueryBinder` → `BoundQuery`, `TypedSemantics`, `FolModel`, `RuntimeModel`), HDR-based samplers with confidence intervals (`vql.sampling`), the structural fragment-membership check (`vql.fragment`), the `VagueSemantics` facade, and typed `QueryError`s (`vql.error`). The extension imports the foundation, never the reverse.
 
 [docs/Architecture.md](docs/Architecture.md) has the full package map, layer diagram, and integration flow.
 
@@ -84,7 +84,7 @@ Two layers in `core/src/main/scala`:
 sbt +test    # full suite, JVM + Scala.js
 ```
 
-`core/src/test/scala/fol/semantics/VagueSemanticsTypedSpec.scala` exercises the typed pipeline end to end and is the most complete worked example of the API above.
+`core/src/test/scala/vql/semantics/VagueSemanticsTypedSpec.scala` exercises the typed pipeline end to end and is the most complete worked example of the API above.
 
 ## Documentation
 

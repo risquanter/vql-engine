@@ -1,4 +1,4 @@
-package fol.typed
+package vql.typed
 
 import munit.FunSuite
 import scala.compiletime.testing.typeChecks

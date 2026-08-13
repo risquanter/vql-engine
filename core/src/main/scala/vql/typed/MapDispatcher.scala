@@ -1,4 +1,4 @@
-package fol.typed
+package vql.typed
 
 /** A [[RuntimeDispatcher]] built from plain per-symbol function maps.
   *
@@ -58,7 +58,7 @@ package fol.typed
   * // — derived from map keys, no separate declaration needed
   * }}}
   *
-  * See also: [[RuntimeDispatcher]], [[RuntimeModel]], [[fol.typed.FolModel]] (planned)
+  * See also: [[RuntimeDispatcher]], [[RuntimeModel]], [[vql.typed.FolModel]] (planned)
   */
 case class MapDispatcher(
   predicates: Map[SymbolName, List[Value] => Either[String, Boolean]],

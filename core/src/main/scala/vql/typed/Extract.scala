@@ -1,4 +1,4 @@
-package fol.typed
+package vql.typed
 
 /** Extraction-boundary typeclass: lift a `Value` into the consumer's
   * chosen JVM carrier `A`.

@@ -1,4 +1,4 @@
-package fol.sampling
+package vql.sampling
 
 import com.risquanter.hdr.HDR
 import scala.reflect.ClassTag

@@ -161,29 +161,29 @@ boundary. See [ADR-017](ADR-017.md) §6.
 
 | Paper Notation | Code | Package |
 |---|---|---|
-| Q[~]^{k/n} | `Quantifier.About(k, n, ε)` | `fol.logic` |
-| Q[≥]^{k/n} | `Quantifier.AtLeast(k, n, ε)` | `fol.logic` |
-| Q[≤]^{k/n} | `Quantifier.AtMost(k, n, ε)` | `fol.logic` |
-| R(x, y') | `range: Formula[FOL]` (in `ParsedQuery`) | `fol.logic` |
-| φ(x, y) | `scope: Formula[FOL]` (in `ParsedQuery`) | `fol.logic` |
-| (y) | `answerVars: List[String]` | `fol.logic` |
-| D_R | `TypedSemantics.collectRangeElements()` result | `fol.typed` |
-| Prop_D(S, φ) | `ProportionEstimator.estimateWithSampling()` | `fol.sampling` |
-| VagueQuantifier threshold | `VagueQuantifier.AtLeast(threshold)` etc. | `fol.quantifier` |
+| Q[~]^{k/n} | `Quantifier.About(k, n, ε)` | `vql.logic` |
+| Q[≥]^{k/n} | `Quantifier.AtLeast(k, n, ε)` | `vql.logic` |
+| Q[≤]^{k/n} | `Quantifier.AtMost(k, n, ε)` | `vql.logic` |
+| R(x, y') | `range: Formula[FOL]` (in `ParsedQuery`) | `vql.logic` |
+| φ(x, y) | `scope: Formula[FOL]` (in `ParsedQuery`) | `vql.logic` |
+| (y) | `answerVars: List[String]` | `vql.logic` |
+| D_R | `TypedSemantics.collectRangeElements()` result | `vql.typed` |
+| Prop_D(S, φ) | `ProportionEstimator.estimateWithSampling()` | `vql.sampling` |
+| VagueQuantifier threshold | `VagueQuantifier.AtLeast(threshold)` etc. | `vql.quantifier` |
 
 ### Algorithm Mapping
 
 | Paper Step | Code Location | Method |
 |---|---|---|
-| Parse query | `fol.parser.VagueQueryParser` | `parse(s): Either[QueryError, ParsedQuery]` |
-| Build model | `fol.typed.FolModel` | `apply(catalog, runtimeModel): Either[QueryError, FolModel]` |
-| Type-check query | `fol.typed.QueryBinder` | `bind(query, catalog): Either[…, BoundQuery]` |
-| Extract D_R | `fol.typed.TypedSemantics` | `collectRangeElements(query, model, env)` |
-| Evaluate scope | `fol.typed.TypedSemantics` | `evalFormula(scope, env, model)` |
-| Sample S ⊆ D_R | `fol.sampling.HDRSampler` | `sample(population, n): Set[A]` |
-| Calculate Prop_D | `fol.sampling.ProportionEstimator` | `estimateWithSampling(…)` |
-| Check quantifier | `fol.result.VagueQueryResult` | `fromEstimate(vq, estimate, N)` |
-| Full pipeline | `fol.semantics.VagueSemantics` | `evaluateTyped(q, folModel, …)` |
+| Parse query | `vql.parser.VagueQueryParser` | `parse(s): Either[QueryError, ParsedQuery]` |
+| Build model | `vql.typed.FolModel` | `apply(catalog, runtimeModel): Either[QueryError, FolModel]` |
+| Type-check query | `vql.typed.QueryBinder` | `bind(query, catalog): Either[…, BoundQuery]` |
+| Extract D_R | `vql.typed.TypedSemantics` | `collectRangeElements(query, model, env)` |
+| Evaluate scope | `vql.typed.TypedSemantics` | `evalFormula(scope, env, model)` |
+| Sample S ⊆ D_R | `vql.sampling.HDRSampler` | `sample(population, n): Set[A]` |
+| Calculate Prop_D | `vql.sampling.ProportionEstimator` | `estimateWithSampling(…)` |
+| Check quantifier | `vql.result.VagueQueryResult` | `fromEstimate(vq, estimate, N)` |
+| Full pipeline | `vql.semantics.VagueSemantics` | `evaluateTyped(q, folModel, …)` |
 
 ---
 

@@ -1,10 +1,10 @@
-package fol.semantics
+package vql.semantics
 
-import fol.logic.ParsedQuery
-import fol.result.EvaluationOutput
-import fol.sampling.{SamplingParams, HDRConfig}
-import fol.error.QueryError
-import fol.typed.{FolModel, TypeCatalog, BoundQuery, QueryBinder, TypeCheckError, Value, TypedSemantics}
+import vql.logic.ParsedQuery
+import vql.result.EvaluationOutput
+import vql.sampling.{SamplingParams, HDRConfig}
+import vql.error.QueryError
+import vql.typed.{FolModel, TypeCatalog, BoundQuery, QueryBinder, TypeCheckError, Value, TypedSemantics}
 import logic.{FOL, Formula}
 
 /** Vague quantifier semantics evaluation — thin facade over the typed pipeline.
@@ -15,7 +15,7 @@ import logic.{FOL, Formula}
   * 1. `bindTyped` — type-check variable sorts against the catalog, producing a
   *    [[BoundQuery]].
   * 2. `evaluateTyped` — run the bound query against the model's dispatchers and
-  *    domains via [[fol.typed.TypedSemantics]].
+  *    domains via [[vql.typed.TypedSemantics]].
   *
   * `SamplingParams` controls whether scope evaluation is exact or sampled;
   * range extraction is always exact. The public API returns
@@ -26,7 +26,7 @@ import logic.{FOL, Formula}
   * with no quantifier and no sampling (ADR-017 §6).
   *
   * Paper reference: Section 3, Definition 2
-  * See also: [[fol.typed.TypedSemantics]] for the canonical typed evaluation path (ADR-001)
+  * See also: [[vql.typed.TypedSemantics]] for the canonical typed evaluation path (ADR-001)
   */
 object VagueSemantics:
 

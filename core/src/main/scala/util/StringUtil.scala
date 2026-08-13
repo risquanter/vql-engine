@@ -95,7 +95,7 @@ object StringUtil:
 
   /** Check if string is a decimal literal of the form `digits.digits` (e.g. `"0.05"`, `"3.14"`).
     *
-    * Shared by [[parser.TermParser]] and [[fol.parser.VagueQueryParser]] to avoid
+    * Shared by [[parser.TermParser]] and [[vql.parser.VagueQueryParser]] to avoid
     * regex duplication. The single-backslash form `\d` is required — raw strings
     * with `\\d` do not match the regex `\d` character class.
     */

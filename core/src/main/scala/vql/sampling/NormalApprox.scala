@@ -1,4 +1,4 @@
-package fol.sampling
+package vql.sampling
 
 /** Pure-Scala standard normal distribution approximations.
   *

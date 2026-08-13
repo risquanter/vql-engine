@@ -1,6 +1,6 @@
-package fol.typed
+package vql.typed
 
-import fol.quantifier.Quantifier
+import vql.quantifier.Quantifier
 
 case class BoundVar(name: String, sort: TypeId)
 
