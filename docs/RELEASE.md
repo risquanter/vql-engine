@@ -42,6 +42,27 @@ Do not rename `ci-build.yml`: release.yml verifies Sigstore certificates against
 
 Do not push another version change to main between steps 2 and 4: release.yml reads the version from main's build.sbt at dispatch time and it must match the bundle being released.
 
+## Dependency automation
+
+Two bots keep dependencies current. Neither can publish a release — that stays the manual, TOTP-gated flow above; they only open PRs.
+
+| Bot | Scope | Config |
+|---|---|---|
+| Dependabot | GitHub Actions (the SHA-pinned `uses:` in every workflow) | `.github/dependabot.yml` |
+| Scala Steward | sbt library and plugin dependencies, the Scala version, the sbt version | `.github/workflows/scala-steward.yml`, `.github/.scala-steward.conf` |
+
+Both open one PR per update against `main`, and `pr-build.yml` runs the full suite on each before it can merge. Merging stays manual.
+
+Scala Steward authenticates as a dedicated GitHub App, not with the workflow `GITHUB_TOKEN`. The App's installation token is short-lived and scoped to this repository, and — unlike `GITHUB_TOKEN` — PRs it opens trigger `pr-build.yml`, so every dependency bump is tested before merge. `github-app-auth-only: true` keeps each run scoped to this repository only.
+
+Required repo secrets for Scala Steward:
+
+- `SCALA_STEWARD_APP_ID` — the App's numeric App ID.
+- `SCALA_STEWARD_APP_INSTALLATION_ID` — the App's installation ID on this repo (the number after `https://github.com/settings/installations/`).
+- `SCALA_STEWARD_APP_PRIVATE_KEY` — a generated private key for the App (the full PEM).
+
+The App needs only these repository permissions: Contents (read and write), Pull requests (read and write), Metadata (read). Install it on this repository only.
+
 ## Verifying a published artifact
 
 Artifacts carry detached GPG signatures (`.asc`) and Sigstore bundles (`.sigstore.json`):

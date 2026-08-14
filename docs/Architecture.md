@@ -158,7 +158,7 @@ Test framework: munit 1.0.0.
 
 ```
 sbt test          # 795 tests (JVM + Scala.js)
-sbt publishLocal  # com.risquanter::vql-engine:0.13.0
+sbt publishLocal  # com.risquanter::vql-engine:0.13.1
 ```
 
 ---

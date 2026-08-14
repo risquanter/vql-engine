@@ -2,12 +2,12 @@
 
 ## T-000 — Scala-package rename `fol.*` → `vql.*`
 
-**Status:** Implemented in the working tree — all nine `fol.*` packages renamed
-to `vql.*` (core main + test), live docs swept, `build.sbt`/README/Architecture
-at `0.13.0`, CHANGELOG `0.13.0` entry added; full suite green both platforms.
-Remaining gate: the user's commit + publish of the `0.13.0` release, and
-register's lockstep import rewrite. Sequenced after the fragment-membership API
-(0.12.x). See "Release sequencing — T-011 and T-000" below and
+**Status:** DONE — all nine `fol.*` packages renamed to `vql.*` (core main +
+test), live docs swept, `build.sbt`/README/Architecture/CHANGELOG at `0.13.1`;
+full suite green both platforms; shipped to Central as **0.13.1**. Remaining
+downstream (separate repo): register's lockstep `import fol.*` → `import vql.*`
+rewrite on the pin bump. Sequenced after the fragment-membership API (0.12.x).
+See "Release sequencing — T-011 and T-000" below and
 [T-011](#t-011--fragment-membership-api-register-facing-targeting-0120).
 
 **Scope:** rename every `fol.*` package across `core/src/**` — the complete set,
@@ -314,7 +314,7 @@ parse-through tests; both fragments (`Targeting`, `Screening(k)`) ship.
 [ADR-018](ADR-018.md) records the design (Accepted 2026-08-12);
 [PLAN-fragment-membership-api.md](PLAN-fragment-membership-api.md) is the plan.
 Bundles as the additive (non-breaking) Central release **0.12.0**, ahead of the
-T-000 package rename (0.13.0). See "Release sequencing — T-011 and T-000" below.
+T-000 package rename (0.13.1). See "Release sequencing — T-011 and T-000" below.
 The contract and rulings below are retained as the specification of the shipped
 code.
 
@@ -433,7 +433,7 @@ adoptable:
 |---|---|---|---|
 | 0.11.0 (shipped) | formula ranges + `satisfyingSet`; 4 `QueryError` variants removed | breaking (error surface) | on Central; register migrates AppError + prunes one server test |
 | **0.12.0** | fragment-membership API ([T-011](#t-011--fragment-membership-api-register-facing-targeting-0120)) | **no — additive** | register needs it for M2/M3 write-path validation; adds no import rewrite, adopted on register's schedule |
-| **0.13.0** | package rename `fol.*` → `vql.*` ([T-000](#t-000--scala-package-rename-fol--vql)) | **yes — import rewrite** | isolated so register's pin bump is a pure mechanical import rewrite, including `fol.fragment` → `vql.fragment`, with nothing else to reason about |
+| **0.13.1** | package rename `fol.*` → `vql.*` ([T-000](#t-000--scala-package-rename-fol--vql)) | **yes — import rewrite** | isolated so register's pin bump is a pure mechanical import rewrite, including `fol.fragment` → `vql.fragment`, with nothing else to reason about |
 
 **Order rationale:** fragment API first because register needs it sooner and it
 is non-breaking, so register adopts without a forced import rewrite. The rename
@@ -442,9 +442,9 @@ final package layout (fragment API included).
 
 **T-008** (prune 10 more dead `QueryError` variants) is a **third, separate**
 breaking release — never bundled with T-000 or T-011 — coordinated with the
-register AppError change it forces. Version TBD, after 0.13.0.
+register AppError change it forces. Version TBD, after 0.13.1.
 
-**Open for register to confirm:** the order between 0.12.0 and 0.13.0 depends on
+**Open for register to confirm:** the order between 0.12.0 and 0.13.1 depends on
 register's M2/M3 timing versus its readiness to do the import rewrite. Engine
 recommends fragment-first as above; register may request the reverse given
 advance notice of the target versions.

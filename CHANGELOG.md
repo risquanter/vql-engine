@@ -3,7 +3,7 @@
 This project follows early-semver (pre-1.0): breaking changes bump the minor
 version.
 
-## 0.13.0
+## 0.13.1
 
 ### Changed (breaking)
 

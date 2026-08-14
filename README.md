@@ -7,7 +7,7 @@ The FOL foundation (parser combinators, pretty printer, Tarski semantics) follow
 ## Installation
 
 ```scala
-libraryDependencies += "com.risquanter" %%% "vql-engine" % "0.13.0"
+libraryDependencies += "com.risquanter" %%% "vql-engine" % "0.13.1"
 ```
 
 (`%%%` resolves to `vql-engine_3` on the JVM and `vql-engine_sjs1_3` on Scala.js; use `%%` for JVM-only projects.)

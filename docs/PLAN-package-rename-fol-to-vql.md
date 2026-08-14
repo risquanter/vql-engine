@@ -1,11 +1,12 @@
-# PLAN — Scala-package rename `fol.*` → `vql.*` (T-000, 0.13.0)
+# PLAN — Scala-package rename `fol.*` → `vql.*` (T-000, 0.13.1)
 
-**Status:** Phase 1 (rename) and Phase 2 (live-docs sweep, version, CHANGELOG,
-TODOS) done; full suite green both platforms (795 each). Remaining: the user's
-commit + `0.13.0` publish, register's lockstep import rewrite (Phase 3 handoff).
+**Status:** DONE — rename, live-docs sweep, version, CHANGELOG, and TODOS all
+landed; full suite green both platforms; shipped to Central as `0.13.1`. Only
+remaining item is downstream: register's lockstep import rewrite (Phase 3
+handoff), in a separate repo.
 **Workstream:** rename the vague-layer Scala packages from `fol.*` to `vql.*`.
 **Tracks:** [TODOS.md T-000](TODOS.md#t-000--scala-package-rename-fol--vql).
-Ships as the breaking Central release **0.13.0**, sequenced after the
+Ships as the breaking Central release **0.13.1**, sequenced after the
 fragment-membership API (0.12.0).
 **ADR:** none new — this is a mechanical rename with no design decision. It
 updates the package paths shown in existing ADRs (ADR-004 diagram and others in
@@ -113,7 +114,7 @@ unchanged from before. Then compile.
 - HARD STOP for review before docs/version.
 
 ### Phase 2 — Live-docs sweep, version, CHANGELOG
-- **Version:** `build.sbt` `0.12.0` → `0.13.0`; `README.md` install snippet and
+- **Version:** `build.sbt` `0.12.0` → `0.13.1`; `README.md` install snippet and
   `docs/Architecture.md:161` publish snippet bumped to match. The user runs the
   publish; HEAD tracks the version being shipped.
 - **Live docs** (describe current state — must move to `vql.*`):
@@ -122,14 +123,14 @@ unchanged from before. Then compile.
   ADRs that show package paths: **ADR-001, ADR-002, ADR-003, ADR-004** (the
   two-layer diagram), **ADR-006, ADR-018**. Update every `fol.<pkg>` reference in
   these to `vql.<pkg>`.
-- **CHANGELOG.md:** new `0.13.0` entry — breaking: "All `fol.*` packages renamed
+- **CHANGELOG.md:** new `0.13.1` entry — breaking: "All `fol.*` packages renamed
   to `vql.*`. Downstream imports rewrite mechanically (`import fol.X` →
   `import vql.X`); no API shape changes."
 - **TODOS.md:** T-000 status → DONE; note the shipped release.
 
 ### Phase 3 — register handoff note
 - No engine code. Record in `docs/scratch/` (or append to the existing register
-  handoff note) that 0.13.0 requires register's foladapter module to rewrite its
+  handoff note) that 0.13.1 requires register's foladapter module to rewrite its
   whole `import fol.*` surface to `import vql.*` in lockstep with the pin bump —
   `RiskTreeKnowledgeBase`, `QueryServiceLive`, `QueryRequest`, `AppError`, and
   the foladapter specs (per TODOS.md T-000). register consumes the engine only as
@@ -178,7 +179,7 @@ reference. There is no behavioural surface to regress.
 ## 8. register handoff (downstream, separate repo)
 
 register is the sole downstream consumer and reaches the engine only through
-published Central binaries. It adopts 0.13.0 as a pin bump plus a mechanical
+published Central binaries. It adopts 0.13.1 as a pin bump plus a mechanical
 `import fol.*` → `import vql.*` rewrite across its foladapter module. The engine
 repository does not edit register; the handoff is the CHANGELOG note plus the
 Phase 3 record. `../register` remains read-only from this workstream.

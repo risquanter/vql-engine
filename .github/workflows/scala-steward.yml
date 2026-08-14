@@ -1,0 +1,43 @@
+name: Scala Steward
+
+# Scala Steward opens one pull request per available update to an sbt library or
+# plugin, the Scala version, or the sbt version. Dependabot
+# (.github/dependabot.yml) covers GitHub Actions only and does not support sbt
+# dependencies; this workflow fills that gap.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"    # Mondays 06:00 UTC — weekly, matching Dependabot's cadence
+  workflow_dispatch: {}     # allow a manual run
+
+# The workflow token needs no write access: the GitHub App below mints its own
+# short-lived, repository-scoped installation token for the branch pushes and PRs.
+permissions:
+  contents: read
+
+# One run at a time; a scheduled run is never cancelled mid-flight.
+concurrency:
+  group: scala-steward
+  cancel-in-progress: false
+
+jobs:
+  scala-steward:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Scala Steward
+        uses: scala-steward-org/scala-steward-action@6162b21b93d4be314a61ce0462fd026630132fee # v2.96.0
+        with:
+          # GitHub App authentication. The installation token is short-lived (about
+          # one hour), scoped to this repository only, and not tied to a personal
+          # account. PRs opened with it trigger pr-build.yml; the default
+          # GITHUB_TOKEN would not — GitHub suppresses workflow runs on its own
+          # PRs — so the dependency bumps would merge untested.
+          github-app-id: ${{ secrets.SCALA_STEWARD_APP_ID }}
+          github-app-installation-id: ${{ secrets.SCALA_STEWARD_APP_INSTALLATION_ID }}
+          github-app-key: ${{ secrets.SCALA_STEWARD_APP_PRIVATE_KEY }}
+          # Use the App for authentication only and update just this repository
+          # (github-repository defaults to it). Without this the run would target
+          # every repository the App is installed on.
+          github-app-auth-only: true
+          author-name: Scala Steward
+          author-email: scala-steward@users.noreply.github.com

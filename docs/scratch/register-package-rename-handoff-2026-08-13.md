@@ -1,10 +1,10 @@
-# register handoff — `fol.*` → `vql.*` package rename (engine 0.13.0)
+# register handoff — `fol.*` → `vql.*` package rename (engine 0.13.1)
 
-Engine release **0.13.0** ([T-000](../TODOS.md#t-000--scala-package-rename-fol--vql),
+Engine release **0.13.1** ([T-000](../TODOS.md#t-000--scala-package-rename-fol--vql),
 [PLAN-package-rename-fol-to-vql.md](../PLAN-package-rename-fol-to-vql.md)) renames
 every vague-layer Scala package from `fol.*` to `vql.*`. register consumes the
 engine only as a Central binary, so it adopts this as a pin bump (`0.12.x` →
-`0.13.0`) plus a mechanical import rewrite.
+`0.13.1`) plus a mechanical import rewrite.
 
 ## What register does
 
@@ -33,10 +33,10 @@ register; each becomes `import vql.` for the same package.
 - Every `FOL` identifier (`FOL`, `FOLParser`, `FOLSemantics`, `Formula[FOL]`) is
   unchanged — the rename is the lowercase package segment only.
 - The artifact coordinates: still `com.risquanter %%% vql-engine`, version
-  `0.13.0`.
+  `0.13.1`.
 
 ## Sequencing
 
-0.13.0 is the isolated breaking change after the 0.12.x fragment-membership API,
+0.13.1 is the isolated breaking change after the 0.12.x fragment-membership API,
 so register absorbs one bounded change per pin bump: the import rewrite here, with
 no new API to integrate in the same diff.
