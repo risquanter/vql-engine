@@ -3,7 +3,14 @@ package vql.typed
 import vql.error.QueryError
 import vql.quantifier.VagueQuantifier
 import vql.result.{EvaluationOutput, VagueQueryResult}
-import vql.sampling.{HDRConfig, HDRSampler, ProportionEstimate, ProportionEstimator, SampleSizeCalculator, SamplingParams}
+import vql.sampling.{
+  HDRConfig,
+  HDRSampler,
+  ProportionEstimate,
+  ProportionEstimator,
+  SampleSizeCalculator,
+  SamplingParams,
+}
 
 object TypedSemantics:
 
@@ -14,38 +21,55 @@ object TypedSemantics:
     model: RuntimeModel,
     answerTuple: Map[String, Value] = Map.empty,
     samplingParams: SamplingParams = SamplingParams.exact,
-    hdrConfig: HDRConfig = HDRConfig.default
+    hdrConfig: HDRConfig = HDRConfig.default,
   ): Either[QueryError, EvaluationOutput[Value]] =
     val quantifier = VagueQuantifier.fromQuantifier(query.quantifier)
     for
-      baseEnv <- validateAnswerTuple(query, answerTuple)
-      rootDomain <- model.domains.get(query.variable.sort)
-        .toRight(QueryError.DomainNotFoundError(
-          typeName       = query.variable.sort.value,
-          availableTypes = model.domains.keySet.map(_.value)
-        ))
+      baseEnv       <- validateAnswerTuple(query, answerTuple)
+      rootDomain    <- model.domains
+        .get(query.variable.sort)
+        .toRight(
+          QueryError.DomainNotFoundError(
+            typeName = query.variable.sort.value,
+            availableTypes = model.domains.keySet.map(_.value),
+          )
+        )
       rangeElements <- collectRangeElements(query, model, baseEnv, rootDomain)
-      output <- evaluateOverRange(query, model, baseEnv, rangeElements, quantifier, samplingParams, hdrConfig)
+      output        <- evaluateOverRange(
+        query,
+        model,
+        baseEnv,
+        rangeElements,
+        quantifier,
+        samplingParams,
+        hdrConfig,
+      )
     yield output
 
-  /** Evaluate a bound formula with one free variable to its exact satisfying
-    * set over that variable's sort (ADR-017 §6).
-    *
-    * Enumerates `model.domains(variable.sort)` and keeps each element for which
-    * the formula holds with the variable bound to it. Exhaustive and
-    * deterministic; no sampling.
-    */
+    end for
+
+  end evaluate
+
+  /**
+   * Evaluate a bound formula with one free variable to its exact satisfying set over that
+   * variable's sort (ADR-017 §6).
+   *
+   * Enumerates `model.domains(variable.sort)` and keeps each element for which the formula holds
+   * with the variable bound to it. Exhaustive and deterministic; no sampling.
+   */
   def satisfyingSet(
     formula: BoundFormula,
     variable: BoundVar,
-    model: RuntimeModel
+    model: RuntimeModel,
   ): Either[QueryError, Set[Value]] =
     model.domains.get(variable.sort) match
-      case None =>
-        Left(QueryError.DomainNotFoundError(
-          typeName       = variable.sort.value,
-          availableTypes = model.domains.keySet.map(_.value)
-        ))
+      case None         =>
+        Left(
+          QueryError.DomainNotFoundError(
+            typeName = variable.sort.value,
+            availableTypes = model.domains.keySet.map(_.value),
+          )
+        )
       case Some(domain) =>
         domain.foldLeft[Either[QueryError, Set[Value]]](Right(Set.empty)) { (acc, candidate) =>
           for
@@ -56,22 +80,27 @@ object TypedSemantics:
 
   private def validateAnswerTuple(
     query: BoundQuery,
-    answerTuple: Map[String, Value]
+    answerTuple: Map[String, Value],
   ): Either[QueryError, Env] =
     query.answerVars.foldLeft[Either[QueryError, Env]](Right(answerTuple)) { (acc, boundVar) =>
       acc.flatMap { env =>
         env.get(boundVar.name) match
-          case None =>
-            Left(QueryError.ValidationError(
-              message = s"Missing answer tuple value for '${boundVar.name}'",
-              field = "answer_tuple"
-            ))
+          case None                               =>
+            Left(
+              QueryError.ValidationError(
+                message = s"Missing answer tuple value for '${boundVar.name}'",
+                field = "answer_tuple",
+              )
+            )
           case Some(v) if v.sort == boundVar.sort => Right(env)
-          case Some(v) =>
-            Left(QueryError.ValidationError(
-              message = s"Type mismatch for answer variable '${boundVar.name}': expected ${boundVar.sort.value}, actual ${v.sort.value}",
-              field = "answer_tuple"
-            ))
+          case Some(v)                            =>
+            Left(
+              QueryError.ValidationError(
+                message =
+                  s"Type mismatch for answer variable '${boundVar.name}': expected ${boundVar.sort.value}, actual ${v.sort.value}",
+                field = "answer_tuple",
+              )
+            )
       }
     }
 
@@ -79,12 +108,12 @@ object TypedSemantics:
     query: BoundQuery,
     model: RuntimeModel,
     baseEnv: Env,
-    rootDomain: Set[Value]
+    rootDomain: Set[Value],
   ): Either[QueryError, Set[Value]] =
     rootDomain.foldLeft[Either[QueryError, Set[Value]]](Right(Set.empty)) { (acc, candidate) =>
       for
         accepted <- acc
-        inRange <- evalFormula(query.range, baseEnv + (query.variable.name -> candidate), model)
+        inRange  <- evalFormula(query.range, baseEnv + (query.variable.name -> candidate), model)
       yield if inRange then accepted + candidate else accepted
     }
 
@@ -95,87 +124,91 @@ object TypedSemantics:
     rangeElements: Set[Value],
     quantifier: VagueQuantifier,
     samplingParams: SamplingParams,
-    hdrConfig: HDRConfig
+    hdrConfig: HDRConfig,
   ): Either[QueryError, EvaluationOutput[Value]] =
     if rangeElements.isEmpty then
-      Right(EvaluationOutput(
-        result = emptyResult(quantifier),
-        rangeElements = Set.empty,
-        satisfyingElements = Set.empty
-      ))
+      Right(
+        EvaluationOutput(
+          result = emptyResult(quantifier),
+          rangeElements = Set.empty,
+          satisfyingElements = Set.empty,
+        )
+      )
     else
-      val n = SampleSizeCalculator.calculateSampleSize(rangeElements.size, samplingParams)
+      val n       = SampleSizeCalculator.calculateSampleSize(rangeElements.size, samplingParams)
       val sampler = HDRSampler[Value](hdrConfig)
-      val sample = sampler.sample(rangeElements, n)
-      for
-        satisfying <- collectSatisfyingSample(query, model, baseEnv, sample)
+      val sample  = sampler.sample(rangeElements, n)
+      for satisfying <- collectSatisfyingSample(query, model, baseEnv, sample)
       yield
         val estimate = ProportionEstimator.estimateFromCount(
           successes = satisfying.size,
           sampleSize = sample.size,
-          params = samplingParams
+          params = samplingParams,
         )
-        val result = VagueQueryResult.fromEstimate(quantifier, estimate, rangeElements.size)
+        val result   = VagueQueryResult.fromEstimate(quantifier, estimate, rangeElements.size)
         EvaluationOutput(
           result = result,
           rangeElements = rangeElements,
-          satisfyingElements = satisfying
+          satisfyingElements = satisfying,
         )
 
   private def collectSatisfyingSample(
     query: BoundQuery,
     model: RuntimeModel,
     baseEnv: Env,
-    sample: Set[Value]
+    sample: Set[Value],
   ): Either[QueryError, Set[Value]] =
     sample.foldLeft[Either[QueryError, Set[Value]]](Right(Set.empty)) { (acc, candidate) =>
       for
         sat <- acc
-        ok <- evalFormula(query.scope, baseEnv + (query.variable.name -> candidate), model)
+        ok  <- evalFormula(query.scope, baseEnv + (query.variable.name -> candidate), model)
       yield if ok then sat + candidate else sat
     }
 
   private def evalFormula(
     formula: BoundFormula,
     env: Env,
-    model: RuntimeModel
+    model: RuntimeModel,
   ): Either[QueryError, Boolean] =
     formula match
-      case BoundFormula.True  => Right(true)
-      case BoundFormula.False => Right(false)
-      case BoundFormula.Atom(a) => evalAtom(a, env, model)
-      case BoundFormula.Not(p) => evalFormula(p, env, model).map(v => !v)
-      case BoundFormula.And(p, q) =>
+      case BoundFormula.True            => Right(true)
+      case BoundFormula.False           => Right(false)
+      case BoundFormula.Atom(a)         => evalAtom(a, env, model)
+      case BoundFormula.Not(p)          => evalFormula(p, env, model).map(v => !v)
+      case BoundFormula.And(p, q)       =>
         evalFormula(p, env, model).flatMap {
           case false => Right(false)
           case true  => evalFormula(q, env, model)
         }
-      case BoundFormula.Or(p, q) =>
+      case BoundFormula.Or(p, q)        =>
         evalFormula(p, env, model).flatMap {
           case true  => Right(true)
           case false => evalFormula(q, env, model)
         }
-      case BoundFormula.Imp(p, q) =>
+      case BoundFormula.Imp(p, q)       =>
         evalFormula(p, env, model).flatMap {
-          case false => Right(true)   // false antecedent → implication vacuously true
+          case false => Right(true) // false antecedent → implication vacuously true
           case true  => evalFormula(q, env, model)
         }
-      case BoundFormula.Iff(p, q) =>
+      case BoundFormula.Iff(p, q)       =>
         for
-          left <- evalFormula(p, env, model)
+          left  <- evalFormula(p, env, model)
           right <- evalFormula(q, env, model)
         yield left == right
       case BoundFormula.Forall(v, body) =>
         model.domains.get(v.sort) match
-          case None => Left(QueryError.DomainNotFoundError(
-            typeName       = v.sort.value,
-            availableTypes = model.domains.keySet.map(_.value)
-          ))
+          case None         =>
+            Left(
+              QueryError.DomainNotFoundError(
+                typeName = v.sort.value,
+                availableTypes = model.domains.keySet.map(_.value),
+              )
+            )
           case Some(domain) =>
             @scala.annotation.tailrec
             def allOf(remaining: List[Value]): Either[QueryError, Boolean] =
               remaining match
-                case Nil => Right(true)
+                case Nil           => Right(true)
                 case value :: rest =>
                   evalFormula(body, env + (v.name -> value), model) match
                     case Right(false) => Right(false)
@@ -184,15 +217,18 @@ object TypedSemantics:
             allOf(domain.toList)
       case BoundFormula.Exists(v, body) =>
         model.domains.get(v.sort) match
-          case None => Left(QueryError.DomainNotFoundError(
-            typeName       = v.sort.value,
-            availableTypes = model.domains.keySet.map(_.value)
-          ))
+          case None         =>
+            Left(
+              QueryError.DomainNotFoundError(
+                typeName = v.sort.value,
+                availableTypes = model.domains.keySet.map(_.value),
+              )
+            )
           case Some(domain) =>
             @scala.annotation.tailrec
             def anyOf(remaining: List[Value]): Either[QueryError, Boolean] =
               remaining match
-                case Nil => Right(false)
+                case Nil           => Right(false)
                 case value :: rest =>
                   evalFormula(body, env + (v.name -> value), model) match
                     case Right(true)  => Right(true)
@@ -200,37 +236,53 @@ object TypedSemantics:
                     case left         => left
             anyOf(domain.toList)
 
-  private def evalAtom(atom: BoundAtom, env: Env, model: RuntimeModel): Either[QueryError, Boolean] =
+  private def evalAtom(atom: BoundAtom, env: Env, model: RuntimeModel): Either[
+    QueryError,
+    Boolean,
+  ] =
     for
-      args <- evalTerms(atom.args, env, model)
-      value <- model.dispatcher.evalPredicate(atom.name, args).left.map(msg =>
-        QueryError.EvaluationError(
-          message = msg,
-          phase = s"predicate:${atom.name.value}"
+      args  <- evalTerms(atom.args, env, model)
+      value <- model.dispatcher
+        .evalPredicate(atom.name, args)
+        .left
+        .map(msg =>
+          QueryError.EvaluationError(
+            message = msg,
+            phase = s"predicate:${atom.name.value}",
+          )
         )
-      )
     yield value
 
-  private def evalTerms(terms: List[BoundTerm], env: Env, model: RuntimeModel): Either[QueryError, List[Value]] =
+  private def evalTerms(terms: List[BoundTerm], env: Env, model: RuntimeModel): Either[
+    QueryError,
+    List[Value],
+  ] =
     terms.foldLeft[Either[QueryError, List[Value]]](Right(Nil)) { (acc, term) =>
       for
         xs <- acc
-        x <- evalTerm(term, env, model)
+        x  <- evalTerm(term, env, model)
       yield xs :+ x
     }
 
   private def evalTerm(term: BoundTerm, env: Env, model: RuntimeModel): Either[QueryError, Value] =
     term match
       case BoundTerm.VarRef(v) =>
-        env.get(v.name).toRight(
-          QueryError.UnboundVariableError(v.name, env.keySet)
-        ).flatMap { value =>
-          if value.sort == v.sort then Right(value)
-          else Left(QueryError.EvaluationError(
-            message = s"Variable '${v.name}' has type ${value.sort.value}, expected ${v.sort.value}",
-            phase = "typed_term"
-          ))
-        }
+        env
+          .get(v.name)
+          .toRight(
+            QueryError.UnboundVariableError(v.name, env.keySet)
+          )
+          .flatMap { value =>
+            if value.sort == v.sort then Right(value)
+            else
+              Left(
+                QueryError.EvaluationError(
+                  message =
+                    s"Variable '${v.name}' has type ${value.sort.value}, expected ${v.sort.value}",
+                  phase = "typed_term",
+                )
+              )
+          }
 
       case BoundTerm.ConstRef(name, sort) =>
         // Named constant: the IR carries no payload, so the name itself is the
@@ -246,12 +298,15 @@ object TypedSemantics:
       case BoundTerm.FnApp(name, args, sort) =>
         for
           argValues <- evalTerms(args, env, model)
-          result    <- model.dispatcher.evalFunction(name, argValues).left.map(msg =>
-            QueryError.EvaluationError(
-              message = msg,
-              phase = s"function:${name.value}"
+          result    <- model.dispatcher
+            .evalFunction(name, argValues)
+            .left
+            .map(msg =>
+              QueryError.EvaluationError(
+                message = msg,
+                phase = s"function:${name.value}",
+              )
             )
-          )
         yield Value(sort, result)
 
   private def emptyResult(quantifier: VagueQuantifier): VagueQueryResult =
@@ -263,5 +318,7 @@ object TypedSemantics:
       domainSize = 0,
       sampleSize = 0,
       satisfyingCount = 0,
-      estimate = ProportionEstimate.empty()
+      estimate = ProportionEstimate.empty(),
     )
+
+end TypedSemantics

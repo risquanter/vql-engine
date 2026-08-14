@@ -1,9 +1,9 @@
 package parser
 
-import munit.FunSuite
-import logic.{FOL, Term, Formula}
-import logic.Term.*
+import logic.{FOL, Formula, Term}
 import logic.Formula.*
+import logic.Term.*
+import munit.FunSuite
 import parser.FOLParser
 
 class FOLParserSpec extends FunSuite:
@@ -31,7 +31,7 @@ class FOLParserSpec extends FunSuite:
     val formula = parseOk("forall x. exists y. x < y")
     assertEquals(
       formula,
-      Forall("x", Exists("y", Atom(FOL("<", List(Var("x"), Var("y"))))))
+      Forall("x", Exists("y", Atom(FOL("<", List(Var("x"), Var("y")))))),
     )
   }
 
@@ -42,10 +42,10 @@ class FOLParserSpec extends FunSuite:
       Imp(
         And(
           Atom(FOL("P", List(Var("x")))),
-          Atom(FOL("Q", List(Var("y"))))
+          Atom(FOL("Q", List(Var("y")))),
         ),
-        Atom(FOL("R", List(Var("x"), Var("y"))))
-      )
+        Atom(FOL("R", List(Var("x"), Var("y")))),
+      ),
     )
   }
 
@@ -53,13 +53,21 @@ class FOLParserSpec extends FunSuite:
     val formula = parseOk("2 * x + 3 = y")
     assertEquals(
       formula,
-      Atom(FOL("=", List(
-        Fn("+", List(
-          Fn("*", List(Const("2"), Var("x"))),
-          Const("3")
-        )),
-        Var("y")
-      )))
+      Atom(
+        FOL(
+          "=",
+          List(
+            Fn(
+              "+",
+              List(
+                Fn("*", List(Const("2"), Var("x"))),
+                Const("3"),
+              ),
+            ),
+            Var("y"),
+          ),
+        )
+      ),
     )
   }
 
@@ -72,12 +80,19 @@ class FOLParserSpec extends FunSuite:
     val formula = parseOk("forall x y. exists z. x < z /\\ y < z")
     assertEquals(
       formula,
-      Forall("x", Forall("y", Exists("z",
-        And(
-          Atom(FOL("<", List(Var("x"), Var("z")))),
-          Atom(FOL("<", List(Var("y"), Var("z"))))
-        )
-      )))
+      Forall(
+        "x",
+        Forall(
+          "y",
+          Exists(
+            "z",
+            And(
+              Atom(FOL("<", List(Var("x"), Var("z")))),
+              Atom(FOL("<", List(Var("y"), Var("z")))),
+            ),
+          ),
+        ),
+      ),
     )
   }
 
@@ -92,8 +107,8 @@ class FOLParserSpec extends FunSuite:
       formula,
       Iff(
         Atom(FOL("P", List(Var("x")))),
-        Atom(FOL("Q", List(Var("x"))))
-      )
+        Atom(FOL("Q", List(Var("x")))),
+      ),
     )
   }
 
@@ -107,7 +122,7 @@ class FOLParserSpec extends FunSuite:
 
   test("parseTokens returns remaining tokens") {
     import lexer.Token.*
-    val tokens = List(Word("P"), LParen, Word("x"), RParen, Word("extra"))
+    val tokens          = List(Word("P"), LParen, Word("x"), RParen, Word("extra"))
     val (formula, rest) = FOLParser.parseTokens(tokens)
     assertEquals(formula, Atom(FOL("P", List(Var("x")))))
     assertEquals(rest, List(Word("extra")))
@@ -115,7 +130,7 @@ class FOLParserSpec extends FunSuite:
 
   test("parseTokens with empty remaining") {
     import lexer.Token.*
-    val tokens = List(Word("P"), LParen, Word("x"), RParen)
+    val tokens          = List(Word("P"), LParen, Word("x"), RParen)
     val (formula, rest) = FOLParser.parseTokens(tokens)
     assertEquals(formula, Atom(FOL("P", List(Var("x")))))
     assertEquals(rest, List())
@@ -169,15 +184,22 @@ class FOLParserSpec extends FunSuite:
     val formula = parseOk("forall x y z . x < y /\\ y < z ==> x < z")
     assertEquals(
       formula,
-      Forall("x", Forall("y", Forall("z",
-        Imp(
-          And(
-            Atom(FOL("<", List(Var("x"), Var("y")))),
-            Atom(FOL("<", List(Var("y"), Var("z"))))
+      Forall(
+        "x",
+        Forall(
+          "y",
+          Forall(
+            "z",
+            Imp(
+              And(
+                Atom(FOL("<", List(Var("x"), Var("y")))),
+                Atom(FOL("<", List(Var("y"), Var("z")))),
+              ),
+              Atom(FOL("<", List(Var("x"), Var("z")))),
+            ),
           ),
-          Atom(FOL("<", List(Var("x"), Var("z"))))
-        )
-      )))
+        ),
+      ),
     )
   }
 
@@ -186,17 +208,22 @@ class FOLParserSpec extends FunSuite:
     val formula = parseOk("forall x y . x < y ==> exists z . x < z /\\ z < y")
     assertEquals(
       formula,
-      Forall("x", Forall("y",
-        Imp(
-          Atom(FOL("<", List(Var("x"), Var("y")))),
-          Exists("z",
-            And(
-              Atom(FOL("<", List(Var("x"), Var("z")))),
-              Atom(FOL("<", List(Var("z"), Var("y"))))
-            )
-          )
-        )
-      ))
+      Forall(
+        "x",
+        Forall(
+          "y",
+          Imp(
+            Atom(FOL("<", List(Var("x"), Var("y")))),
+            Exists(
+              "z",
+              And(
+                Atom(FOL("<", List(Var("x"), Var("z")))),
+                Atom(FOL("<", List(Var("z"), Var("y")))),
+              ),
+            ),
+          ),
+        ),
+      ),
     )
   }
 
@@ -204,10 +231,15 @@ class FOLParserSpec extends FunSuite:
     val formula = parseOk("f(x) = g(y, z)")
     assertEquals(
       formula,
-      Atom(FOL("=", List(
-        Fn("f", List(Var("x"))),
-        Fn("g", List(Var("y"), Var("z")))
-      )))
+      Atom(
+        FOL(
+          "=",
+          List(
+            Fn("f", List(Var("x"))),
+            Fn("g", List(Var("y"), Var("z"))),
+          ),
+        )
+      ),
     )
   }
 
@@ -215,12 +247,22 @@ class FOLParserSpec extends FunSuite:
     val formula = parseOk("( x + y ) * z = w")
     assertEquals(
       formula,
-      Atom(FOL("=", List(
-        Fn("*", List(
-          Fn("+", List(Var("x"), Var("y"))),
-          Var("z")
-        )),
-        Var("w")
-      )))
+      Atom(
+        FOL(
+          "=",
+          List(
+            Fn(
+              "*",
+              List(
+                Fn("+", List(Var("x"), Var("y"))),
+                Var("z"),
+              ),
+            ),
+            Var("w"),
+          ),
+        )
+      ),
     )
   }
+
+end FOLParserSpec

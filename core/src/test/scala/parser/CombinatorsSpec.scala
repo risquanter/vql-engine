@@ -1,14 +1,14 @@
 package parser
 
-import munit.FunSuite
+import Combinators.*
 import lexer.Token
 import lexer.Token.*
-import Combinators.*
+import munit.FunSuite
 
 class CombinatorsSpec extends FunSuite:
 
   // Token literal helpers — keep tests readable.
-  private def w(s: String): Token = Word(s)
+  private def w(s: String): Token  = Word(s)
   private def op(s: String): Token = OpSym(s)
 
   // Simple test parser: parses a single Word token as an Int
@@ -19,7 +19,7 @@ class CombinatorsSpec extends FunSuite:
       case other :: _      => throw new Exception(s"Expected number, got: $other")
 
   test("papply transforms parse result") {
-    val result = parseNum(List(w("42"), w("x")))
+    val result  = parseNum(List(w("42"), w("x")))
     val doubled = papply((n: Int) => n * 2)(result)
     assertEquals(doubled, (84, List(w("x"))))
   }
@@ -42,7 +42,8 @@ class CombinatorsSpec extends FunSuite:
   }
 
   test("parseLeftInfix: simple addition") {
-    val result = parseLeftInfix(op("+"), (a: Int, b: Int) => a + b)(parseNum)(List(w("1"), op("+"), w("2")))
+    val result =
+      parseLeftInfix(op("+"), (a: Int, b: Int) => a + b)(parseNum)(List(w("1"), op("+"), w("2")))
     assertEquals(result._1, 3)
   }
 
@@ -54,8 +55,8 @@ class CombinatorsSpec extends FunSuite:
 
   test("parseRightInfix: right associativity (2 ^ 3 ^ 2)") {
     def pow(a: Int, b: Int): Int = Math.pow(a.toDouble, b.toDouble).toInt
-    val tokens = List(w("2"), op("^"), w("3"), op("^"), w("2"))
-    val result = parseRightInfix(op("^"), pow)(parseNum)(tokens)
+    val tokens                   = List(w("2"), op("^"), w("3"), op("^"), w("2"))
+    val result                   = parseRightInfix(op("^"), pow)(parseNum)(tokens)
     assertEquals(result._1, 512)
   }
 
@@ -100,7 +101,7 @@ class CombinatorsSpec extends FunSuite:
   }
 
   test("chaining parsers: parse then transform") {
-    val tokens = List(w("5"), op("+"), w("3"), op("*"))
+    val tokens      = List(w("5"), op("+"), w("3"), op("*"))
     val (sum, rest) = parseLeftInfix(op("+"), (a: Int, b: Int) => a + b)(parseNum)(tokens)
     assertEquals(sum, 8)
     assertEquals(rest, List(op("*")))
@@ -120,3 +121,5 @@ class CombinatorsSpec extends FunSuite:
     assertEquals(headOption(List(w("x"), w("y"))), Some(w("x")))
     assertEquals(headOption(List()), None)
   }
+
+end CombinatorsSpec

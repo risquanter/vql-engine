@@ -1,21 +1,21 @@
 package vql.typed
 
-import munit.FunSuite
 import scala.compiletime.testing.typeChecks
 
-/** Tests for [[Extract]] and the `Value.extract[A]` extension
-  * (ADR-015 §2).
-  *
-  * Coverage:
-  *   - `Extract[Long]` accepts a `Value` whose `raw` is a `Long`; rejects
-  *     `String`-carrying values with a descriptive `Left`.
-  *   - `Extract[Double]` accepts `Double`-carrying values; widens `Long`
-  *     carriers; rejects non-numeric.
-  *   - `Extract[String]` accepts `String`-carrying values; rejects others.
-  *   - `value.extract[A]` extension delegates to the given `Extract[A]`.
-  *   - Compile-error guarantee: extracting to a type with no `Extract`
-  *     given fails to compile.
-  */
+import munit.FunSuite
+
+/**
+ * Tests for [[Extract]] and the `Value.extract[A]` extension (ADR-015 §2).
+ *
+ * Coverage:
+ *   - `Extract[Long]` accepts a `Value` whose `raw` is a `Long`; rejects `String`-carrying values
+ *     with a descriptive `Left`.
+ *   - `Extract[Double]` accepts `Double`-carrying values; widens `Long` carriers; rejects
+ *     non-numeric.
+ *   - `Extract[String]` accepts `String`-carrying values; rejects others.
+ *   - `value.extract[A]` extension delegates to the given `Extract[A]`.
+ *   - Compile-error guarantee: extracting to a type with no `Extract` given fails to compile.
+ */
 class ExtractSpec extends FunSuite:
 
   private val sort = TypeId("AnySort")
@@ -26,8 +26,10 @@ class ExtractSpec extends FunSuite:
   test("Extract[Long] rejects String-carrying Value with descriptive Left"):
     val res = summon[Extract[Long]](Value(sort, "42"))
     assert(res.isLeft, s"expected Left, got $res")
-    assert(res.left.exists(_.toLowerCase.contains("long")),
-      s"expected diagnostic to mention Long, got $res")
+    assert(
+      res.left.exists(_.toLowerCase.contains("long")),
+      s"expected diagnostic to mention Long, got $res",
+    )
 
   test("Extract[Double] accepts Double-carrying Value"):
     assertEquals(summon[Extract[Double]](Value(sort, 3.14)), Right(3.14))
@@ -54,5 +56,7 @@ class ExtractSpec extends FunSuite:
     class Unregistered
     assert(
       !typeChecks("Value(sort, new Unregistered).extract[Unregistered]"),
-      "Value.extract[Unregistered] must NOT compile without a given Extract instance"
+      "Value.extract[Unregistered] must NOT compile without a given Extract instance",
     )
+
+end ExtractSpec

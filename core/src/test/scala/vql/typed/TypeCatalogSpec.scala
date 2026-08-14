@@ -7,8 +7,8 @@ class TypeCatalogSpec extends FunSuite:
 
   test("validate succeeds for coherent catalog"):
     val asset = TypeId("Asset")
-    val loss = TypeId("Loss")
-    val bool = TypeId("Bool")
+    val loss  = TypeId("Loss")
+    val bool  = TypeId("Bool")
 
     val result = TypeCatalog(
       types = Set(DomainType(asset), ValueType(loss), DomainType(bool)),
@@ -19,20 +19,20 @@ class TypeCatalogSpec extends FunSuite:
       predicates = Map(
         SymbolName("gt_loss") -> PredicateSig(List(loss, loss))
       ),
-      literalValidators = Map(loss -> (s => s.toLongOption))
+      literalValidators = Map(loss -> (s => s.toLongOption)),
     )
 
     assert(result.isRight)
 
   test("validate fails when symbol name is reused across functions and predicates"):
     val asset = TypeId("Asset")
-    val loss = TypeId("Loss")
+    val loss  = TypeId("Loss")
 
     val result = TypeCatalog(
       types = Set(DomainType(asset), DomainType(loss)),
       constants = Map.empty,
       functions = Map(SymbolName("foo") -> FunctionSig(List(asset), loss)),
-      predicates = Map(SymbolName("foo") -> PredicateSig(List(loss)))
+      predicates = Map(SymbolName("foo") -> PredicateSig(List(loss))),
     )
 
     assert(result.isLeft)
@@ -42,11 +42,11 @@ class TypeCatalogSpec extends FunSuite:
     val loss  = TypeId("Loss")
 
     val result = TypeCatalog(
-      types = Set(DomainType(asset), ValueType(loss)),  // Loss present but not quantifiable
+      types = Set(DomainType(asset), ValueType(loss)), // Loss present but not quantifiable
       predicates = Map(
         SymbolName("leaf")    -> PredicateSig(List(asset)),
-        SymbolName("hasloss") -> PredicateSig(List(loss))
-      )
+        SymbolName("hasloss") -> PredicateSig(List(loss)),
+      ),
     )
 
     assert(result.isRight)
@@ -59,8 +59,8 @@ class TypeCatalogSpec extends FunSuite:
       types = Set(DomainType(asset), ValueType(loss)),
       predicates = Map(
         SymbolName("leaf")    -> PredicateSig(List(asset)),
-        SymbolName("hasloss") -> PredicateSig(List(loss))
-      )
+        SymbolName("hasloss") -> PredicateSig(List(loss)),
+      ),
     ).getOrElse(fail("catalog must be valid"))
 
     assertEquals(catalog.domainTypes, Set(asset))
@@ -76,7 +76,7 @@ class TypeCatalogSpec extends FunSuite:
       types = Set(DomainType(asset), ValueType(loss)),
       functions = Map(SymbolName("foo") -> FunctionSig(List(asset), loss)),
       predicates = Map(SymbolName("foo") -> PredicateSig(List(loss))),
-      literalValidators = Map(loss -> (s => s.toLongOption.map(_ => s)))
+      literalValidators = Map(loss -> (s => s.toLongOption.map(_ => s))),
     )
 
     assert(result.isLeft)
@@ -93,7 +93,7 @@ class TypeCatalogSpec extends FunSuite:
 
     val result = TypeCatalog(
       types = Set(DomainType(asset), ValueType(loss)),
-      literalValidators = Map(loss -> LiteralParser.asValidator[Long])
+      literalValidators = Map(loss -> LiteralParser.asValidator[Long]),
     )
 
     assert(result.isRight)
@@ -106,12 +106,15 @@ class TypeCatalogSpec extends FunSuite:
 
     TypeCatalog(
       types = Set(DomainType(asset)),
-      functions = Map(SymbolName("p95") -> FunctionSig(List(asset), ghost))
+      functions = Map(SymbolName("p95") -> FunctionSig(List(asset), ghost)),
     ) match
       case Left(List(TypeCatalogError.UnknownType(name, location))) =>
         assertEquals(name, "Ghost")
-        assert(location.contains("p95"),       s"location '$location' should mention 'p95'")
-        assert(location.contains("return type"), s"location '$location' should mention 'return type'")
+        assert(location.contains("p95"), s"location '$location' should mention 'p95'")
+        assert(
+          location.contains("return type"),
+          s"location '$location' should mention 'return type'",
+        )
       case other => fail(s"expected exactly one UnknownType, got $other")
 
   test("UnknownType emitted separately per site for same unknown type"):
@@ -119,38 +122,60 @@ class TypeCatalogSpec extends FunSuite:
     val ghost = TypeId("Ghost")
 
     TypeCatalog(
-      types      = Set(DomainType(asset)),
-      functions  = Map(SymbolName("f") -> FunctionSig(List(ghost), asset)),
-      predicates = Map(SymbolName("p") -> PredicateSig(List(ghost)))
+      types = Set(DomainType(asset)),
+      functions = Map(SymbolName("f") -> FunctionSig(List(ghost), asset)),
+      predicates = Map(SymbolName("p") -> PredicateSig(List(ghost))),
     ) match
       case Left(errors) =>
         val unknowns = errors.collect { case e: TypeCatalogError.UnknownType => e }
-        assertEquals(unknowns.length, 2, s"expected one error per site, not deduplicated: $unknowns")
-        assert(unknowns.exists(_.location.contains("function")), s"no function-site error in $unknowns")
-        assert(unknowns.exists(_.location.contains("predicate")), s"no predicate-site error in $unknowns")
-      case Right(_) => fail("expected Left")
+        assertEquals(
+          unknowns.length,
+          2,
+          s"expected one error per site, not deduplicated: $unknowns",
+        )
+        assert(
+          unknowns.exists(_.location.contains("function")),
+          s"no function-site error in $unknowns",
+        )
+        assert(
+          unknowns.exists(_.location.contains("predicate")),
+          s"no predicate-site error in $unknowns",
+        )
+      case Right(_)     => fail("expected Left")
+
+    end match
 
   test("FunctionReturnIsDomainType emitted when function return sort is a DomainType"):
     val asset = TypeId("Asset")
     val loss  = TypeId("Loss")
 
     TypeCatalog(
-      types     = Set(DomainType(asset), DomainType(loss)),
-      functions = Map(SymbolName("p95") -> FunctionSig(List(asset), loss))
+      types = Set(DomainType(asset), DomainType(loss)),
+      functions = Map(SymbolName("p95") -> FunctionSig(List(asset), loss)),
     ) match
       case Left(errors) =>
-        val domainReturns = errors.collect { case e: TypeCatalogError.FunctionReturnIsDomainType => e }
-        assertEquals(domainReturns.length, 1, s"expected one FunctionReturnIsDomainType error: $errors")
+        val domainReturns = errors.collect {
+          case e: TypeCatalogError.FunctionReturnIsDomainType => e
+        }
+        assertEquals(
+          domainReturns.length,
+          1,
+          s"expected one FunctionReturnIsDomainType error: $errors",
+        )
         assertEquals(domainReturns.head.functionName, "p95")
         assertEquals(domainReturns.head.returnType, "Loss")
-      case Right(_) => fail("expected Left for function returning DomainType")
+      case Right(_)     => fail("expected Left for function returning DomainType")
+
+    end match
 
   test("FunctionReturnIsDomainType not emitted when function return sort is a ValueType"):
     val asset = TypeId("Asset")
     val loss  = TypeId("Loss")
 
     val result = TypeCatalog(
-      types     = Set(DomainType(asset), ValueType(loss)),
-      functions = Map(SymbolName("p95") -> FunctionSig(List(asset), loss))
+      types = Set(DomainType(asset), ValueType(loss)),
+      functions = Map(SymbolName("p95") -> FunctionSig(List(asset), loss)),
     )
     assert(result.isRight, s"ValueType return should be accepted, got $result")
+
+end TypeCatalogSpec

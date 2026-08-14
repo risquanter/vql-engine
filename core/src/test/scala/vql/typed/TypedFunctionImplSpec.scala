@@ -2,13 +2,13 @@ package vql.typed
 
 import munit.FunSuite
 
-/** Tests for [[TypedFunctionImpl]] (ADR-015 §1, §2).
-  *
-  * The dispatcher boundary carries `Any` end-to-end; the consumer's
-  * native `A` is widened at the registration site, and any downstream
-  * lambda recovers a typed view via `value.extract[A]` (`Extract[A]`
-  * instance, ADR-015 §2).
-  */
+/**
+ * Tests for [[TypedFunctionImpl]] (ADR-015 §1, §2).
+ *
+ * The dispatcher boundary carries `Any` end-to-end; the consumer's native `A` is widened at the
+ * registration site, and any downstream lambda recovers a typed view via `value.extract[A]`
+ * (`Extract[A]` instance, ADR-015 §2).
+ */
 class TypedFunctionImplSpec extends FunSuite:
 
   // ─── Right path: native A flows out as Any ─────────────────────────────────
@@ -34,12 +34,14 @@ class TypedFunctionImplSpec extends FunSuite:
   // ─── args forwarding ───────────────────────────────────────────────────────
 
   test("of[Double]: args list is forwarded to impl unchanged"):
-    val tProb = TypeId("Probability")
-    val vA    = Value(tProb, 0.05)
-    val vB    = Value(tProb, 0.10)
+    val tProb                 = TypeId("Probability")
+    val vA                    = Value(tProb, 0.05)
+    val vB                    = Value(tProb, 0.10)
     var received: List[Value] = Nil
-    val fn = TypedFunctionImpl.of[Double](
+    val fn                    = TypedFunctionImpl.of[Double](
       impl = args => { received = args; Right(0.0) }
     )
     fn(List(vA, vB))
     assertEquals(received, List(vA, vB))
+
+end TypedFunctionImplSpec

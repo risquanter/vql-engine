@@ -1,28 +1,29 @@
 package vql.typed
 
 import TypeDecl.*
+import logic.{FOL, Formula, Term}
+import munit.FunSuite
 import vql.error.QueryError
 import vql.logic.ParsedQuery
 import vql.quantifier.Quantifier
 import vql.sampling.SamplingParams
 import vql.semantics.VagueSemantics
 import vql.typed.FolModel
-import logic.{FOL, Formula, Term}
-import munit.FunSuite
 
-/** Tests for [[MapDispatcher]].
-  *
-  * Coverage:
-  *   - Symbol sets derived from map keys (the core intra-dispatcher coherence guarantee)
-  *   - evalPredicate and evalFunction dispatch to correct lambdas
-  *   - Unknown symbol returns Left (not exception)
-  *   - Lambda returning Left propagates as Either.Left through the pipeline
-  *   - Default empty functions map
-  *   - validateAgainst integration: MapDispatcher symbol sets are used correctly
-  *   - Full evaluateTyped pipeline with MapDispatcher and non-empty domains
-  *     (this test class is the library-side proof that raw type handling works
-  *      end-to-end; register-side tests must mirror this pattern — see handover doc)
-  */
+/**
+ * Tests for [[MapDispatcher]].
+ *
+ * Coverage:
+ *   - Symbol sets derived from map keys (the core intra-dispatcher coherence guarantee)
+ *   - evalPredicate and evalFunction dispatch to correct lambdas
+ *   - Unknown symbol returns Left (not exception)
+ *   - Lambda returning Left propagates as Either.Left through the pipeline
+ *   - Default empty functions map
+ *   - validateAgainst integration: MapDispatcher symbol sets are used correctly
+ *   - Full evaluateTyped pipeline with MapDispatcher and non-empty domains (this test class is the
+ *     library-side proof that raw type handling works end-to-end; register-side tests must mirror
+ *     this pattern — see handover doc)
+ */
 class MapDispatcherSpec extends FunSuite:
 
   // ─── shared fixtures ────────────────────────────────────────────────────────
@@ -42,8 +43,7 @@ class MapDispatcherSpec extends FunSuite:
   test("functionSymbols derived from functions map keys"):
     val d = MapDispatcher(
       predicates = Map(symLeaf -> (_ => Right(true))),
-      functions  = Map(symLec -> (_ => Right(0.1)),
-                       symP95 -> (_ => Right(42L)))
+      functions = Map(symLec -> (_ => Right(0.1)), symP95 -> (_ => Right(42L))),
     )
     assertEquals(d.functionSymbols, Set(symLec, symP95))
 
@@ -64,7 +64,7 @@ class MapDispatcherSpec extends FunSuite:
       predicates = Map(symLeaf -> (_ => Right(true))),
       // Native primitive return: NOT wrapped in FloatLiteral. The dispatcher
       // boundary is `Either[String, Any]` after Phase 4.
-      functions  = Map(symLec -> (_ => Right(0.07)))
+      functions = Map(symLec -> (_ => Right(0.07))),
     )
     assertEquals(d.evalFunction(symLec, Nil), Right(0.07))
 
@@ -83,11 +83,11 @@ class MapDispatcherSpec extends FunSuite:
     )
     assertEquals(
       d.evalPredicate(symGtLoss, List(Value(tLoss, 10L), Value(tLoss, 3L))),
-      Right(true)
+      Right(true),
     )
     assertEquals(
       d.evalPredicate(symGtLoss, List(Value(tLoss, 1L), Value(tLoss, 9L))),
-      Right(false)
+      Right(false),
     )
 
   test("Phase 4: value.extract[Long] returns Left for wrong-carrier Value"):
@@ -105,12 +105,13 @@ class MapDispatcherSpec extends FunSuite:
     )
     val r = d.evalPredicate(symGtLoss, List(Value(tLoss, "10"), Value(tLoss, 3L)))
     assert(r.isLeft, s"expected Left, got $r")
-    assert(r.left.exists(_.toLowerCase.contains("long")),
-      s"expected diagnostic to mention 'Long', got $r")
-
+    assert(
+      r.left.exists(_.toLowerCase.contains("long")),
+      s"expected diagnostic to mention 'Long', got $r",
+    )
 
   test("adding symbol to map immediately reflected in symbol set — no separate declaration"):
-    val base  = MapDispatcher(predicates = Map(symLeaf -> (_ => Right(true))))
+    val base     = MapDispatcher(predicates = Map(symLeaf -> (_ => Right(true))))
     val extended = base.copy(predicates = base.predicates + (symGtProb -> (_ => Right(false))))
     assert(!base.predicateSymbols.contains(symGtProb))
     assert(extended.predicateSymbols.contains(symGtProb))
@@ -120,13 +121,19 @@ class MapDispatcherSpec extends FunSuite:
   test("evalPredicate dispatches to correct lambda"):
     var leafCalled  = false
     var otherCalled = false
-    val d = MapDispatcher(predicates = Map(
-      symLeaf   -> { _ => leafCalled = true;  Right(true)  },
-      symGtProb -> { _ => otherCalled = true; Right(false) }
-    ))
-    val r = d.evalPredicate(symLeaf, List(Value(tAsset, "A")))
+    val d           = MapDispatcher(predicates =
+      Map(
+        symLeaf   -> { _ =>
+          leafCalled = true; Right(true)
+        },
+        symGtProb -> { _ =>
+          otherCalled = true; Right(false)
+        },
+      )
+    )
+    val r           = d.evalPredicate(symLeaf, List(Value(tAsset, "A")))
     assertEquals(r, Right(true))
-    assert(leafCalled,  "leaf lambda was not called")
+    assert(leafCalled, "leaf lambda was not called")
     assert(!otherCalled, "gt_prob lambda should not have been called")
 
   test("evalPredicate returns Left for unknown symbol"):
@@ -136,30 +143,34 @@ class MapDispatcherSpec extends FunSuite:
     assert(r.left.toOption.get.contains("gt_prob"))
 
   test("evalPredicate propagates Left returned by lambda"):
-    val d = MapDispatcher(predicates = Map(
-      symLeaf -> { _ => Left("deliberate failure from lambda") }
-    ))
+    val d = MapDispatcher(predicates =
+      Map(
+        symLeaf -> { _ => Left("deliberate failure from lambda") }
+      )
+    )
     assertEquals(d.evalPredicate(symLeaf, Nil), Left("deliberate failure from lambda"))
 
   // ─── unit: evalFunction dispatch ────────────────────────────────────────────
 
   test("evalFunction dispatches to correct lambda"):
     var lecCalled = false
-    val d = MapDispatcher(
+    val d         = MapDispatcher(
       predicates = Map.empty,
-      functions  = Map(
-        symLec -> { _ => lecCalled = true; Right(0.07) },
-        symP95 -> { _ => Right(100L) }
-      )
+      functions = Map(
+        symLec -> { _ =>
+          lecCalled = true; Right(0.07)
+        },
+        symP95 -> { _ => Right(100L) },
+      ),
     )
-    val r = d.evalFunction(symLec, List(Value(tAsset, 1), Value(tLoss, 10000000L)))
+    val r         = d.evalFunction(symLec, List(Value(tAsset, 1), Value(tLoss, 10000000L)))
     assertEquals(r, Right(0.07))
     assert(lecCalled, "lec lambda was not called")
 
   test("evalFunction returns Left for unknown symbol"):
     val d = MapDispatcher(
       predicates = Map.empty,
-      functions  = Map(symP95 -> (_ => Right(0L)))
+      functions = Map(symP95 -> (_ => Right(0L))),
     )
     val r = d.evalFunction(symLec, Nil)
     assert(r.isLeft)
@@ -168,27 +179,31 @@ class MapDispatcherSpec extends FunSuite:
   test("evalFunction propagates Left returned by lambda"):
     val d = MapDispatcher(
       predicates = Map.empty,
-      functions  = Map(symLec -> { _ => Left("computation failed") })
+      functions = Map(symLec -> { _ => Left("computation failed") }),
     )
     assertEquals(d.evalFunction(symLec, Nil), Left("computation failed"))
 
   // ─── unit: lambda receives correct args ─────────────────────────────────────
 
   test("evalPredicate passes args list to lambda unchanged"):
-    val vA = Value(tAsset, "A")
-    val vB = Value(tAsset, "B")
+    val vA                    = Value(tAsset, "A")
+    val vB                    = Value(tAsset, "B")
     var received: List[Value] = Nil
-    val d = MapDispatcher(predicates = Map(symLeaf -> { args => received = args; Right(true) }))
+    val d                     = MapDispatcher(predicates = Map(symLeaf -> { args =>
+      received = args; Right(true)
+    }))
     d.evalPredicate(symLeaf, List(vA, vB))
     assertEquals(received, List(vA, vB))
 
   test("evalFunction passes args list to lambda unchanged"):
-    val vAsset = Value(tAsset, 1)
-    val vLoss  = Value(tLoss, 10000000L)
+    val vAsset                = Value(tAsset, 1)
+    val vLoss                 = Value(tLoss, 10000000L)
     var received: List[Value] = Nil
-    val d = MapDispatcher(
+    val d                     = MapDispatcher(
       predicates = Map.empty,
-      functions  = Map(symLec -> { args => received = args; Right(0.0) })
+      functions = Map(symLec -> { args =>
+        received = args; Right(0.0)
+      }),
     )
     d.evalFunction(symLec, List(vAsset, vLoss))
     assertEquals(received, List(vAsset, vLoss))
@@ -199,51 +214,55 @@ class MapDispatcherSpec extends FunSuite:
 
   test("validateAgainst passes when MapDispatcher covers all catalog symbols"):
     val catalog = TypeCatalog.unsafe(
-      types      = Set(DomainType(tAsset), ValueType(tLoss), ValueType(tProb)),
-      predicates = Map(symLeaf -> PredicateSig(List(tAsset)),
-                       symGtProb -> PredicateSig(List(tProb, tProb))),
-      functions  = Map(symLec -> FunctionSig(List(tAsset, tLoss), tProb))
+      types = Set(DomainType(tAsset), ValueType(tLoss), ValueType(tProb)),
+      predicates =
+        Map(symLeaf -> PredicateSig(List(tAsset)), symGtProb -> PredicateSig(List(tProb, tProb))),
+      functions = Map(symLec -> FunctionSig(List(tAsset, tLoss), tProb)),
     )
-    val d = MapDispatcher(
-      predicates = Map(symLeaf   -> (_ => Right(true)),
-                       symGtProb -> (_ => Right(true))),
-      functions  = Map(symLec    -> (_ => Right(0.0)))
+    val d       = MapDispatcher(
+      predicates = Map(symLeaf -> (_ => Right(true)), symGtProb -> (_ => Right(true))),
+      functions = Map(symLec -> (_ => Right(0.0))),
     )
-    val model = RuntimeModel(domains = Map(tAsset -> Set(Value(tAsset, "A"))), dispatcher = d)
+    val model   = RuntimeModel(domains = Map(tAsset -> Set(Value(tAsset, "A"))), dispatcher = d)
     assert(model.validateAgainst(catalog).isRight)
 
-  test("validateAgainst returns MissingPredicateImplementation when predicate absent from MapDispatcher"):
+  test(
+    "validateAgainst returns MissingPredicateImplementation when predicate absent from MapDispatcher"
+  ):
     val catalog = TypeCatalog.unsafe(
-      types      = Set(DomainType(tAsset), ValueType(tLoss)),  // tLoss must be declared for gt_loss signature
-      predicates = Map(symLeaf   -> PredicateSig(List(tAsset)),
-                       symGtLoss -> PredicateSig(List(tLoss, tLoss)))
+      types =
+        Set(DomainType(tAsset), ValueType(tLoss)), // tLoss must be declared for gt_loss signature
+      predicates =
+        Map(symLeaf -> PredicateSig(List(tAsset)), symGtLoss -> PredicateSig(List(tLoss, tLoss))),
     )
     // gt_loss missing from dispatcher
-    val d = MapDispatcher(predicates = Map(symLeaf -> (_ => Right(true))))
-    val model = RuntimeModel(domains = Map(tAsset -> Set(Value(tAsset, "A"))), dispatcher = d)
-    val result = model.validateAgainst(catalog)
+    val d       = MapDispatcher(predicates = Map(symLeaf -> (_ => Right(true))))
+    val model   = RuntimeModel(domains = Map(tAsset -> Set(Value(tAsset, "A"))), dispatcher = d)
+    val result  = model.validateAgainst(catalog)
     assert(result.isLeft)
-    val errors = result.left.toOption.get
+    val errors  = result.left.toOption.get
     assert(errors.exists {
       case RuntimeModelError.MissingPredicateImplementation(n) => n == symGtLoss
-      case _ => false
+      case _                                                   => false
     })
 
-  test("validateAgainst returns MissingFunctionImplementation when function absent from MapDispatcher"):
+  test(
+    "validateAgainst returns MissingFunctionImplementation when function absent from MapDispatcher"
+  ):
     val catalog = TypeCatalog.unsafe(
-      types      = Set(DomainType(tAsset), ValueType(tLoss), ValueType(tProb)),
+      types = Set(DomainType(tAsset), ValueType(tLoss), ValueType(tProb)),
       predicates = Map(symLeaf -> PredicateSig(List(tAsset))),
-      functions  = Map(symLec  -> FunctionSig(List(tAsset, tLoss), tProb))
+      functions = Map(symLec -> FunctionSig(List(tAsset, tLoss), tProb)),
     )
     // lec present in catalog but functions map is empty
-    val d = MapDispatcher(predicates = Map(symLeaf -> (_ => Right(true))))
-    val model = RuntimeModel(domains = Map(tAsset -> Set(Value(tAsset, "A"))), dispatcher = d)
-    val result = model.validateAgainst(catalog)
+    val d       = MapDispatcher(predicates = Map(symLeaf -> (_ => Right(true))))
+    val model   = RuntimeModel(domains = Map(tAsset -> Set(Value(tAsset, "A"))), dispatcher = d)
+    val result  = model.validateAgainst(catalog)
     assert(result.isLeft)
-    val errors = result.left.toOption.get
+    val errors  = result.left.toOption.get
     assert(errors.exists {
       case RuntimeModelError.MissingFunctionImplementation(n) => n == symLec
-      case _ => false
+      case _                                                  => false
     })
 
   // ─── integration: full evaluateTyped pipeline ───────────────────────────────
@@ -259,22 +278,22 @@ class MapDispatcherSpec extends FunSuite:
   //   gt_prob : Probability × Probability → Boolean
   //
   // Asset raw type: String (asset identifier)
-  // Loss  raw type: Long  (inline integer literals like "10000000" produce Long via literalValidator)
+  // Loss raw type: Long (inline integer literals like "10000000" produce Long via literalValidator)
   // Probability raw type: Double (inline decimals like "0.05" produce Double via literalValidator)
 
   private val catalog = TypeCatalog.unsafe(
     types = Set(
       DomainType(tAsset),
       ValueType(tLoss),
-      ValueType(tProb)
+      ValueType(tProb),
     ),
     predicates = Map(
       symLeaf   -> PredicateSig(List(tAsset)),
-      symGtProb -> PredicateSig(List(tProb, tProb))
+      symGtProb -> PredicateSig(List(tProb, tProb)),
     ),
     functions = Map(
       symLec -> FunctionSig(List(tAsset, tLoss), tProb),
-      symP95 -> FunctionSig(List(tAsset), tLoss)
+      symP95 -> FunctionSig(List(tAsset), tLoss),
     ),
     // Numeric literals appearing as Loss or Probability tokens in queries are
     // validated by these validators at bind time.  The validator produces the
@@ -282,8 +301,8 @@ class MapDispatcherSpec extends FunSuite:
     // See ADR-015.
     literalValidators = Map(
       tLoss -> (s => s.toLongOption),
-      tProb -> (s => s.toDoubleOption)
-    )
+      tProb -> (s => s.toDoubleOption),
+    ),
   )
 
   // Domain: two assets, A and B. A has lec > 0.05 at threshold 10000000, B does not.
@@ -316,7 +335,7 @@ class MapDispatcherSpec extends FunSuite:
 
   private val dispatcher = MapDispatcher(
     predicates = Map(
-      symLeaf -> { _ =>
+      symLeaf   -> { _ =>
         // Every asset is in range (all are "leaves" in this illustrative model)
         Right(true)
       },
@@ -327,7 +346,7 @@ class MapDispatcherSpec extends FunSuite:
           a <- args(0).extract[Double]
           b <- args(1).extract[Double]
         yield a > b
-      }
+      },
     ),
     functions = Map(
       symLec -> { args =>
@@ -345,31 +364,40 @@ class MapDispatcherSpec extends FunSuite:
         Right(assetId match
           case "A" => 5000000L
           case _   => 1000000L)
-      }
-    )
+      },
+    ),
   )
 
   private val model = RuntimeModel(
-    domains    = Map(tAsset -> Set(domainA, domainB)),
-    dispatcher = dispatcher
+    domains = Map(tAsset -> Set(domainA, domainB)),
+    dispatcher = dispatcher,
   )
 
   // Query: Q[<=]^{1/4} x (leaf(x), gt_prob(lec(x, 10000000), 0.05))
   // Expected: only A satisfies gt_prob(lec(A, 10000000), 0.05) since lec(A)=0.07 > 0.05
   private val lecQuery = ParsedQuery(
     quantifier = Quantifier.About(1, 2, 0.01),
-    variable   = "x",
-    range      = Formula.Atom(FOL(symLeaf.value, List(Term.Var("x")))),
-    scope      = Formula.Atom(FOL(symGtProb.value, List(
-      Term.Fn(symLec.value, List(Term.Var("x"), Term.Const("10000000"))),
-      Term.Const("0.05")
-    ))),
-    answerVars = Nil
+    variable = "x",
+    range = Formula.Atom(FOL(symLeaf.value, List(Term.Var("x")))),
+    scope = Formula.Atom(
+      FOL(
+        symGtProb.value,
+        List(
+          Term.Fn(symLec.value, List(Term.Var("x"), Term.Const("10000000"))),
+          Term.Const("0.05"),
+        ),
+      )
+    ),
+    answerVars = Nil,
   )
 
   test("evaluateTyped with MapDispatcher: full pipeline over non-empty domain"):
     val fm = FolModel(catalog, model).fold(e => fail(s"FolModel construction failed: $e"), identity)
-    val result = VagueSemantics.evaluateTyped(query = lecQuery, folModel = fm, samplingParams = SamplingParams.exact)
+    val result = VagueSemantics.evaluateTyped(
+      query = lecQuery,
+      folModel = fm,
+      samplingParams = SamplingParams.exact,
+    )
     assert(result.isRight, s"Expected Right, got $result")
     val output = result.toOption.get
     assertEquals(output.rangeElements.size, 2, "both assets should be in range")
@@ -379,7 +407,11 @@ class MapDispatcherSpec extends FunSuite:
 
   test("evaluateTyped with MapDispatcher: proportion reflects satisfying count"):
     val fm = FolModel(catalog, model).fold(e => fail(s"FolModel construction failed: $e"), identity)
-    val result = VagueSemantics.evaluateTyped(query = lecQuery, folModel = fm, samplingParams = SamplingParams.exact)
+    val result = VagueSemantics.evaluateTyped(
+      query = lecQuery,
+      folModel = fm,
+      samplingParams = SamplingParams.exact,
+    )
     val output = result.toOption.get
     assertEquals(output.result.proportion, 0.5)
 
@@ -387,39 +419,44 @@ class MapDispatcherSpec extends FunSuite:
     val failingDispatcher = MapDispatcher(
       predicates = Map(
         symLeaf   -> (_ => Right(true)),
-        symGtProb -> (_ => Left("deliberate predicate failure"))
+        symGtProb -> (_ => Left("deliberate predicate failure")),
       ),
       functions = Map(
         symLec -> (_ => Right(0.07)),
-        symP95 -> (_ => Right(5000000L))
-      )
+        symP95 -> (_ => Right(5000000L)),
+      ),
     )
-    val failingModel = RuntimeModel(
-      domains    = Map(tAsset -> Set(domainA, domainB)),
-      dispatcher = failingDispatcher
+    val failingModel      = RuntimeModel(
+      domains = Map(tAsset -> Set(domainA, domainB)),
+      dispatcher = failingDispatcher,
     )
-    val fm = FolModel(catalog, failingModel).fold(e => fail(s"FolModel construction failed: $e"), identity)
-    val result = VagueSemantics.evaluateTyped(query = lecQuery, folModel = fm, samplingParams = SamplingParams.exact)
+    val fm                =
+      FolModel(catalog, failingModel).fold(e => fail(s"FolModel construction failed: $e"), identity)
+    val result            = VagueSemantics.evaluateTyped(
+      query = lecQuery,
+      folModel = fm,
+      samplingParams = SamplingParams.exact,
+    )
     result match
       case Left(e: QueryError.EvaluationError) =>
         assert(e.message.contains("deliberate predicate failure"))
-      case Left(other) => fail(s"Expected EvaluationError, got $other")
-      case Right(_)    => fail("Expected Left for failing dispatcher")
+      case Left(other)                         => fail(s"Expected EvaluationError, got $other")
+      case Right(_)                            => fail("Expected Left for failing dispatcher")
 
   test("evaluateTyped with MapDispatcher: validateAgainst catches missing symbol in catalog"):
     // A dispatcher that is missing symGtProb from its predicates map
     val incompleteDispatcher = MapDispatcher(
       predicates = Map(symLeaf -> (_ => Right(true))), // gt_prob absent
-      functions  = Map(
+      functions = Map(
         symLec -> (_ => Right(0.07)),
-        symP95 -> (_ => Right(5000000L))
-      )
+        symP95 -> (_ => Right(5000000L)),
+      ),
     )
-    val incompleteModel = RuntimeModel(
-      domains    = Map(tAsset -> Set(domainA, domainB)),
-      dispatcher = incompleteDispatcher
+    val incompleteModel      = RuntimeModel(
+      domains = Map(tAsset -> Set(domainA, domainB)),
+      dispatcher = incompleteDispatcher,
     )
-    val result = FolModel(catalog, incompleteModel)
+    val result               = FolModel(catalog, incompleteModel)
     result match
       case Left(e: QueryError.ModelValidationError) =>
         assert(e.errors.exists(_.contains("gt_prob")))
@@ -443,28 +480,34 @@ class MapDispatcherSpec extends FunSuite:
           // Deliberate wrong cast: lec returns Double, but this casts to Int.
           // The evaluateTyped return type is Either but no try/catch wraps lambdas,
           // so ClassCastException propagates uncaught through the Either boundary.
-          val _ = args(0).raw.asInstanceOf[Int]  // will throw ClassCastException
+          val _ = args(0).raw.asInstanceOf[Int] // will throw ClassCastException
           Right(true)
-        }
+        },
       ),
       functions = Map(
         symLec -> (_ => Right(0.07)),
-        symP95 -> (_ => Right(5000000L))
-      )
+        symP95 -> (_ => Right(5000000L)),
+      ),
     )
-    val badModel = RuntimeModel(
-      domains    = Map(tAsset -> Set(domainA, domainB)),
-      dispatcher = badDispatcher
+    val badModel      = RuntimeModel(
+      domains = Map(tAsset -> Set(domainA, domainB)),
+      dispatcher = badDispatcher,
     )
     // On the JVM this is ClassCastException.
     // On ScalaJS the same cast failure surfaces as UndefinedBehaviorError (extends Error).
     // The key property being tested — that the exception escapes the Either boundary
     // rather than being caught as Left — holds on both platforms.
-    val fm = FolModel(catalog, badModel).fold(e => fail(s"FolModel construction failed: $e"), identity)
-    var threw = false
+    val fm            =
+      FolModel(catalog, badModel).fold(e => fail(s"FolModel construction failed: $e"), identity)
+    var threw         = false
     try
-      VagueSemantics.evaluateTyped(query = lecQuery, folModel = fm, samplingParams = SamplingParams.exact)
+      VagueSemantics.evaluateTyped(
+        query = lecQuery,
+        folModel = fm,
+        samplingParams = SamplingParams.exact,
+      )
       ()
-    catch
-      case _: Throwable => threw = true
+    catch case _: Throwable => threw = true
     assert(threw, "Expected raw-type mismatch to propagate as uncaught exception, not Either.Left")
+
+end MapDispatcherSpec

@@ -2,18 +2,19 @@ package vql.sampling
 
 import munit.FunSuite
 
-/** Comprehensive tests for NormalApprox — pure-Scala normal distribution
-  * approximations replacing Apache Commons Math3.
-  *
-  * Test strategy:
-  * 1. Known reference values from statistical tables (NIST, textbooks)
-  * 2. Symmetry and boundary properties
-  * 3. Roundtrip: inverseCDF(cdf(x)) ≈ x
-  * 4. Cross-validation at the exact values the existing SamplingSpec tests
-  *    expect (z-scores for α = 0.05, 0.01, 0.10)
-  * 5. Monotonicity
-  * 6. Error bound verification
-  */
+/**
+ * Comprehensive tests for NormalApprox — pure-Scala normal distribution approximations replacing
+ * Apache Commons Math3.
+ *
+ * Test strategy:
+ *   1. Known reference values from statistical tables (NIST, textbooks)
+ *   2. Symmetry and boundary properties
+ *   3. Roundtrip: inverseCDF(cdf(x)) ≈ x
+ *   4. Cross-validation at the exact values the existing SamplingSpec tests expect (z-scores for α =
+ *      0.05, 0.01, 0.10)
+ *   5. Monotonicity
+ *   6. Error bound verification
+ */
 class NormalApproxSpec extends FunSuite:
 
   // --------------- inverseCDF (Acklam) ---------------
@@ -34,24 +35,24 @@ class NormalApproxSpec extends FunSuite:
       (0.2000, -0.8416),
       (0.3000, -0.5244),
       (0.4000, -0.2533),
-      (0.5000,  0.0000),
-      (0.6000,  0.2533),
-      (0.7000,  0.5244),
-      (0.8000,  0.8416),
-      (0.9000,  1.2816),
-      (0.9500,  1.6449),
-      (0.9750,  1.9600),
-      (0.9900,  2.3263),
-      (0.9950,  2.5758),
-      (0.9990,  3.0902)
+      (0.5000, 0.0000),
+      (0.6000, 0.2533),
+      (0.7000, 0.5244),
+      (0.8000, 0.8416),
+      (0.9000, 1.2816),
+      (0.9500, 1.6449),
+      (0.9750, 1.9600),
+      (0.9900, 2.3263),
+      (0.9950, 2.5758),
+      (0.9990, 3.0902),
     )
 
     referenceValues.foreach { (p, expected) =>
-      val actual = NormalApprox.inverseCDF(p)
+      val actual  = NormalApprox.inverseCDF(p)
       val absDiff = math.abs(actual - expected)
       assert(
         absDiff < 0.0005,
-        s"inverseCDF($p): expected $expected, got $actual (diff=$absDiff)"
+        s"inverseCDF($p): expected $expected, got $actual (diff=$absDiff)",
       )
     }
   }
@@ -79,14 +80,18 @@ class NormalApproxSpec extends FunSuite:
     probabilities.foreach { p =>
       val lower = NormalApprox.inverseCDF(p)
       val upper = NormalApprox.inverseCDF(1.0 - p)
-      assertEqualsDouble(lower, -upper, 1e-10,
-        s"Symmetry violated at p=$p: inverseCDF($p)=$lower, inverseCDF(${1-p})=$upper")
+      assertEqualsDouble(
+        lower,
+        -upper,
+        1e-10,
+        s"Symmetry violated at p=$p: inverseCDF($p)=$lower, inverseCDF(${1 - p})=$upper",
+      )
     }
   }
 
   test("inverseCDF — monotonically increasing") {
     val probabilities = (1 to 99).map(_ / 100.0)
-    val values = probabilities.map(NormalApprox.inverseCDF)
+    val values        = probabilities.map(NormalApprox.inverseCDF)
     values.sliding(2).foreach { window =>
       val Seq(a, b) = window
       assert(a < b, s"Not monotonic: $a >= $b")
@@ -107,10 +112,10 @@ class NormalApproxSpec extends FunSuite:
   }
 
   test("inverseCDF — rejects out-of-range input") {
-    intercept[IllegalArgumentException] { NormalApprox.inverseCDF(0.0) }
-    intercept[IllegalArgumentException] { NormalApprox.inverseCDF(1.0) }
-    intercept[IllegalArgumentException] { NormalApprox.inverseCDF(-0.1) }
-    intercept[IllegalArgumentException] { NormalApprox.inverseCDF(1.5) }
+    intercept[IllegalArgumentException](NormalApprox.inverseCDF(0.0))
+    intercept[IllegalArgumentException](NormalApprox.inverseCDF(1.0))
+    intercept[IllegalArgumentException](NormalApprox.inverseCDF(-0.1))
+    intercept[IllegalArgumentException](NormalApprox.inverseCDF(1.5))
   }
 
   // --------------- cdf (Abramowitz & Stegun) ---------------
@@ -129,21 +134,21 @@ class NormalApproxSpec extends FunSuite:
       (-1.5, 0.066807),
       (-1.0, 0.158655),
       (-0.5, 0.308538),
-      ( 0.0, 0.500000),
-      ( 0.5, 0.691462),
-      ( 1.0, 0.841345),
-      ( 1.5, 0.933193),
-      ( 2.0, 0.977250),
-      ( 2.5, 0.993790),
-      ( 3.0, 0.998650)
+      (0.0, 0.500000),
+      (0.5, 0.691462),
+      (1.0, 0.841345),
+      (1.5, 0.933193),
+      (2.0, 0.977250),
+      (2.5, 0.993790),
+      (3.0, 0.998650),
     )
 
     referenceValues.foreach { (x, expected) =>
-      val actual = NormalApprox.cdf(x)
+      val actual  = NormalApprox.cdf(x)
       val absDiff = math.abs(actual - expected)
       assert(
         absDiff < 1e-4,
-        s"cdf($x): expected $expected, got $actual (diff=$absDiff)"
+        s"cdf($x): expected $expected, got $actual (diff=$absDiff)",
       )
     }
   }
@@ -153,14 +158,13 @@ class NormalApproxSpec extends FunSuite:
     xValues.foreach { x =>
       val sum = NormalApprox.cdf(x) + NormalApprox.cdf(-x)
       // A&S symmetry error is ≤ 2 × max absolute error ≈ 1.5e-7
-      assertEqualsDouble(sum, 1.0, 1.5e-7,
-        s"Symmetry violated at x=$x: Φ($x) + Φ(${-x}) = $sum")
+      assertEqualsDouble(sum, 1.0, 1.5e-7, s"Symmetry violated at x=$x: Φ($x) + Φ(${-x}) = $sum")
     }
   }
 
   test("cdf — monotonically increasing") {
     val xValues = (-40 to 40).map(_ / 10.0)
-    val cdfs = xValues.map(NormalApprox.cdf)
+    val cdfs    = xValues.map(NormalApprox.cdf)
     cdfs.sliding(2).foreach { window =>
       val Seq(a, b) = window
       assert(a <= b, s"Not monotonic: cdf values $a > $b")
@@ -186,18 +190,18 @@ class NormalApproxSpec extends FunSuite:
       (-3.0, 0.001349898031630),
       (-2.0, 0.022750131948179),
       (-1.0, 0.158655253931457),
-      ( 0.0, 0.500000000000000),
-      ( 1.0, 0.841344746068543),
-      ( 2.0, 0.977249868051821),
-      ( 3.0, 0.998650101968370)
+      (0.0, 0.500000000000000),
+      (1.0, 0.841344746068543),
+      (2.0, 0.977249868051821),
+      (3.0, 0.998650101968370),
     )
 
     highPrecisionRefs.foreach { (x, expected) =>
-      val actual = NormalApprox.cdf(x)
+      val actual  = NormalApprox.cdf(x)
       val absDiff = math.abs(actual - expected)
       assert(
         absDiff < 7.5e-8,
-        s"cdf($x): error $absDiff exceeds 7.5e-8 bound (actual=$actual, expected=$expected)"
+        s"cdf($x): error $absDiff exceeds 7.5e-8 bound (actual=$actual, expected=$expected)",
       )
     }
   }
@@ -209,8 +213,7 @@ class NormalApproxSpec extends FunSuite:
     xValues.foreach { x =>
       val roundtrip = NormalApprox.inverseCDF(NormalApprox.cdf(x))
       // Compound error from both approximations; tightest achievable is ~2e-6
-      assertEqualsDouble(roundtrip, x, 5e-6,
-        s"roundtrip failed at x=$x: got $roundtrip")
+      assertEqualsDouble(roundtrip, x, 5e-6, s"roundtrip failed at x=$x: got $roundtrip")
     }
   }
 
@@ -218,8 +221,7 @@ class NormalApproxSpec extends FunSuite:
     val probabilities = List(0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99)
     probabilities.foreach { p =>
       val roundtrip = NormalApprox.cdf(NormalApprox.inverseCDF(p))
-      assertEqualsDouble(roundtrip, p, 1e-6,
-        s"roundtrip failed at p=$p: got $roundtrip")
+      assertEqualsDouble(roundtrip, p, 1e-6, s"roundtrip failed at p=$p: got $roundtrip")
     }
   }
 
@@ -228,14 +230,22 @@ class NormalApproxSpec extends FunSuite:
   test("SamplingParams.zScore uses NormalApprox and matches expected values") {
     // These are the values the existing SamplingSpec tests assert
     val params95 = SamplingParams(alpha = 0.05)
-    assert(math.abs(params95.zScore - 1.96) < 0.001,
-      s"95% z-score ${params95.zScore} should be ≈ 1.96")
+    assert(
+      math.abs(params95.zScore - 1.96) < 0.001,
+      s"95% z-score ${params95.zScore} should be ≈ 1.96",
+    )
 
     val params99 = SamplingParams(alpha = 0.01)
-    assert(math.abs(params99.zScore - 2.576) < 0.001,
-      s"99% z-score ${params99.zScore} should be ≈ 2.576")
+    assert(
+      math.abs(params99.zScore - 2.576) < 0.001,
+      s"99% z-score ${params99.zScore} should be ≈ 2.576",
+    )
 
     val params90 = SamplingParams(alpha = 0.10)
-    assert(math.abs(params90.zScore - 1.645) < 0.001,
-      s"90% z-score ${params90.zScore} should be ≈ 1.645")
+    assert(
+      math.abs(params90.zScore - 1.645) < 0.001,
+      s"90% z-score ${params90.zScore} should be ≈ 1.645",
+    )
   }
+
+end NormalApproxSpec
