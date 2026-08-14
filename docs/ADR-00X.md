@@ -35,14 +35,14 @@ This meta-ADR defines the structure, style, and content depth for all ADRs.
 
 Avoid: *current*, *existing*, *previously*, *old approach*, *the old X*. Express the underlying quality attribute or constraint instead.
 
-**Example (from ADR-001):**
+**Example:**
 ```markdown
 ## Context
 
-- External input (HTTP, JSON) is **untrusted**
-- Domain objects must be **correct by construction**
-- Validation happens at **domain boundaries**, not scattered throughout
-- Internal code trusts validated types
+- Input crossing a trust boundary is **untrusted**
+- Values must be **correct by construction**, not re-checked downstream
+- Validation belongs at the **boundary**, not scattered through call sites
+- Internal code trusts already-validated types
 ```
 
 ### Decision (3-5 numbered patterns)
@@ -55,26 +55,18 @@ Avoid: *current*, *existing*, *previously*, *old approach*, *the old X*. Express
 - Show pattern, not full implementation
 - Avoid prose—let code speak
 
-**Example (from ADR-001):**
+**Example:**
 ```markdown
 ## Decision
 
 ### 1. Smart Constructor Pattern
 
-Domain objects expose `create()` returning `Validation[ValidationError, DomainObject]`:
+A domain type hides its constructor behind a validated factory returning `Either[Error, DomainType]`:
 
 ```scala
-object RiskLeaf {
-  def create(id: String, name: String, ...): Validation[ValidationError, RiskLeaf] = {
-    // Layer 1: Iron refinement (per-field)
-    val idV = toValidation(ValidationUtil.refineId(id, "id"))
-    
-    // Layer 2: Business rules (cross-field)
-    // e.g., minLoss < maxLoss
-    
-    Validation.validateWith(idV, ...) { ... => RiskLeaf(...) }
-  }
-}
+object DomainType:
+  def make(raw: String): Either[Error, DomainType] =
+    Either.cond(isValid(raw), DomainType(raw), Error.Invalid(raw))
 ```
 ```
 
@@ -88,26 +80,19 @@ object RiskLeaf {
 - Keep examples short (5-10 lines each)
 - Comments should be in code, not prose
 
-**Example (from ADR-001):**
+**Example:**
 ```markdown
 ## Code Smells
 
-### ❌ Validation in Service Layer
+### ❌ Validation in the Service Layer
 
 ```scala
-// BAD: Service validates raw types
-def computeLEC(nTrials: Int, depth: Int) = {
-  val validated = for {
-    validTrials <- ValidationUtil.refinePositiveInt(nTrials, "nTrials")
-    validDepth <- ValidationUtil.refineNonNegativeInt(depth, "depth")
-  } yield (validTrials, validDepth)
-  // ...
-}
+// BAD: service re-validates a raw input
+def process(rawId: String): Either[Error, Result] =
+  DomainType.make(rawId).flatMap(run)
 
-// GOOD: Service trusts Iron types
-def computeLEC(nTrials: PositiveInt, depth: NonNegativeInt) = {
-  // No validation - types guarantee correctness
-}
+// GOOD: service trusts an already-validated type
+def process(id: DomainType): Result = run(id)
 ```
 ```
 
@@ -115,15 +100,15 @@ def computeLEC(nTrials: PositiveInt, depth: NonNegativeInt) = {
 **Purpose:** Quick reference to where patterns are implemented.  
 **Style:** Table mapping location to pattern. 3-12 rows typical. Group related items when the list exceeds 6.
 
-**Example (from ADR-001):**
+**Example:**
 ```markdown
 ## Implementation
 
 | Location | Pattern |
 |----------|---------|
-| `RiskLeaf.create()` | Smart constructor with Validation |
-| `JsonDecoder[RiskLeaf]` | Calls `create()` during parsing |
-| `RiskTreeService` | Iron types in signatures, no validation |
+| `DomainType.make` | Smart constructor returning `Either` |
+| `Parser` | Calls `make` at the input boundary |
+| service signatures | Validated types in, no re-validation |
 ```
 
 ### Alternatives Rejected (Optional — Approved Extension)
@@ -140,9 +125,9 @@ def computeLEC(nTrials: PositiveInt, depth: NonNegativeInt) = {
 ```markdown
 ## Alternatives Rejected
 
-### Reflector operator (emberstack/kubernetes-reflector)
-- **What**: annotate source Secret; operator copies to target namespaces automatically
-- **Why rejected**: requires cluster-wide Secret R/W RBAC — compromised reflector exposes all namespaces. Mirrors the admin credential rather than provisioning a dedicated role, violating least-privilege (ADR-INFRA-004).
+### Global mutable registry
+- **What**: a single process-wide registry every module reads and writes directly
+- **Why rejected**: couples unrelated modules through hidden shared state and bypasses construction-time validation; the boundary type (ADR-NNN) already gives the guarantee without the coupling.
 ```
 
 > **Schema note:** This section is a deliberate, documented extension to the base ADR schema. It is optional and appears after Implementation, before References. ADRs that capture multi-option decisions (technology choices, operator selection, secret delivery strategies) should include it. ADRs that record a single obvious pattern (e.g., a coding convention) should omit it.
@@ -216,11 +201,11 @@ def computeLEC(nTrials: PositiveInt, depth: NonNegativeInt) = {
 
 ## Reference Implementation
 
-**ADR-001** is the canonical example. When in doubt, match its:
-- Structure (Context → Decision → Code Smells → Implementation)
+**ADR-001** is the canonical in-repo example. When in doubt, match its:
+- Structure (Context → Decision → Code Smells → Cross-ADR Relationship → Implementation)
 - Depth (concise code examples, minimal prose)
 - Style (bullets, code-first, prescriptive)
-- Length (~160 lines)
+- Length (within the 100–200 line target)
 
 ---
 

@@ -61,19 +61,11 @@ object QueryError:
     override def formatted: String =
       val pos = position.map(p => s" at position $p").getOrElse("")
       val snippet = if input.length > 50 then input.take(50) + "..." else input
-      s"Parse error$pos: $message\nInput: $snippet" + 
+      s"Parse error$pos: $message\nInput: $snippet" +
         (if context.isEmpty then "" else "\n" + context.map { case (k, v) => s"  $k: $v" }.mkString("\n"))
-  
-  /** Lexical error (invalid tokens) */
-  case class LexicalError(
-    message: String,
-    char: Char,
-    position: Int
-  ) extends QueryError:
-    override val context = Map("character" -> char.toString, "position" -> position.toString)
-  
+
   // ==================== Validation Errors ====================
-  
+
   /** Validation error (well-formed but invalid query) */
   case class ValidationError(
     message: String,
@@ -83,30 +75,9 @@ object QueryError:
     override def formatted: String =
       s"Validation error in '$field': $message" +
         (if context.isEmpty then "" else "\n" + context.map { case (k, v) => s"  $k: $v" }.mkString("\n"))
-  
-  /** Query structure validation errors */
-  case class QueryStructureError(
-    message: String,
-    queryPart: String,
-    suggestion: Option[String] = None
-  ) extends QueryError:
-    override val context = Map("query_part" -> queryPart) ++ suggestion.map("suggestion" -> _)
-  
-  /** Quantifier constraint violation */
-  case class QuantifierError(
-    message: String,
-    k: Int,
-    n: Int,
-    tolerance: Double
-  ) extends QueryError:
-    override val context = Map(
-      "numerator" -> k.toString,
-      "denominator" -> n.toString,
-      "tolerance" -> tolerance.toString
-    )
-  
+
   // ==================== Evaluation Errors ====================
-  
+
   /** Error during query evaluation */
   case class EvaluationError(
     message: String,
@@ -118,29 +89,9 @@ object QueryError:
       val causeMsg = cause.map(c => s"\nCause: ${c.getMessage}").getOrElse("")
       s"Evaluation error in $phase: $message$causeMsg" +
         (if context.isEmpty then "" else "\n" + context.map { case (k, v) => s"  $k: $v" }.mkString("\n"))
-  
-  /** Scope evaluation failed */
-  case class ScopeEvaluationError(
-    message: String,
-    formula: String,
-    element: String
-  ) extends QueryError:
-    override val context = Map("formula" -> formula, "element" -> element)
-  
+
   // ==================== FOL Semantics Errors ====================
-  
-  /** Uninterpreted symbol in FOL evaluation */
-  case class UninterpretedSymbolError(
-    symbolType: String,  // "function" or "predicate"
-    symbolName: String,
-    availableSymbols: Set[String] = Set.empty
-  ) extends QueryError:
-    def message = s"Uninterpreted $symbolType: '$symbolName'"
-    override val context = Map(
-      "symbol_type" -> symbolType,
-      "symbol_name" -> symbolName
-    ) ++ (if availableSymbols.nonEmpty then Map("available" -> availableSymbols.mkString(", ")) else Map.empty)
-  
+
   /** Defensive fallback raised when evaluation reaches a type with no registered
     * domain, despite passing binding. In a correctly wired system this should
     * not be reachable: [[vql.typed.RuntimeModel.validateAgainst]] enforces domain
@@ -204,60 +155,6 @@ object QueryError:
       "variable" -> variableName,
       "bound_variables" -> boundVariables.mkString(", ")
     )
-  
-  /** Type mismatch in FOL evaluation */
-  case class TypeMismatchError(
-    message: String,
-    expected: String,
-    actual: String,
-    location: String
-  ) extends QueryError:
-    override val context = Map(
-      "expected" -> expected,
-      "actual" -> actual,
-      "location" -> location
-    )
-  
-  // ==================== Resource Errors ====================
-  
-  /** Resource management error */
-  case class ResourceError(
-    message: String,
-    resourceType: String,
-    cause: Option[Throwable] = None
-  ) extends QueryError:
-    override val context = Map("resource_type" -> resourceType)
-  
-  /** Connection/network error */
-  case class ConnectionError(
-    message: String,
-    endpoint: String,
-    cause: Option[Throwable] = None
-  ) extends QueryError:
-    override val context = Map("endpoint" -> endpoint)
-  
-  // ==================== Timeout Errors ====================
-  
-  /** Operation timeout */
-  case class TimeoutError(
-    operation: String,
-    timeoutMs: Long,
-    message: String = "Operation timed out"
-  ) extends QueryError:
-    override val context = Map(
-      "operation" -> operation,
-      "timeout_ms" -> timeoutMs.toString
-    )
-  
-  // ==================== Configuration Errors ====================
-  
-  /** Configuration error */
-  case class ConfigError(
-    message: String,
-    key: String,
-    cause: Option[Throwable] = None
-  ) extends QueryError:
-    override val context = Map("config_key" -> key)
 
 /** Exception wrapper for backward compatibility
   * 

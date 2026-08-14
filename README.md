@@ -7,7 +7,7 @@ The FOL foundation (parser combinators, pretty printer, Tarski semantics) follow
 ## Installation
 
 ```scala
-libraryDependencies += "com.risquanter" %%% "vql-engine" % "0.13.1"
+libraryDependencies += "com.risquanter" %%% "vql-engine" % "0.14.0"
 ```
 
 (`%%%` resolves to `vql-engine_3` on the JVM and `vql-engine_sjs1_3` on Scala.js; use `%%` for JVM-only projects.)
@@ -84,7 +84,7 @@ Two layers in `core/src/main/scala`:
 sbt +test    # full suite, JVM + Scala.js
 ```
 
-`core/src/test/scala/vql/semantics/VagueSemanticsTypedSpec.scala` exercises the typed pipeline end to end and is the most complete worked example of the API above.
+`core/src/test/scala/vql/semantics/VagueSemanticsTypedSpec.scala` exercises the typed pipeline end to end and is the most complete worked example of the API above. For a runnable walkthrough, `sbt "folEngine.jvm/runMain examples.VagueDemo"` runs `examples.VagueDemo` (plain query, compound range with negation, and `satisfyingSet`).
 
 ## Documentation
 

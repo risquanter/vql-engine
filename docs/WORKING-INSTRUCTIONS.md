@@ -108,20 +108,20 @@ At each phase, validate implementation against:
    - ADR-002: Parser-Combinator Style
    - ADR-003: HDR Deterministic Sampling
    - ADR-004: Tagless Initial Architecture
-   - ADR-005: Model Augmentation via Functional Composition
    - ADR-006: ADT Encoding (`enum` vs `sealed trait`)
    - ADR-007: Preserve OCaml-Ported Parser Combinator Core
-   - ADR-008: Domain Type Safety — Generic `KnowledgeBase[D]`
-   - ADR-009: Symmetric Relation Support via Schema Metadata
-   - ADR-010: Typed Relation Names — `RelationName` Opaque Type
    - ADR-012: Error Channel Policy — `require` vs `Either`
    - ADR-014: Domain Type Quantifiability
    - ADR-015: Symmetric Value Boundaries
+   - ADR-017: Formula Ranges and the Satisfying-Set Boundary
+   - ADR-018: Structural Fragment Membership over the Parse Tree
 
 2. **Proposed ADRs** (validate once accepted):
    - ADR-016: Carrier Witness on Symmetric Value Typeclasses
 
-   (ADR-00X is the meta template governing ADR structure.)
+   (ADR-00X is the meta template governing ADR structure. ADR-005/008/009/010,
+   which covered the retired untyped backend, are archived under
+   `docs/archive/` and are not validated against.)
 
 ### ADR Lifecycle
 
@@ -151,9 +151,9 @@ When a phase completes and its ADR is validated:
 
 Implement in order of dependencies (matches the ADR-004 layering):
 1. Foundation (`logic/`, `parser/`, `lexer/`, `semantics/`, `printer/` — ADR-007 scope; rarely touched)
-2. Vague-layer core (`fol/datastore`, `fol/quantifier`, `fol/sampling`, `fol/error`)
-3. Typed pipeline (`fol/typed`: catalog, binder, evaluator, model)
-4. Facade (`fol/semantics/VagueSemantics`) and examples
+2. Vague-layer core (`vql/quantifier`, `vql/sampling`, `vql/error`)
+3. Typed pipeline (`vql/typed`: catalog, binder, evaluator, model)
+4. Facade (`vql/semantics/VagueSemantics`) and examples
 5. Docs (ADRs, `VagueQuantifiers.md`, `README.md`)
 
 ---

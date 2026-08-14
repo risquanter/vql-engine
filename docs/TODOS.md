@@ -68,7 +68,7 @@ The `catalog.constants: Map[String, TypeId]` feature is an OCaml-heritage artifa
 - (b) Route named constants through the same `LiteralValue`/validator mechanism as inline literals — the consumer registers a validator that recognises the constant name and returns the appropriate `LiteralValue`.
 - (c) A separate named-constant registry where consumers supply the full `Value(sort, raw)` directly, bypassing the validator mechanism.
 
-**Context:** ADR-015 §1 (injection boundary), `fol/typed/QueryBinder.scala` `bindTermExpected` `Term.Const` branch, conversation history 2026-04-03.
+**Context:** ADR-015 §1 (injection boundary), `vql/typed/QueryBinder.scala` `bindTermExpected` `Term.Const` branch, conversation history 2026-04-03.
 
 ---
 
@@ -117,7 +117,7 @@ declarations at construction time, making the current scope limitation explicit 
 surfacing it as an error rather than silent misbehaviour. This guard is removed when
 T-004 is resolved.
 
-**Context:** `PLAN-function-return-normalisation.md` §Q2, `fol/typed/TypeCatalog.scala`
+**Context:** `PLAN-function-return-normalisation.md` §Q2, `vql/typed/TypeCatalog.scala`
 `collectErrors`, conversation history 2026-04-04.
 
 ---
@@ -175,9 +175,10 @@ only by tests and demos" is a dead-code smell.
 
 ## T-007 — Fresh typed-path demo
 
-**Status:** PENDING — write after Phase 5 of
-`docs/DONE_PLAN-range-formula-and-satisfying-set.md`, against the finished API
-(formula ranges + `satisfyingSet`).
+**Status:** DONE — `examples.VagueDemo` (`@main`) added in 0.14.0. Runs a plain
+query, a compound-range query with closed-world negation, and a `satisfyingSet`
+call against the finished API (`TypeCatalog` → `RuntimeModel` → `FolModel` →
+`evaluateTyped`). `README.md` links it as the runnable walkthrough.
 
 **Context:** Phase 0 (T-006) deleted the untyped demos
 (`examples/VagueSemanticsDemo`, `fol/examples/*`) with no port. The library
@@ -195,11 +196,15 @@ Deferring to post-Phase-5 lets the demo cover formula ranges and
 
 ## T-008 — Prune dead `QueryError` variants
 
-**Status:** PENDING — standalone task, **not** part of the range-formula
-workstream. Sequence as its own commit; coordinate with a register upgrade
-(breaking change).
+**Status:** DONE (engine side, 0.14.0) — the 10 variants below were removed from
+`vql.error.QueryError`; the 8 live variants remain. No main or test raisers
+existed. **Register gate still open:** register's `AppError.scala` `case` arms
+and `FolQueryFailureFromQueryErrorSpec.scala` for these 10 must be pruned in the
+register pin bump to 0.14.0 (arms catalogued in
+`docs/scratch/register-breaking-changes-2026-08-10.md` §5). Do not publish
+0.14.0 to Central ahead of that register upgrade.
 
-**Goal:** `fol.error.QueryError` declares 19 variants; **10 are raised by no
+**Goal:** `vql.error.QueryError` declares 19 variants; **10 are raised by no
 main-source code** — dead public surface, much of it generic scaffolding that
 predates the current typed pipeline. Remove them so the type honestly reflects
 what the engine returns.
@@ -227,12 +232,12 @@ TimeoutError, ConfigError`.
   (early-semver pre-1.0). Do it in its own release, ideally bundled with the
   register upgrade that already adapts to the 0.11.0 error changes.
 - The related smell — `BindError` / `ModelValidationError` carry `List[String]`
-  rather than structured typed errors, due to the `fol.error → fol.typed`
+  rather than structured typed errors, due to the `vql.error → vql.typed`
   package constraint — is a **separate, larger** change (it means deciding that
   dependency direction). Do not bundle it here.
 - Cross-layer / cross-phase error-hierarchy consolidation is a non-goal: it
   would break ADR-004 (foundation must not import vague; this is why
-  `parser.ParseError` is foundation-local) and the `fol.error → fol.typed`
+  `parser.ParseError` is foundation-local) and the `vql.error → vql.typed`
   boundary.
 
 **Context:** analysis of 2026-08-10 (after PLAN-range Phase 1). See also
@@ -271,7 +276,7 @@ precondition. ADR-017 §7 records the current behavior; this task decides whethe
 to change it.
 
 **Context:** Phase 3 complex review findings 3 and 4;
-`fol/typed/TypedSemantics.scala` `evalFormula`. See also T-010.
+`vql/typed/TypedSemantics.scala` `evalFormula`. See also T-010.
 
 ---
 
@@ -301,14 +306,14 @@ carrier.
 enforce a hard precondition that sampled carriers have content-based `hashCode`.
 Shared root cause with T-009.
 
-**Context:** Phase 3 complex review finding 5; `fol/sampling/HDRSampler.scala`
+**Context:** Phase 3 complex review finding 5; `vql/sampling/HDRSampler.scala`
 `sample`/`toArray`; ADR-003 (reproducibility claim). See also T-009.
 
 ---
 
 ## T-011 — Fragment-membership API (register-facing, targeting 0.12.0)
 
-**Status:** IMPLEMENTED (2026-08-12) — awaiting release. `fol.fragment`
+**Status:** DONE — shipped in 0.12.0 (2026-08-12). `vql.fragment`
 (`Fragment`, `FragmentViolation`, `FragmentCheck`) is in main with unit and
 parse-through tests; both fragments (`Targeting`, `Screening(k)`) ship.
 [ADR-018](ADR-018.md) records the design (Accepted 2026-08-12);
@@ -415,11 +420,11 @@ fragment added additively — not this one.
   vague-query (`VagueQueryParser` → `ParsedQuery`) path. Consistent with §8.4-3.
 
 **Implemented under [PLAN-fragment-membership-api.md](PLAN-fragment-membership-api.md)
-and [ADR-018](ADR-018.md).** The code in `fol.fragment` follows the shape above:
+and [ADR-018](ADR-018.md).** The code in `vql.fragment` follows the shape above:
 first-violation `Either[FragmentViolation, Unit]`, pre-order left-to-right
 traversal, `Term.Const`/`Term.Var` admitted and every `Term.Fn` rejected by
-`Targeting`, and 0-indexed quantifier-rank depth for `Screening(k)`. Ships in
-0.12.0 (ADR-018 accepted 2026-08-12); the release push is the remaining gate.
+`Targeting`, and 0-indexed quantifier-rank depth for `Screening(k)`. Shipped in
+0.12.0 (ADR-018 accepted 2026-08-12).
 
 ---
 
@@ -432,8 +437,8 @@ adoptable:
 | Version | Change | Breaking? | Rationale |
 |---|---|---|---|
 | 0.11.0 (shipped) | formula ranges + `satisfyingSet`; 4 `QueryError` variants removed | breaking (error surface) | on Central; register migrates AppError + prunes one server test |
-| **0.12.0** | fragment-membership API ([T-011](#t-011--fragment-membership-api-register-facing-targeting-0120)) | **no — additive** | register needs it for M2/M3 write-path validation; adds no import rewrite, adopted on register's schedule |
-| **0.13.1** | package rename `fol.*` → `vql.*` ([T-000](#t-000--scala-package-rename-fol--vql)) | **yes — import rewrite** | isolated so register's pin bump is a pure mechanical import rewrite, including `fol.fragment` → `vql.fragment`, with nothing else to reason about |
+| **0.12.0** (shipped) | fragment-membership API ([T-011](#t-011--fragment-membership-api-register-facing-targeting-0120)) | **no — additive** | register needs it for M2/M3 write-path validation; adds no import rewrite, adopted on register's schedule |
+| **0.13.1** (shipped) | package rename `fol.*` → `vql.*` ([T-000](#t-000--scala-package-rename-fol--vql)) | **yes — import rewrite** | isolated so register's pin bump is a pure mechanical import rewrite, including `fol.fragment` → `vql.fragment`, with nothing else to reason about |
 
 **Order rationale:** fragment API first because register needs it sooner and it
 is non-breaking, so register adopts without a forced import rewrite. The rename

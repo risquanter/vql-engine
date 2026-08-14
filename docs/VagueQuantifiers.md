@@ -161,9 +161,9 @@ boundary. See [ADR-017](ADR-017.md) §6.
 
 | Paper Notation | Code | Package |
 |---|---|---|
-| Q[~]^{k/n} | `Quantifier.About(k, n, ε)` | `vql.logic` |
-| Q[≥]^{k/n} | `Quantifier.AtLeast(k, n, ε)` | `vql.logic` |
-| Q[≤]^{k/n} | `Quantifier.AtMost(k, n, ε)` | `vql.logic` |
+| Q[~]^{k/n} | `Quantifier.About(k, n, ε)` | `vql.quantifier` |
+| Q[≥]^{k/n} | `Quantifier.AtLeast(k, n, ε)` | `vql.quantifier` |
+| Q[≤]^{k/n} | `Quantifier.AtMost(k, n, ε)` | `vql.quantifier` |
 | R(x, y') | `range: Formula[FOL]` (in `ParsedQuery`) | `vql.logic` |
 | φ(x, y) | `scope: Formula[FOL]` (in `ParsedQuery`) | `vql.logic` |
 | (y) | `answerVars: List[String]` | `vql.logic` |

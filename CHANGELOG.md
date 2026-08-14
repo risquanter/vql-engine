@@ -3,6 +3,28 @@
 This project follows early-semver (pre-1.0): breaking changes bump the minor
 version.
 
+## 0.14.0
+
+### Changed (breaking)
+
+- **Ten unraised `QueryError` variants removed** (T-008): `LexicalError`,
+  `QueryStructureError`, `QuantifierError`, `ScopeEvaluationError`,
+  `UninterpretedSymbolError`, `TypeMismatchError`, `ResourceError`,
+  `ConnectionError`, `TimeoutError`, `ConfigError`. These were generic
+  scaffolding raised by no engine code; the sealed `QueryError` surface now
+  reflects only what the typed pipeline returns. The eight live variants
+  (`ParseError`, `ValidationError`, `EvaluationError`, `DomainNotFoundError`,
+  `UnknownConstantOrLiteralError`, `BindError`, `ModelValidationError`,
+  `UnboundVariableError`) are unchanged. Downstream `match` arms over the
+  removed variants must be deleted.
+
+### Added
+
+- **Runnable typed-path demo** (`examples.VagueDemo`, T-007): a `@main` that
+  builds a `TypeCatalog` → `RuntimeModel` → `FolModel` and runs a plain query,
+  a compound-range query with closed-world negation, and a `satisfyingSet`
+  call against the finished API.
+
 ## 0.13.1
 
 ### Changed (breaking)
