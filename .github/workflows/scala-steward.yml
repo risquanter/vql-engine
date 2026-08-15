@@ -24,6 +24,14 @@ jobs:
   scala-steward:
     runs-on: ubuntu-latest
     steps:
+      # ghaction-import-gpg configures git signing with git_user_signingkey, which
+      # needs a git repository in the workspace; without this checkout it fails
+      # with "fatal: not in a git directory". Scala Steward clones the target
+      # repository itself, so this checkout exists only to give the import step a
+      # git directory.
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       # Import the dedicated commit-signing GPG key into the runner's keyring so
       # Scala Steward can sign every commit. main requires signed, verified
       # commits; GitHub marks these Verified because the key's public half and a
