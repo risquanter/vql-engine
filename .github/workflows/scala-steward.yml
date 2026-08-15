@@ -10,8 +10,8 @@ on:
     - cron: "0 6 * * 1"    # Mondays 06:00 UTC — weekly, matching Dependabot's cadence
   workflow_dispatch: {}     # allow a manual run
 
-# The workflow token needs no write access: the GitHub App below mints its own
-# short-lived, repository-scoped installation token for the branch pushes and PRs.
+# The workflow's GITHUB_TOKEN needs no write access: STEWARD_PAT below carries the
+# permission to push branches and open pull requests.
 permissions:
   contents: read
 
@@ -24,20 +24,32 @@ jobs:
   scala-steward:
     runs-on: ubuntu-latest
     steps:
+      # Import the dedicated commit-signing GPG key into the runner's keyring so
+      # Scala Steward can sign every commit. main requires signed, verified
+      # commits; GitHub marks these Verified because the key's public half and a
+      # matching committer email are both registered on the account that owns
+      # STEWARD_PAT.
+      - name: Import GPG key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
+        with:
+          gpg_private_key: ${{ secrets.STEWARD_GPG_PRIVATE_KEY }}
+          passphrase:      ${{ secrets.STEWARD_GPG_PASSPHRASE }}
+          git_user_signingkey: true
+
       - name: Run Scala Steward
         uses: scala-steward-org/scala-steward-action@6162b21b93d4be314a61ce0462fd026630132fee # v2.96.0
         with:
-          # GitHub App authentication. The installation token is short-lived (about
-          # one hour), scoped to this repository only, and not tied to a personal
-          # account. PRs opened with it trigger pr-build.yml; the default
-          # GITHUB_TOKEN would not — GitHub suppresses workflow runs on its own
-          # PRs — so the dependency bumps would merge untested.
-          github-app-id: ${{ secrets.SCALA_STEWARD_APP_ID }}
-          github-app-installation-id: ${{ secrets.SCALA_STEWARD_APP_INSTALLATION_ID }}
-          github-app-key: ${{ secrets.SCALA_STEWARD_APP_PRIVATE_KEY }}
-          # Use the App for authentication only and update just this repository
-          # (github-repository defaults to it). Without this the run would target
-          # every repository the App is installed on.
-          github-app-auth-only: true
-          author-name: Scala Steward
-          author-email: scala-steward@users.noreply.github.com
+          # A fine-grained PAT scoped to this repository (Contents and Pull
+          # requests write), not the default GITHUB_TOKEN: GitHub suppresses
+          # workflow runs on PRs opened by GITHUB_TOKEN, so pr-build.yml would
+          # not run and the bumps would merge untested. A PAT-opened PR triggers
+          # it. Signing commits also requires a PAT rather than a GitHub App.
+          github-token: ${{ secrets.STEWARD_PAT }}
+          # Sign every commit with the imported key. author-email/author-name are
+          # taken from that key so the committer identity matches the signature
+          # GitHub verifies against.
+          signing-key:  ${{ secrets.STEWARD_GPG_KEY_ID }}
+          sign-commits: true
+          author-email: ${{ steps.import_gpg.outputs.email }}
+          author-name:  ${{ steps.import_gpg.outputs.name }}

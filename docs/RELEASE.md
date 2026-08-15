@@ -53,15 +53,18 @@ Two bots keep dependencies current. Neither can publish a release — that stays
 
 Both open one PR per update against `main`, and `pr-build.yml` runs the full suite on each before it can merge. Merging stays manual.
 
-Scala Steward authenticates as a dedicated GitHub App, not with the workflow `GITHUB_TOKEN`. The App's installation token is short-lived and scoped to this repository, and — unlike `GITHUB_TOKEN` — PRs it opens trigger `pr-build.yml`, so every dependency bump is tested before merge. `github-app-auth-only: true` keeps each run scoped to this repository only.
+Scala Steward authenticates with a fine-grained personal access token (`STEWARD_PAT`), not the workflow `GITHUB_TOKEN`. GitHub suppresses workflow runs on PRs opened by `GITHUB_TOKEN`, so `pr-build.yml` would not run; a PAT-opened PR triggers it, so every dependency bump is tested before merge.
+
+Its commits are signed with a dedicated GPG key so they satisfy the signed-commit rule on `main`. GitHub marks them Verified because the key's public half and its committer email are both registered on the account that owns `STEWARD_PAT`. Signing this way requires a PAT rather than a GitHub App: the tool takes the committer identity from the token's owner, and a GitHub App's bot identity cannot hold a GPG key or a verified email.
 
 Required repo secrets for Scala Steward:
 
-- `SCALA_STEWARD_APP_ID` — the App's numeric App ID.
-- `SCALA_STEWARD_APP_INSTALLATION_ID` — the App's installation ID on this repo (the number after `https://github.com/settings/installations/`).
-- `SCALA_STEWARD_APP_PRIVATE_KEY` — a generated private key for the App (the full PEM).
+- `STEWARD_PAT` — fine-grained PAT, resource owner `risquanter`, scoped to this repository only, with Contents and Pull requests read and write. Creating it needs an org owner to approve the token.
+- `STEWARD_GPG_PRIVATE_KEY` — the dedicated signing key as an ASCII-armored private key.
+- `STEWARD_GPG_PASSPHRASE` — the key's passphrase (only if the key is passphrase-protected).
+- `STEWARD_GPG_KEY_ID` — the long-format key ID of that key.
 
-The App needs only these repository permissions: Contents (read and write), Pull requests (read and write), Metadata (read). Install it on this repository only.
+The key's public half must be added to the GitHub account that owns `STEWARD_PAT`, and its committer email must be a verified email on that account, or GitHub will not mark the commits Verified.
 
 ## Verifying a published artifact
 
