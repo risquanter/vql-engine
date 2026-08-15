@@ -54,10 +54,10 @@ jobs:
           # not run and the bumps would merge untested. A PAT-opened PR triggers
           # it. Signing commits also requires a PAT rather than a GitHub App.
           github-token: ${{ secrets.STEWARD_PAT }}
-          # Sign every commit with the imported key. author-email/author-name are
-          # taken from that key so the committer identity matches the signature
-          # GitHub verifies against.
-          signing-key:  ${{ secrets.STEWARD_GPG_KEY_ID }}
+          # Sign every commit with the imported key. Its id, email, and name all
+          # come from the import step, so the signing key and committer identity
+          # always match the imported key and cannot be left empty.
+          signing-key:  ${{ steps.import_gpg.outputs.keyid }}
           sign-commits: true
           author-email: ${{ steps.import_gpg.outputs.email }}
           author-name:  ${{ steps.import_gpg.outputs.name }}

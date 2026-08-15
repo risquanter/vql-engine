@@ -62,7 +62,8 @@ Required repo secrets for Scala Steward:
 - `STEWARD_PAT` — fine-grained PAT, resource owner `risquanter`, scoped to this repository only, with Contents and Pull requests read and write. Creating it needs an org owner to approve the token.
 - `STEWARD_GPG_PRIVATE_KEY` — the dedicated signing key as an ASCII-armored private key.
 - `STEWARD_GPG_PASSPHRASE` — the key's passphrase (only if the key is passphrase-protected).
-- `STEWARD_GPG_KEY_ID` — the long-format key ID of that key.
+
+The signing key's id, committer email, and name are read from the imported key at runtime, so they need no secrets of their own.
 
 The key's public half must be added to the GitHub account that owns `STEWARD_PAT`, and its committer email must be a verified email on that account, or GitHub will not mark the commits Verified.
 
