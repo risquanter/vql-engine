@@ -1,4 +1,4 @@
-val scala3Version = "3.7.4"
+val scala3Version = "3.8.4"
 
 ThisBuild / organization := "com.risquanter"
 ThisBuild / version      := "0.14.0"
@@ -38,7 +38,7 @@ lazy val folEngine = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "vql-engine",
     libraryDependencies ++= Seq(
-      "org.scalameta"  %%% "munit"   % "1.0.0"          % Test,
+      "org.scalameta"  %%% "munit"   % "1.0.4"          % Test,
       "com.risquanter" %%% "hdr-rng" % "0.1.0"
     )
   )

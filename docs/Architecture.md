@@ -151,10 +151,10 @@ and [ADR-012](ADR-012.md).
 
 ## Build
 
-Scala 3.7.4, sbt 1.12.14, GraalVM Java 25.
+Scala 3.8.4, sbt 1.12.15, GraalVM Java 25.
 
 No external runtime dependencies beyond `com.risquanter::hdr-rng`.
-Test framework: munit 1.0.0.
+Test framework: munit 1.0.4.
 
 ```
 sbt test          # 795 tests (JVM + Scala.js)

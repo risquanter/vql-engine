@@ -84,7 +84,7 @@ Two layers in `core/src/main/scala`:
 sbt +test    # full suite, JVM + Scala.js
 ```
 
-`core/src/test/scala/vql/semantics/VagueSemanticsTypedSpec.scala` exercises the typed pipeline end to end and is the most complete worked example of the API above. For a runnable walkthrough, `sbt "folEngine.jvm/runMain examples.VagueDemo"` runs `examples.VagueDemo` (plain query, compound range with negation, and `satisfyingSet`).
+`core/src/test/scala/vql/semantics/VagueSemanticsTypedSpec.scala` exercises the typed pipeline end to end and is the most complete worked example of the API above. For a runnable walkthrough, `sbt "folEngineJVM/runMain examples.VagueDemo"` runs `examples.VagueDemo` (plain query, compound range with negation, and `satisfyingSet`).
 
 ## Documentation
 
