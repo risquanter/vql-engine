@@ -54,8 +54,16 @@ This document defines the working protocol for all changes in this repository.
 Before writing any code, agent must:
 
 1. **Review all accepted ADRs** to understand current architecture
-2. **Identify potential conflicts** with proposed changes
-3. **Document alignment or deviations** in planning proposal
+2. **Record an explicit per-ADR verdict for every active ADR** — relevant or
+   not, with a one-line basis. Listing only the ADRs judged "materially
+   touched" is not sufficient. This is **mandatory** whenever the change is a
+   cross-cutting concern (typing, layering, error-channel, encoding, or value
+   boundaries) where topical overlaps are non-trivial: a change that looks
+   local to one ADR routinely stales code sketches or implementation rows in
+   others (e.g. an error-rendering rename touching ADR-014/ADR-017 impl tables).
+   The verdict table is what forces those out into the open.
+3. **Identify potential conflicts** with proposed changes
+4. **Document alignment or deviations** in planning proposal
 4. **Notify user immediately** if any deviation is detected:
    ```markdown
    ⚠️ **ADR Deviation Detected**
@@ -172,7 +180,9 @@ Implement in order of dependencies (matches the ADR-004 layering):
 [Which proposals this implements]
 
 ### ADR Compliance Review (Planning Phase)
-**Reviewed ADRs:** [all accepted ADRs; list those materially touched]
+**Per-ADR verdict:** [a table covering EVERY active ADR — relevant/not-relevant
++ one-line basis. Not just the ones touched. Mandatory for cross-cutting
+changes: typing, layering, error channels, encoding, value boundaries.]
 **Deviations detected:** None / [List of deviations with decisions required]
 **Alignment notes:** [How this phase aligns with existing ADRs]
 
