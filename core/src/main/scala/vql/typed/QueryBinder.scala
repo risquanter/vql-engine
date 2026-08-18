@@ -74,6 +74,23 @@ object QueryBinder:
       case Formula.Forall(x, p) => bindQuantified(x, p, env, catalog, BoundFormula.Forall.apply)
       case Formula.Exists(x, p) => bindQuantified(x, p, env, catalog, BoundFormula.Exists.apply)
 
+  /** Accumulating product over the error channel (ADR-020): evaluates BOTH
+    * sides and, on any failure, concatenates their errors left-to-right. Use
+    * only where the two computations take the same input independently; a `for`
+    * comprehension is correct wherever one's input depends on the other's
+    * output (the environment threads), because running the second against a
+    * failed first's incomplete environment manufactures cascade errors. `eb` is
+    * strict — a by-name argument would re-introduce short-circuiting. */
+  private def both[A, B](
+    ea: Either[List[TypeCheckError], A],
+    eb: Either[List[TypeCheckError], B]
+  ): Either[List[TypeCheckError], (A, B)] =
+    (ea, eb) match
+      case (Right(a), Right(b)) => Right((a, b))
+      case (Left(e1), Left(e2)) => Left(e1 ++ e2)
+      case (Left(e1), Right(_)) => Left(e1)
+      case (Right(_), Left(e2)) => Left(e2)
+
   private def bindBinary(
     p: Formula[FOL],
     q: Formula[FOL],
@@ -81,11 +98,12 @@ object QueryBinder:
     catalog: TypeCatalog,
     mk: (BoundFormula, BoundFormula) => BoundFormula
   ): Either[List[TypeCheckError], (BoundFormula, Env)] =
-    for
-      left  <- bindFormula(p, env, catalog)
-      right <- bindFormula(q, env, catalog)
-      mergedEnv <- mergeEnvs(left._2, right._2)
-    yield (mk(left._1, right._1), mergedEnv)
+    // Both sides bind against the same `env`, so they are independent inputs and
+    // accumulate (ADR-020). `mergeEnvs` runs only when both succeed.
+    both(bindFormula(p, env, catalog), bindFormula(q, env, catalog)).flatMap {
+      case ((boundP, leftEnv), (boundQ, rightEnv)) =>
+        mergeEnvs(leftEnv, rightEnv).map(mergedEnv => (mk(boundP, boundQ), mergedEnv))
+    }
 
   private def bindQuantified(
     name: String,
@@ -183,15 +201,15 @@ object QueryBinder:
                      else Left(List(TypeCheckError.TypeMismatch(expected, sig.returns, s"function '$name' return")))
               yield (BoundTerm.FnApp(symbol, boundArgs._1, sig.returns), boundArgs._2)
 
+  /** Both sides already type-checked; a key is judged against the same
+    * `(left, right)` pair, so every conflicting variable accumulates (ADR-020).
+    * Keys are sorted for a deterministic error order across platforms. */
   private def mergeEnvs(left: Env, right: Env): Either[List[TypeCheckError], Env] =
-    val keys = left.keySet union right.keySet
-    keys.foldLeft[Either[List[TypeCheckError], Env]](Right(Map.empty)) { (acc, k) =>
-      acc.flatMap { merged =>
-        (left.get(k), right.get(k)) match
-          case (Some(a), Some(b)) if a != b => Left(List(TypeCheckError.ConflictingTypes(k, a, b)))
-          case (Some(a), Some(_))           => Right(merged + (k -> a))
-          case (Some(a), None)              => Right(merged + (k -> a))
-          case (None, Some(b))              => Right(merged + (k -> b))
-          case (None, None)                 => Right(merged)
-      }
+    val keys = (left.keySet union right.keySet).toList.sorted
+    val conflicts = keys.collect {
+      case k if left.get(k).exists(a => right.get(k).exists(_ != a)) =>
+        TypeCheckError.ConflictingTypes(k, left(k), right(k))
     }
+    conflicts match
+      case Nil => Right(keys.map(k => k -> left.getOrElse(k, right(k))).toMap)
+      case cs  => Left(cs)

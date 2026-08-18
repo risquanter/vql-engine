@@ -258,7 +258,7 @@ A (record the layering decision as ADR-019). No code.
 | AC | Assertion | New test |
 |---|---|---|
 | 1 | Sole `UnparseableConstant` bind error: sort name recoverable from the `QueryError` returned by `evaluateTyped` (not `QueryBinder.bind`) | detail is `UnparseableConstant` with expected `sortName` |
-| 2 | Mixed-list classification (`UNKNOWN_REFERENCE` only if *every* detail is a Node typo): **no engine test — ruled B (§7 Decision #4).** The binder is single-error today, so a mixed list is unreachable through the pipeline; the engine's obligation — each detail exposes its `sortName` — is covered by AC-1/AC-3, and register owns the all-node predicate and tests it. Becomes a pipeline test in the binder-error-accumulation follow-up plan. | (none) |
+| 2 | Mixed-list classification (`UNKNOWN_REFERENCE` only if *every* detail is a Node typo): **no engine test in this plan — ruled B (§7 Decision #4).** At ruling time the binder was single-error, so a mixed list was unreachable through the pipeline; the engine's obligation — each detail exposes its `sortName` — is covered by AC-1/AC-3, and register owns the all-node predicate and tests it. The mixed list is now produced and pipeline-tested in PLAN-binder-error-accumulation (0.16.0, ADR-020). | (none) |
 | 3 | Homogeneous non-node `UnparseableConstant` (bad `Loss` literal): recoverable as a structured detail carrying **both** sort name and rendered message; consumer classifies `BIND_FAILED` without re-rendering | detail has `sortName == "Loss"` and non-empty `rendered` |
 | 4 | `UnknownConstantOrLiteralError` homogeneous path unchanged | existing tests stay green (no new-code path taken) |
 | 5 | Rendered messages for `BindError` unchanged for a string-only consumer | `e.messages` equals the pre-change `renderTypeErrors` output for the same query |
@@ -318,9 +318,9 @@ unreachable through the pipeline; a real query never yields more than one error.
   classification logic in the engine suite.
 - **B (ruled): no engine test for the mix.** The engine's obligation — each
   detail carries its `sortName` and `rendered` — is covered by AC-1/AC-3/AC-5.
-  register owns the all-node predicate and tests it. The mixed-list case becomes
-  a real pipeline test in the accumulation follow-up plan, when the binder
-  actually emits mixed lists.
+  register owns the all-node predicate and tests it. The mixed-list case is now a
+  real pipeline test (AC-A/AC-B) in PLAN-binder-error-accumulation (0.16.0,
+  ADR-020), where the binder emits mixed lists.
 
 **Ruled: B** — the engine exposes the data; the classification is the consumer's,
 and duplicating it in the engine suite tests logic the engine does not own. The
@@ -402,14 +402,15 @@ The homogeneous `UnknownConstantOrLiteralError` path (a token that is neither a
 constant nor has a literal validator) is unchanged and still maps to
 `UNKNOWN_REFERENCE` directly.
 
-**Single-error caveat.** The engine's binder currently reports the first error
-only, so `details` today holds exactly one element. The `forall` above is
-therefore correct now and stays correct when the approved binder-error-
-accumulation follow-up lands and `details` starts carrying several errors — a
-mix that includes any non-node error will then fall to `BIND_FAILED`, which is
-the intended behaviour. register needs no change when that follow-up ships.
+**Multi-error list.** As of 0.16.0 the binder accumulates errors across
+independent subtrees (ADR-020), so `details` can hold several entries — for
+example `big(x, "abc") /\ leaf(x, x)` yields two. The `forall` above is written
+for exactly this: a list that mixes any non-node error falls to `BIND_FAILED`,
+which is the intended behaviour; a list whose every entry is a node-recoverable
+unparseable constant is `UNKNOWN_REFERENCE`. register needs no code change for
+the multi-element list beyond re-pinning.
 
-**Migration.** register re-pins to `0.15.0` and collapses its two-tier bind
+**Migration.** register re-pins to `0.16.0` and collapses its two-tier bind
 handling — it no longer drops to `QueryBinder.bind` to recover the sort — into a
 single `fromQueryError` mapper whose `BindError` case runs the classification
 above.

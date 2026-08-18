@@ -242,6 +242,107 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val d: BindErrorDetail = BindErrorDetail.UnparseableConstant("n", "Loss", "n", "cannot parse 'n' as Loss")
     assertEquals(d.rendered, "cannot parse 'n' as Loss")
 
+  // ==================== Binder error accumulation (ADR-020) ====================
+
+  // Scope fragments over the sortCatalog fixture (range is leaf(x), so x: Asset).
+  private def bigConst(c: String): Formula[FOL] =
+    Formula.Atom(FOL("big", List(Term.Var("x"), Term.Const(c))))
+  private val leafArity2: Formula[FOL] =
+    Formula.Atom(FOL("leaf", List(Term.Var("x"), Term.Var("x"))))
+
+  private def bindErrorForQuery(q: ParsedQuery, fm: FolModel): QueryError.BindError =
+    VagueSemantics.evaluateTyped(q, fm, samplingParams = SamplingParams.exact) match
+      case Left(e: QueryError.BindError) => e
+      case other                         => fail(s"expected BindError, got $other")
+
+  test("AC-A: two independent errors across a conjunction are reported together, in source order"):
+    // big(x, "abc") — "abc" is not a Loss; leaf(x, x) — arity 1 called with 2.
+    val e = bindErrorFor(Formula.And(bigConst("abc"), leafArity2))
+    assertEquals(e.details.length, 2)
+    e.details match
+      case List(d: BindErrorDetail.UnparseableConstant, o: BindErrorDetail.Other) =>
+        assertEquals(d.sortName, "Loss")
+        assertEquals(d.sourceText, "abc")
+        assert(o.rendered.contains("leaf"), s"second detail was '${o.rendered}'")
+      case other => fail(s"expected [UnparseableConstant, Other], got $other")
+
+  test("AC-B: a consumer's forall over details runs over the whole list (AC-2 as a pipeline test)"):
+    // register classifies UNKNOWN_REFERENCE iff EVERY detail is a recoverable
+    // unparseable constant; that predicate now runs over a real multi-element list.
+    def allUnparseableLoss(e: QueryError.BindError): Boolean =
+      e.details.forall {
+        case d: BindErrorDetail.UnparseableConstant => d.sortName == "Loss"
+        case _                                      => false
+      }
+    // Mixed list: one unparseable + one arity error → predicate false (BIND_FAILED).
+    assert(!allUnparseableLoss(bindErrorFor(Formula.And(bigConst("abc"), leafArity2))))
+    // Homogeneous list: two unparseable Loss constants → predicate true, over length 2.
+    val homo = bindErrorFor(Formula.And(bigConst("abc"), bigConst("def")))
+    assertEquals(homo.details.length, 2)
+    assert(allUnparseableLoss(homo))
+
+  test("AC-C: accumulated errors preserve source order and hold no duplicate for one mistake"):
+    val e = bindErrorFor(Formula.And(bigConst("abc"), bigConst("def")))
+    assertEquals(e.messages, List("cannot parse 'abc' as Loss", "cannot parse 'def' as Loss"))
+    assertEquals(e.details, e.details.distinct)
+
+  test("AC-D: sequential points still short-circuit — a failed range hides a scope error"):
+    // range = big(x, "abc") fails; scope = leaf(x, x) also fails; only the range
+    // error is reported, because scope binds against the range's output environment.
+    val q = ParsedQuery(
+      quantifier = Quantifier.About(1, 2, 0.01),
+      variable   = "x",
+      range      = bigConst("abc"),
+      scope      = leafArity2,
+      answerVars = Nil
+    )
+    val e = bindErrorForQuery(q, sortModel)
+    assertEquals(e.details.length, 1)
+    e.details.head match
+      case d: BindErrorDetail.UnparseableConstant => assertEquals(d.sourceText, "abc")
+      case other                                  => fail(s"expected the range's UnparseableConstant, got $other")
+
+  test("AC-E: mergeEnvs reports every conflicting variable, not just the first"):
+    // Two variables each inferred at Loss on the left and Probability on the right
+    // of a conjunction; both conflicts surface at the merge.
+    val lossP = SymbolName("lossp")
+    val probP = SymbolName("probp")
+    val conflictCatalog = TypeCatalog.unsafe(
+      types = Set(DomainType(asset), ValueType(lossSort), ValueType(probSort)),
+      predicates = Map(
+        SymbolName("leaf") -> PredicateSig(List(asset)),
+        lossP -> PredicateSig(List(lossSort)),
+        probP -> PredicateSig(List(probSort))
+      )
+    )
+    val conflictModel =
+      val dispatcher = new RuntimeDispatcher:
+        override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] = Left("no functions")
+        override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] = Right(true)
+        override def functionSymbols: Set[SymbolName] = Set.empty
+        override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"), lossP, probP)
+      FolModel(conflictCatalog, RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = dispatcher))
+        .fold(e => fail(s"FolModel construction failed: $e"), identity)
+
+    def lossAtom(v: String) = Formula.Atom(FOL("lossp", List(Term.Var(v))))
+    def probAtom(v: String) = Formula.Atom(FOL("probp", List(Term.Var(v))))
+    val scope = Formula.And(
+      Formula.And(lossAtom("u"), lossAtom("v")),
+      Formula.And(probAtom("u"), probAtom("v"))
+    )
+    val q = ParsedQuery(
+      quantifier = Quantifier.About(1, 2, 0.01),
+      variable   = "x",
+      range      = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      scope      = scope,
+      answerVars = Nil
+    )
+    val e = bindErrorForQuery(q, conflictModel)
+    assertEquals(e.details.length, 2)
+    assert(e.messages.forall(_.contains("conflicting")), s"got ${e.messages}")
+    assert(e.messages.exists(_.contains("'u'")), s"got ${e.messages}")
+    assert(e.messages.exists(_.contains("'v'")), s"got ${e.messages}")
+
   // ==================== ModelValidationError (missing domain) tests ====================
 
   private val loss = TypeId("Loss")

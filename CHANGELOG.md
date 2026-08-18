@@ -3,6 +3,23 @@
 This project follows early-semver (pre-1.0): breaking changes bump the minor
 version.
 
+## 0.16.0
+
+### Changed (breaking)
+
+- **`QueryError.BindError.details` may now contain more than one entry.** The
+  type checker (`QueryBinder`) accumulates errors across independent subtrees
+  instead of stopping at the first. A query with two independent mistakes —
+  `big(x, "abc") /\ leaf(x, x)`, an unparseable `Loss` literal and an arity
+  error — now returns both details in source order, where before it returned only
+  the first. Accumulation is confined to the binary connectives (`/\ \/ => <=>`)
+  and the variable-sort merge, where the two sides bind against the same
+  environment; env-threaded points (`range → scope → answer-vars`, argument
+  lists, quantifier bodies) still short-circuit, so no cascade errors are
+  introduced (ADR-020). A consumer that read `details.head` and ignored the rest
+  must iterate the full list; the derived `messages` / `message` already reflect
+  every entry. See ADR-020.
+
 ## 0.15.0
 
 ### Changed (breaking)
