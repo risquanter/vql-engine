@@ -3,7 +3,7 @@ package vql.semantics
 import vql.logic.ParsedQuery
 import vql.result.EvaluationOutput
 import vql.sampling.{SamplingParams, HDRConfig}
-import vql.error.QueryError
+import vql.error.{QueryError, BindErrorDetail}
 import vql.typed.{FolModel, TypeCatalog, BoundQuery, QueryBinder, TypeCheckError, Value, TypedSemantics}
 import logic.{FOL, Formula}
 
@@ -47,11 +47,14 @@ object VagueSemantics:
         if others.isEmpty && unknowns.nonEmpty then
           QueryError.UnknownConstantOrLiteralError(unknowns.head)
         else
-          QueryError.BindError(errors = renderTypeErrors(errors))
+          QueryError.BindError(details = errors.map(toBindErrorDetail))
       }
 
-  private def renderTypeErrors(errors: List[TypeCheckError]): List[String] =
-    errors.map {
+  /** Single source of a bind error's human-readable string. Both a detail's
+    * `rendered` and any message list flow from here — rendering is not forked.
+    */
+  private def renderTypeError(error: TypeCheckError): String =
+    error match
       case TypeCheckError.UnknownPredicate(name)                   => s"unknown predicate: $name"
       case TypeCheckError.UnknownFunction(name)                    => s"unknown function: $name"
       case TypeCheckError.ArityMismatch(symbol, expected, actual)  => s"arity mismatch for '$symbol': expected $expected, actual $actual"
@@ -63,7 +66,18 @@ object VagueSemantics:
       case TypeCheckError.TypeNotQuantifiable(name)                 => s"type '$name' is not a domain type and cannot be quantified over"
       case TypeCheckError.UnparseableConstant(_, sort, sourceText) => s"cannot parse '$sourceText' as ${sort.value}"
       case TypeCheckError.UnexpectedFreeVar(name)                  => s"unexpected free variable '$name': a satisfying-set formula may only mention its one variable"
-    }
+
+  /** Project a typed bind error down to the primitives-only [[BindErrorDetail]]
+    * carried across the error/typed boundary. The sort crosses as its
+    * `TypeId.value` `String` (ADR-015). Runs in the facade, the layer that
+    * already imports both `vql.error` and `vql.typed`.
+    */
+  private def toBindErrorDetail(error: TypeCheckError): BindErrorDetail =
+    error match
+      case TypeCheckError.UnparseableConstant(name, sort, sourceText) =>
+        BindErrorDetail.UnparseableConstant(name, sort.value, sourceText, renderTypeError(error))
+      case _ =>
+        BindErrorDetail.Other(renderTypeError(error))
 
   /** Evaluate a parsed query through the typed pipeline using a pre-validated [[FolModel]].
     *
@@ -107,7 +121,7 @@ object VagueSemantics:
     for
       bound                    <- QueryBinder
                                     .bindSatisfyingFormula(formula, variable, folModel.catalog)
-                                    .left.map(errors => QueryError.BindError(errors = renderTypeErrors(errors)))
+                                    .left.map(errors => QueryError.BindError(details = errors.map(toBindErrorDetail)))
       (boundFormula, boundVar) = bound
       result                   <- TypedSemantics.satisfyingSet(boundFormula, boundVar, folModel.model)
     yield result

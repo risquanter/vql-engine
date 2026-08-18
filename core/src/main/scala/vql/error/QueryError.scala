@@ -47,8 +47,25 @@ sealed trait QueryError:
               else context.map { case (k, v) => s"  $k: $v" }.mkString("\n", "\n", "")
     s"$message$ctx"
 
+/** Per-error detail for a bind-phase failure. Primitives only: the error layer
+  * must not depend on `vql.typed`, so a sort crosses this boundary as its
+  * `TypeId.value` `String`, never as a typed value. `rendered` is the single
+  * human-readable message for this error, produced by
+  * [[vql.semantics.VagueSemantics]]'s per-error renderer.
+  */
+enum BindErrorDetail:
+  case UnparseableConstant(name: String, sortName: String, sourceText: String, rendered: String)
+  case Other(rendered: String)
+
+  /** `rendered` is a stored value, not derived from other fields, so it is an
+    * abstract member the case parameters implement. A concrete pattern-matching
+    * `def rendered` would clash with the same-named case parameter and fail to
+    * compile (ADR-006 §3, which governs *derived* accessors).
+    */
+  def rendered: String
+
 object QueryError:
-  
+
   // ==================== Parsing Errors ====================
   
   /** Error during query parsing */
@@ -125,14 +142,19 @@ object QueryError:
 
   /** Raised when a query fails the typed bind phase (type-check errors).
     * Indicates a user query error — all instances map to HTTP 400.
-    * Individual error messages are rendered strings; raw TypeCheckError
-    * detail is not carried here due to vql.error → vql.typed package constraint.
+    *
+    * Carries one [[BindErrorDetail]] per error: primitives only, because the
+    * error layer must not depend on `vql.typed`. Each detail holds its own
+    * rendered message and, for an unparseable constant, the sort name a consumer
+    * needs to classify the failure. `messages` derives the human-readable string
+    * list from the details, so the two never drift.
     */
   case class BindError(
-    errors: List[String]
+    details: List[BindErrorDetail]
   ) extends QueryError:
-    def message = s"Query type-checking failed: ${errors.mkString("; ")}"
-    override val context = Map("errors" -> errors.mkString("; "))
+    def messages: List[String] = details.map(_.rendered)
+    def message = s"Query type-checking failed: ${messages.mkString("; ")}"
+    override val context = Map("errors" -> messages.mkString("; "))
 
   /** Raised when RuntimeModel.validateAgainst fails (dispatcher or domain
     * coverage gaps). Indicates a wiring/infra error — all instances map to HTTP 500.

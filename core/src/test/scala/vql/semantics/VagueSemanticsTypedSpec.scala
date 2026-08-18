@@ -1,6 +1,6 @@
 package vql.semantics
 
-import vql.error.QueryError
+import vql.error.{QueryError, BindErrorDetail}
 import vql.logic.ParsedQuery
 import vql.quantifier.Quantifier
 import vql.sampling.SamplingParams
@@ -140,8 +140,8 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val result = VagueSemantics.bindTyped(badQuery, catalog)
     result match
       case Left(e: QueryError.BindError) =>
-        assert(e.errors.nonEmpty)
-        assert(e.errors.exists(_.contains("nonexistent_predicate")))
+        assert(e.messages.nonEmpty)
+        assert(e.messages.exists(_.contains("nonexistent_predicate")))
       case Left(other) => fail(s"Expected BindError, got $other")
       case Right(_)    => fail("Expected Left for unknown predicate")
 
@@ -170,6 +170,77 @@ class VagueSemanticsTypedSpec extends FunSuite:
       case Left(_: QueryError.BindError) => assert(true)
       case Left(other) => fail(s"Expected BindError, got $other")
       case Right(_)    => fail("Expected Left")
+
+  // ==================== Structured bind-error detail (sort fidelity) ====================
+
+  private val lossSort = TypeId("Loss")
+  private val probSort = TypeId("Probability")
+
+  // Asset is a domain type to quantify over; Loss and Probability are value types
+  // whose literal validators reject non-numeric / out-of-range constants.
+  private val sortCatalog = TypeCatalog.unsafe(
+    types = Set(DomainType(asset), ValueType(lossSort), ValueType(probSort)),
+    predicates = Map(
+      SymbolName("leaf")   -> PredicateSig(List(asset)),
+      SymbolName("big")    -> PredicateSig(List(asset, lossSort)),
+      SymbolName("likely") -> PredicateSig(List(asset, probSort))
+    ),
+    literalValidators = Map(
+      lossSort -> (s => s.toDoubleOption),
+      probSort -> (s => s.toDoubleOption.filter(d => d >= 0.0 && d <= 1.0))
+    )
+  )
+
+  private val sortModel =
+    val dispatcher = new RuntimeDispatcher:
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] = Left("no functions")
+      override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] = Right(true)
+      override def functionSymbols: Set[SymbolName] = Set.empty
+      override def predicateSymbols: Set[SymbolName] =
+        Set(SymbolName("leaf"), SymbolName("big"), SymbolName("likely"))
+    FolModel(sortCatalog, RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = dispatcher))
+      .fold(e => fail(s"FolModel construction failed: $e"), identity)
+
+  private def sortQuery(scope: Formula[FOL]): ParsedQuery =
+    ParsedQuery(
+      quantifier = Quantifier.About(1, 2, 0.01),
+      variable = "x",
+      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      scope = scope,
+      answerVars = Nil
+    )
+
+  private def bindErrorFor(scope: Formula[FOL]): QueryError.BindError =
+    VagueSemantics.evaluateTyped(sortQuery(scope), sortModel, samplingParams = SamplingParams.exact) match
+      case Left(e: QueryError.BindError) => e
+      case other                         => fail(s"expected BindError, got $other")
+
+  test("AC-1/AC-7: a sole unparseable constant surfaces its sort name through evaluateTyped, with one rendered source"):
+    val e = bindErrorFor(Formula.Atom(FOL("big", List(Term.Var("x"), Term.Const("abc")))))
+    e.details match
+      case List(d: BindErrorDetail.UnparseableConstant) =>
+        assertEquals(d.sortName, "Loss")
+        assertEquals(d.sourceText, "abc")
+        // AC-7: the detail's rendered string is the very string the message list carries
+        assertEquals(e.messages, List(d.rendered))
+      case other => fail(s"expected one UnparseableConstant detail, got $other")
+
+  test("AC-3: a homogeneous non-node unparseable carries both sort name and rendered message"):
+    val e = bindErrorFor(Formula.Atom(FOL("likely", List(Term.Var("x"), Term.Const("2.0")))))
+    e.details match
+      case List(d: BindErrorDetail.UnparseableConstant) =>
+        assertEquals(d.sortName, "Probability")
+        assert(d.rendered.contains("2.0"), s"rendered was '${d.rendered}'")
+      case other => fail(s"expected one UnparseableConstant detail, got $other")
+
+  test("AC-5: messages match the plain rendered strings a text-only consumer reads"):
+    val e = bindErrorFor(Formula.Atom(FOL("big", List(Term.Var("x"), Term.Const("abc")))))
+    assertEquals(e.messages, List("cannot parse 'abc' as Loss"))
+
+  test("AC-6: BindErrorDetail is built from primitives only — no typed value crosses the boundary"):
+    // The error layer holds no TypeId: a detail is constructed from String fields alone.
+    val d: BindErrorDetail = BindErrorDetail.UnparseableConstant("n", "Loss", "n", "cannot parse 'n' as Loss")
+    assertEquals(d.rendered, "cannot parse 'n' as Loss")
 
   // ==================== ModelValidationError (missing domain) tests ====================
 

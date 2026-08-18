@@ -1,7 +1,7 @@
 val scala3Version = "3.8.4"
 
 ThisBuild / organization := "com.risquanter"
-ThisBuild / version      := "0.14.0"
+ThisBuild / version      := "0.15.0"
 ThisBuild / scalaVersion := scala3Version
 
 // POM metadata required by the Maven Central Publisher Portal

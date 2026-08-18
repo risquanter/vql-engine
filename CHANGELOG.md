@@ -3,6 +3,27 @@
 This project follows early-semver (pre-1.0): breaking changes bump the minor
 version.
 
+## 0.15.0
+
+### Changed (breaking)
+
+- **`QueryError.BindError` now carries structured detail instead of rendered
+  strings.** Its single field changes from `errors: List[String]` to
+  `details: List[BindErrorDetail]`. The text contract is preserved as a derived
+  `messages: List[String]` (and `message` / `context` read from it), so a
+  text-only consumer changes `e.errors` to `e.messages`. Construction and
+  pattern matches over the old `errors` field must be updated.
+
+### Added
+
+- **`vql.error.BindErrorDetail`** — a per-error, primitives-only detail for bind
+  failures (ADR-019). Cases: `UnparseableConstant(name, sortName, sourceText,
+  rendered)` and `Other(rendered)`. `sortName` exposes the sort the failed token
+  was expected to be (the opaque `TypeId` crosses the error/typed boundary as its
+  `TypeId.value` `String`), letting a consumer tell a mistyped reference from a
+  genuine type error without dropping to `QueryBinder.bind` or re-rendering the
+  message. The error layer still imports nothing from `vql.typed`.
+
 ## 0.14.0
 
 ### Changed (breaking)

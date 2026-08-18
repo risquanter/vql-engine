@@ -1,6 +1,6 @@
 # Implementation Plan: Bind-Error Sort Fidelity in `QueryError.BindError`
 
-**Status:** Awaiting user approval (Draft). No code written.
+**Status:** DONE (2026-08-17). Phases 0–2 complete; suite green both platforms.
 **Date:** 2026-08-17
 **Source contract:** `PROMPT-BIND-ERROR-SORT-FIDELITY.md` (repo root) — its
 acceptance criteria AC-1 … AC-7 are the interface contract the downstream
@@ -212,7 +212,7 @@ E1 confirmed; #1 → A (authorize the mechanical `errors → messages` rename); 
 A (record the layering decision as ADR-019). No code.
 **HARD STOP.**
 
-### Phase 1 — Error layer, facade, call sites, tests
+### Phase 1 — Error layer, facade, call sites, tests ✅
 1. Add `enum BindErrorDetail` to `vql.error` (§2).
 2. Change `QueryError.BindError` to `details` + derived `messages`/`message`/
    `context` (§2); update its scaladoc to describe the structured shape and the
@@ -221,32 +221,35 @@ A (record the layering decision as ADR-019). No code.
    `toBindErrorDetail`, update both construction sites (§3).
 4. Update the in-repo test sites per §4 — including the authorized
    `errors → messages` rename in `VagueSemanticsTypedSpec` (§7 Decision #1 → A).
-5. New tests (AC-1 … AC-7 — §6). Do not weaken or delete existing tests; add
-   alongside.
-6. Full suite green: `sbt test`.
-**HARD STOP.**
+5. New tests: AC-1/AC-7, AC-3, AC-5, AC-6 (§6). AC-2 has no engine test
+   (§7 Decision #4 → B). AC-4 is existing coverage. Do not weaken or delete
+   existing tests; add alongside.
+6. Full suite green: `sbt test` (799/799 both platforms).
 
-### Phase 2 — Versioning, changelog, ADR acceptance, doc sweep
+### Phase 2 — Versioning, changelog, ADR acceptance, handover, doc sweep ✅
 1. `ThisBuild / version := "0.15.0"` in `build.sbt`.
 2. `CHANGELOG.md` entry: new `BindError` shape, `BindErrorDetail`, how a
    consumer reads the sort (`sortName`), message contract preserved via
    `messages`.
 3. [ADR-019](ADR-019.md) status Proposed → Accepted, add acceptance date;
    add it to the WORKING-INSTRUCTIONS validation set.
-4. Doc-consistency sweep (full list from the F2 finding, §1):
-   - `[[BindError]]` scaladoc at QueryError.scala:119 and the layering comment
-     at QueryError.scala:128-129 (now `details`, not rendered `errors`).
-   - **ADR-014**: implementation row (line 157) `renderTypeErrors → renderTypeError`;
-     Code Smell (line 114) `e.errors.exists(...) → e.messages.exists(...)`.
-   - **ADR-017**: implementation row (line 250) `renderTypeErrors → renderTypeError`.
+4. Handover section for register (§9): the `BindError`/`BindErrorDetail` shape,
+   how register reads `sortName`/`rendered`, the node-recoverability
+   classification rule, and the single-error-today caveat with the accumulation
+   follow-up.
+5. Doc-consistency sweep (full list from the F2 finding, §1):
+   - `[[BindError]]` scaladoc at QueryError.scala and the layering comment
+     (now `details`, not rendered `errors`).
+   - **ADR-014**: implementation row `renderTypeErrors → renderTypeError`;
+     Code Smell `e.errors.exists(...) → e.messages.exists(...)`.
+   - **ADR-017**: implementation row `renderTypeErrors → renderTypeError`.
    - T-008 note in `docs/TODOS.md`: mark the `BindError` `List[String]` smell
      resolved for `BindError`; state `ModelValidationError` stays out of scope.
    - Any `README.md` / `VagueQuantifiers.md` mention of `BindError`'s shape
      (verify with `grep`).
    - **Do not touch** `ModelValidationError` or its ADR-001:177 Code Smell —
      that half keeps `errors: List[String]`.
-5. Full suite green.
-**HARD STOP.**
+6. Full suite green.
 
 ---
 
@@ -255,7 +258,7 @@ A (record the layering decision as ADR-019). No code.
 | AC | Assertion | New test |
 |---|---|---|
 | 1 | Sole `UnparseableConstant` bind error: sort name recoverable from the `QueryError` returned by `evaluateTyped` (not `QueryBinder.bind`) | detail is `UnparseableConstant` with expected `sortName` |
-| 2 | Mixed list (`UnparseableConstant` + `ArityMismatch`): representation lets a consumer classify `BIND_FAILED` — not every error separately "recoverable" | `details` contains a non-node / `Other` detail ⇒ register's all-node predicate is false |
+| 2 | Mixed-list classification (`UNKNOWN_REFERENCE` only if *every* detail is a Node typo): **no engine test — ruled B (§7 Decision #4).** The binder is single-error today, so a mixed list is unreachable through the pipeline; the engine's obligation — each detail exposes its `sortName` — is covered by AC-1/AC-3, and register owns the all-node predicate and tests it. Becomes a pipeline test in the binder-error-accumulation follow-up plan. | (none) |
 | 3 | Homogeneous non-node `UnparseableConstant` (bad `Loss` literal): recoverable as a structured detail carrying **both** sort name and rendered message; consumer classifies `BIND_FAILED` without re-rendering | detail has `sortName == "Loss"` and non-empty `rendered` |
 | 4 | `UnknownConstantOrLiteralError` homogeneous path unchanged | existing tests stay green (no new-code path taken) |
 | 5 | Rendered messages for `BindError` unchanged for a string-only consumer | `e.messages` equals the pre-change `renderTypeErrors` output for the same query |
@@ -270,8 +273,7 @@ Reachable-sort inputs for AC-1/AC-3 (from the source contract):
 
 ## 7. Decisions
 
-#1, #2, and #3 all ruled 2026-08-17. No decision is open; Phase 1 needs only the
-user's explicit "proceed".
+#1–#4 all ruled 2026-08-17. No decision is open. Phases 1 and 2 executed.
 
 **Decision #1 — the forced test change in `VagueSemanticsTypedSpec` — ruled A.**
 [VagueSemanticsTypedSpec.scala:142-144](../core/src/test/scala/vql/semantics/VagueSemanticsTypedSpec.scala#L142-L144)
@@ -302,10 +304,39 @@ reads, both compile (verified):
 
 **Ruled: A** — `rendered` is a stored value, not a derivation, so the
 abstract-member idiom fits; §3's prohibition targets the concrete-`def` clash,
-which A avoids. The docs (PLAN §2, ADR-019 §Decision 1) already show A. An
-optional one-line ADR-006 §3 clarification (that the rule is about *derived*
-accessors, not abstract members implemented by case parameters) remains offered,
-not assumed.
+which A avoids. The docs (PLAN §2, ADR-019 §Decision 1) already show A. The
+ADR-006 §3 clarification (that the rule is about *derived* accessors, not
+abstract members implemented by case parameters) is applied.
+
+**Decision #4 — how AC-2 (mixed-list classification) is verified — ruled B
+(2026-08-17).** The binder short-circuits (every combinator is a `for`/`foldLeft`
+over `Either`, each `Left` a singleton list), so a mixed bind-error list is
+unreachable through the pipeline; a real query never yields more than one error.
+- **A (not chosen): direct-construction stand-in.** An engine test hand-builds a
+  mixed `BindError` and runs a copy of register's "every detail node-recoverable"
+  predicate over it. Documents the mixed case now, but puts register-owned
+  classification logic in the engine suite.
+- **B (ruled): no engine test for the mix.** The engine's obligation — each
+  detail carries its `sortName` and `rendered` — is covered by AC-1/AC-3/AC-5.
+  register owns the all-node predicate and tests it. The mixed-list case becomes
+  a real pipeline test in the accumulation follow-up plan, when the binder
+  actually emits mixed lists.
+
+**Ruled: B** — the engine exposes the data; the classification is the consumer's,
+and duplicating it in the engine suite tests logic the engine does not own. The
+handover to register (§9) states the classification rule so the consumer has it
+in writing.
+
+## Follow-up workstream (separate plan, approved 2026-08-17)
+
+Binder error accumulation: rework `QueryBinder` to collect errors across
+independent subtrees (conjuncts, argument lists) while still sequencing
+range → scope (the environment threads through that dependency). Makes the
+`List[TypeCheckError]` return type honest, aligns the binder with
+`TypeCatalog.collectErrors` (which already accumulates), and turns AC-2 into a
+real pipeline test. Requires its own ADR fixing the accumulate-vs-sequence
+boundary and the cascade-error policy. Opened as a new plan after this workstream
+ships — not appended here.
 
 ---
 
@@ -322,3 +353,63 @@ not assumed.
   alongside. The two test-site edits in §4 are the only forced changes, both
   mechanical field renames (§7 Decision #1 covers the one the source contract
   did not pre-authorize).
+
+---
+
+## 9. Handover to register
+
+register consumes this change. This is the contract it reads and the
+classification it owns.
+
+**What the engine now returns.** A bind failure is `QueryError.BindError` with a
+single field:
+
+```scala
+case class BindError(details: List[BindErrorDetail])
+```
+
+Each `BindErrorDetail` is one of:
+
+```scala
+enum BindErrorDetail:
+  case UnparseableConstant(name: String, sortName: String, sourceText: String, rendered: String)
+  case Other(rendered: String)
+  def rendered: String   // the human-readable message for this error
+```
+
+- `sortName` is the sort the failed token was expected to be, as a plain
+  `String` (`TypeId.value`). This is the detail register needs: it is what tells
+  a mistyped entity reference from a genuine type error.
+- `rendered` is the engine's message for that error. Read it directly — do not
+  re-derive it. `BindError.messages: List[String]` is `details.map(_.rendered)`
+  for a text-only consumer.
+
+**The classification register owns.** Map a `BindError` to `UNKNOWN_REFERENCE`
+(a user-recoverable reference mistake) only if *every* detail is
+node-recoverable:
+
+```scala
+def nodeRecoverable(d: BindErrorDetail): Boolean = d match
+  case BindErrorDetail.UnparseableConstant(_, sortName, _, _) => sortName == "Node"
+  case BindErrorDetail.Other(_)                               => false
+
+val outcome =
+  if bindError.details.forall(nodeRecoverable) then UNKNOWN_REFERENCE
+  else BIND_FAILED   // read bindError.messages for the text
+```
+
+The homogeneous `UnknownConstantOrLiteralError` path (a token that is neither a
+constant nor has a literal validator) is unchanged and still maps to
+`UNKNOWN_REFERENCE` directly.
+
+**Single-error caveat.** The engine's binder currently reports the first error
+only, so `details` today holds exactly one element. The `forall` above is
+therefore correct now and stays correct when the approved binder-error-
+accumulation follow-up lands and `details` starts carrying several errors — a
+mix that includes any non-node error will then fall to `BIND_FAILED`, which is
+the intended behaviour. register needs no change when that follow-up ships.
+
+**Migration.** register re-pins to `0.15.0` and collapses its two-tier bind
+handling — it no longer drops to `QueryBinder.bind` to recover the sort — into a
+single `fromQueryError` mapper whose `BindError` case runs the classification
+above.

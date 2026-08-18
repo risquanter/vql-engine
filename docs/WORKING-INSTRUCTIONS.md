@@ -123,6 +123,7 @@ At each phase, validate implementation against:
    - ADR-015: Symmetric Value Boundaries
    - ADR-017: Formula Ranges and the Satisfying-Set Boundary
    - ADR-018: Structural Fragment Membership over the Parse Tree
+   - ADR-019: Structured Bind-Error Detail across the Error/Typed Boundary
 
 2. **Proposed ADRs** (validate once accepted):
    - ADR-016: Carrier Witness on Symmetric Value Typeclasses

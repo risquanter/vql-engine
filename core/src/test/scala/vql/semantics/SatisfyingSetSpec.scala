@@ -111,5 +111,5 @@ class SatisfyingSetSpec extends FunSuite:
   test("facade surfaces an unexpected free variable as a BindError"):
     val f = atom("r", Term.Var("x"), Term.Var("y"))
     VagueSemantics.satisfyingSet(f, "x", folModel) match
-      case Left(QueryError.BindError(errors)) => assert(errors.exists(_.contains("y")), s"got $errors")
-      case other                              => fail(s"expected BindError, got $other")
+      case Left(e: QueryError.BindError) => assert(e.messages.exists(_.contains("y")), s"got ${e.messages}")
+      case other                         => fail(s"expected BindError, got $other")
