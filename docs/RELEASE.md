@@ -30,10 +30,10 @@ Do not rename `ci-build.yml`: release.yml verifies Sigstore certificates against
 
 1. Set a non-SNAPSHOT version in `build.sbt` (`ThisBuild / version := "X.Y.Z"`), commit, push to main.
 2. Wait for the resulting ci-build run to go green and note its run ID (Actions → the run → the number in the URL, or `gh run list --workflow ci-build.yml`).
-3. Generate a fresh TOTP code from the YubiKey. The credential period is 60 seconds and the release run spends time installing tools before verifying, so use a code from the start of a window. This command counts down to the next window boundary and then prints a full-life code:
+3. Generate a TOTP code from the YubiKey. The credential period is 60 seconds; the release run verifies the code within seconds of starting and accepts the current window plus the two prior ones (about 180 seconds of validity), so any freshly generated code works — no need to time it to a window boundary:
 
    ```bash
-   t=$(( $(date +%s) / 60 * 60 + 60 )); while (( r = t - $(date +%s), r > 0 )); do printf '\rfresh code in %2ds ' "$r"; sleep 1; done; printf '\r\033[K'; ykman oath accounts code -s '60/risquanter/simulation-util:release'
+   ykman oath accounts code -s '60/risquanter/simulation-util:release'
    ```
 
    The single org-wide OATH credential is named `60/risquanter/simulation-util:release`; the same code authorizes releases in every risquanter repo.

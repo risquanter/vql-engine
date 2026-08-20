@@ -44,9 +44,10 @@ jobs:
   verify-authorization:
     runs-on: ubuntu-latest
     steps:
-      - name: Install oathtool
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y oathtool
-
+      # TOTP is verified with preinstalled python3 (RFC 6238: HMAC-SHA1, 6
+      # digits, base32 secret, 60s step — oathtool's defaults). Nothing is
+      # installed first, so verification runs seconds after the runner boots
+      # and the code cannot age out of its window before it is checked.
       - name: Verify TOTP
         env:
           TOTP_SECRET: ${{ secrets.TOTP_ORG }}
@@ -54,12 +55,28 @@ jobs:
         run: |
           set -euo pipefail
           date --utc
-          EXPECTED=$(oathtool --totp --base32 --time-step-size 60 "$TOTP_SECRET")
-          if [ "${INPUT_TOTP}" != "$EXPECTED" ]; then
-            echo "❌ Invalid TOTP code"
-            exit 1
-          fi
-          echo "✅ TOTP verified successfully"
+          python3 - <<'PY'
+          import base64, hashlib, hmac, os, struct, sys, time
+
+          key = base64.b32decode(os.environ["TOTP_SECRET"].strip().replace(" ", "").upper())
+          provided = os.environ["INPUT_TOTP"].strip()
+          STEP = 60
+
+          def totp(counter: int) -> str:
+              digest = hmac.new(key, struct.pack(">Q", counter), hashlib.sha1).digest()
+              offset = digest[-1] & 0x0F
+              code = (struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7FFFFFFF) % 1_000_000
+              return f"{code:06d}"
+
+          counter = int(time.time()) // STEP
+          # Accept the current 60s window and the two prior ones so that runner
+          # startup and dispatch latency cannot reject an otherwise-valid code.
+          if any(hmac.compare_digest(provided, totp(counter - back)) for back in (0, 1, 2)):
+              print("✅ TOTP verified successfully")
+          else:
+              print("❌ Invalid TOTP code")
+              sys.exit(1)
+          PY
 
   sign-and-publish:
     needs: verify-authorization
