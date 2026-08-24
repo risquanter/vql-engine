@@ -1,7 +1,7 @@
 package vql.typed
 
-import vql.logic.ParsedQuery
 import logic.{FOL, Formula, Term}
+import vql.logic.ParsedQuery
 
 object QueryBinder:
 
@@ -11,79 +11,87 @@ object QueryBinder:
     for
       rangeResult <- bindFormula(query.range, Map.empty, catalog)
       (boundRange, envAfterRange) = rangeResult
-      quantifiedVarSort <- envAfterRange.get(query.variable).toRight(List(TypeCheckError.UnconstrainedVar(query.variable)))
-      _ <- if catalog.domainTypes.contains(quantifiedVarSort) then Right(())
-           else Left(List(TypeCheckError.TypeNotQuantifiable(quantifiedVarSort.value)))
-      scopeResult <- bindFormula(query.scope, envAfterRange, catalog)
+      quantifiedVarSort <- envAfterRange
+        .get(query.variable)
+        .toRight(List(TypeCheckError.UnconstrainedVar(query.variable)))
+      _                 <-
+        if catalog.domainTypes.contains(quantifiedVarSort) then Right(())
+        else Left(List(TypeCheckError.TypeNotQuantifiable(quantifiedVarSort.value)))
+      scopeResult       <- bindFormula(query.scope, envAfterRange, catalog)
       (boundScope, envAfterScope) = scopeResult
       boundAnswers <- bindAnswerVars(query.answerVars, envAfterScope)
-    yield
-      BoundQuery(
-        quantifier = query.quantifier,
-        variable = BoundVar(query.variable, quantifiedVarSort),
-        range = boundRange,
-        scope = boundScope,
-        answerVars = boundAnswers
-      )
+    yield BoundQuery(
+      quantifier = query.quantifier,
+      variable = BoundVar(query.variable, quantifiedVarSort),
+      range = boundRange,
+      scope = boundScope,
+      answerVars = boundAnswers,
+    )
 
-  /** Bind a bare formula for the satisfying-set entry point (ADR-017 §6).
-    *
-    * The formula is bound from an empty environment; the result is valid only
-    * when its free variables are exactly `variable`, and that variable's
-    * inferred sort is a domain type. Failure modes, in order: the variable is
-    * absent from the formula ([[TypeCheckError.UnconstrainedVar]]); some other
-    * free variable appears ([[TypeCheckError.UnexpectedFreeVar]]); the inferred
-    * sort is a value type ([[TypeCheckError.TypeNotQuantifiable]]).
-    */
+  /**
+   * Bind a bare formula for the satisfying-set entry point (ADR-017 §6).
+   *
+   * The formula is bound from an empty environment; the result is valid only when its free
+   * variables are exactly `variable`, and that variable's inferred sort is a domain type. Failure
+   * modes, in order: the variable is absent from the formula ([[TypeCheckError.UnconstrainedVar]]);
+   * some other free variable appears ([[TypeCheckError.UnexpectedFreeVar]]); the inferred sort is a
+   * value type ([[TypeCheckError.TypeNotQuantifiable]]).
+   */
   def bindSatisfyingFormula(
     formula: Formula[FOL],
     variable: String,
-    catalog: TypeCatalog
+    catalog: TypeCatalog,
   ): Either[List[TypeCheckError], (BoundFormula, BoundVar)] =
     for
-      result       <- bindFormula(formula, Map.empty, catalog)
+      result <- bindFormula(formula, Map.empty, catalog)
       (bound, env) = result
-      sort         <- env.get(variable).toRight(List(TypeCheckError.UnconstrainedVar(variable)))
-      _            <- (env.keySet - variable).toList match
-                        case Nil    => Right(())
-                        case extras => Left(extras.map(TypeCheckError.UnexpectedFreeVar.apply))
-      _            <- if catalog.domainTypes.contains(sort) then Right(())
-                      else Left(List(TypeCheckError.TypeNotQuantifiable(sort.value)))
+      sort <- env.get(variable).toRight(List(TypeCheckError.UnconstrainedVar(variable)))
+      _    <- (env.keySet - variable).toList match
+        case Nil    => Right(())
+        case extras => Left(extras.map(TypeCheckError.UnexpectedFreeVar.apply))
+      _    <-
+        if catalog.domainTypes.contains(sort) then Right(())
+        else Left(List(TypeCheckError.TypeNotQuantifiable(sort.value)))
     yield (bound, BoundVar(variable, sort))
 
-  private def bindAnswerVars(names: List[String], env: Env): Either[List[TypeCheckError], List[BoundVar]] =
+  private def bindAnswerVars(names: List[String], env: Env): Either[List[TypeCheckError], List[
+    BoundVar
+  ]] =
     names.foldLeft[Either[List[TypeCheckError], List[BoundVar]]](Right(Nil)) { (acc, name) =>
       for
         xs <- acc
-        s <- env.get(name).toRight(List(TypeCheckError.UnboundAnswerVar(name)))
+        s  <- env.get(name).toRight(List(TypeCheckError.UnboundAnswerVar(name)))
       yield xs :+ BoundVar(name, s)
     }
 
-  private def bindFormula(formula: Formula[FOL], env: Env, catalog: TypeCatalog): Either[List[TypeCheckError], (BoundFormula, Env)] =
+  private def bindFormula(formula: Formula[FOL], env: Env, catalog: TypeCatalog): Either[List[
+    TypeCheckError
+  ], (BoundFormula, Env)] =
     formula match
-      case Formula.True  => Right((BoundFormula.True, env))
-      case Formula.False => Right((BoundFormula.False, env))
-      case Formula.Atom(a) =>
+      case Formula.True         => Right((BoundFormula.True, env))
+      case Formula.False        => Right((BoundFormula.False, env))
+      case Formula.Atom(a)      =>
         bindAtom(a, env, catalog).map((atom, newEnv) => (BoundFormula.Atom(atom), newEnv))
-      case Formula.Not(p) =>
+      case Formula.Not(p)       =>
         bindFormula(p, env, catalog).map((bp, e) => (BoundFormula.Not(bp), e))
-      case Formula.And(p, q) => bindBinary(p, q, env, catalog, BoundFormula.And.apply)
-      case Formula.Or(p, q)  => bindBinary(p, q, env, catalog, BoundFormula.Or.apply)
-      case Formula.Imp(p, q) => bindBinary(p, q, env, catalog, BoundFormula.Imp.apply)
-      case Formula.Iff(p, q) => bindBinary(p, q, env, catalog, BoundFormula.Iff.apply)
+      case Formula.And(p, q)    => bindBinary(p, q, env, catalog, BoundFormula.And.apply)
+      case Formula.Or(p, q)     => bindBinary(p, q, env, catalog, BoundFormula.Or.apply)
+      case Formula.Imp(p, q)    => bindBinary(p, q, env, catalog, BoundFormula.Imp.apply)
+      case Formula.Iff(p, q)    => bindBinary(p, q, env, catalog, BoundFormula.Iff.apply)
       case Formula.Forall(x, p) => bindQuantified(x, p, env, catalog, BoundFormula.Forall.apply)
       case Formula.Exists(x, p) => bindQuantified(x, p, env, catalog, BoundFormula.Exists.apply)
 
-  /** Accumulating product over the error channel (ADR-020): evaluates BOTH
-    * sides and, on any failure, concatenates their errors left-to-right. Use
-    * only where the two computations take the same input independently; a `for`
-    * comprehension is correct wherever one's input depends on the other's
-    * output (the environment threads), because running the second against a
-    * failed first's incomplete environment manufactures cascade errors. `eb` is
-    * strict — a by-name argument would re-introduce short-circuiting. */
+  /**
+   * Accumulating product over the error channel (ADR-020): evaluates BOTH sides and, on any
+   * failure, concatenates their errors left-to-right. Use only where the two computations take the
+   * same input independently; a `for` comprehension is correct wherever one's input depends on the
+   * other's output (the environment threads), because running the second against a failed first's
+   * incomplete environment manufactures cascade errors. `eb` is strict — a by-name argument would
+   * re-introduce short-circuiting.
+   */
   private def both[A, B](
     ea: Either[List[TypeCheckError], A],
-    eb: Either[List[TypeCheckError], B]
+    eb: Either[List[TypeCheckError], B],
   ): Either[List[TypeCheckError], (A, B)] =
     (ea, eb) match
       case (Right(a), Right(b)) => Right((a, b))
@@ -96,7 +104,7 @@ object QueryBinder:
     q: Formula[FOL],
     env: Env,
     catalog: TypeCatalog,
-    mk: (BoundFormula, BoundFormula) => BoundFormula
+    mk: (BoundFormula, BoundFormula) => BoundFormula,
   ): Either[List[TypeCheckError], (BoundFormula, Env)] =
     // Both sides bind against the same `env`, so they are independent inputs and
     // accumulate (ADR-020). `mergeEnvs` runs only when both succeed.
@@ -110,38 +118,48 @@ object QueryBinder:
     body: Formula[FOL],
     env: Env,
     catalog: TypeCatalog,
-    mk: (BoundVar, BoundFormula) => BoundFormula
+    mk: (BoundVar, BoundFormula) => BoundFormula,
   ): Either[List[TypeCheckError], (BoundFormula, Env)] =
     val scopedEnv = env - name
-    bindFormula(body, scopedEnv, catalog).flatMap { case (boundBody, envAfterBody) =>
-      envAfterBody.get(name) match
-        case None => Left(List(TypeCheckError.UnconstrainedVar(name)))
-        case Some(sort) =>
-          if !catalog.domainTypes.contains(sort) then
-            Left(List(TypeCheckError.TypeNotQuantifiable(sort.value)))
-          else
-            val escaped = envAfterBody - name
-            val outerMerged = env ++ escaped
-            Right((mk(BoundVar(name, sort), boundBody), outerMerged))
+    bindFormula(body, scopedEnv, catalog).flatMap {
+      case (boundBody, envAfterBody) =>
+        envAfterBody.get(name) match
+          case None       => Left(List(TypeCheckError.UnconstrainedVar(name)))
+          case Some(sort) =>
+            if !catalog.domainTypes.contains(sort) then
+              Left(List(TypeCheckError.TypeNotQuantifiable(sort.value)))
+            else
+              val escaped     = envAfterBody - name
+              val outerMerged = env ++ escaped
+              Right((mk(BoundVar(name, sort), boundBody), outerMerged))
     }
 
-  private def bindAtom(atom: FOL, env: Env, catalog: TypeCatalog): Either[List[TypeCheckError], (BoundAtom, Env)] =
+  end bindQuantified
+
+  private def bindAtom(atom: FOL, env: Env, catalog: TypeCatalog): Either[List[
+    TypeCheckError
+  ], (BoundAtom, Env)] =
     val symbol = SymbolName(atom.predicate)
     catalog.predicates.get(symbol) match
-      case None => Left(List(TypeCheckError.UnknownPredicate(atom.predicate)))
+      case None      => Left(List(TypeCheckError.UnknownPredicate(atom.predicate)))
       case Some(sig) =>
         if sig.params.length != atom.terms.length then
-          Left(List(TypeCheckError.ArityMismatch(atom.predicate, sig.params.length, atom.terms.length)))
+          Left(
+            List(TypeCheckError.ArityMismatch(atom.predicate, sig.params.length, atom.terms.length))
+          )
         else
-          bindTermsExpected(atom.terms, sig.params, env, catalog).map { case (args, newEnv) =>
-            (BoundAtom(symbol, args), newEnv)
+          bindTermsExpected(atom.terms, sig.params, env, catalog).map {
+            case (args, newEnv) =>
+              (BoundAtom(symbol, args), newEnv)
           }
+
+  end bindAtom
 
   private def bindTermsExpected(
     terms: List[Term],
     expected: List[TypeId],
     env: Env,
-    catalog: TypeCatalog
+    catalog: TypeCatalog,
   ): Either[List[TypeCheckError], (List[BoundTerm], Env)] =
     val zipped = terms.zip(expected)
     zipped.foldLeft[Either[List[TypeCheckError], (List[BoundTerm], Env)]](Right((Nil, env))) {
@@ -156,17 +174,17 @@ object QueryBinder:
     term: Term,
     expected: TypeId,
     env: Env,
-    catalog: TypeCatalog
+    catalog: TypeCatalog,
   ): Either[List[TypeCheckError], (BoundTerm, Env)] =
     term match
       case Term.Var(name) =>
         env.get(name) match
-          case None =>
+          case None                               =>
             val newEnv = env + (name -> expected)
             Right((BoundTerm.VarRef(BoundVar(name, expected)), newEnv))
           case Some(actual) if actual == expected =>
             Right((BoundTerm.VarRef(BoundVar(name, actual)), env))
-          case Some(actual) =>
+          case Some(actual)                       =>
             Left(List(TypeCheckError.TypeMismatch(expected, actual, s"variable '$name'")))
 
       case Term.Const(name) =>
@@ -174,38 +192,48 @@ object QueryBinder:
           case Some(actual) if actual == expected =>
             // Named constant: resolved by the model at eval time.
             Right((BoundTerm.ConstRef(name, expected), env))
-          case Some(actual) =>
+          case Some(actual)                       =>
             Left(List(TypeCheckError.TypeMismatch(expected, actual, s"constant '$name'")))
-          case None =>
+          case None                               =>
             catalog.literalValidators.get(expected) match
               case Some(v) =>
                 v(name) match
                   case Some(raw) =>
                     Right((BoundTerm.LiteralRef(name, expected, raw), env))
-                  case None =>
+                  case None      =>
                     Left(List(TypeCheckError.UnparseableConstant(name, expected, name)))
-              case None =>
+              case None    =>
                 Left(List(TypeCheckError.UnknownConstantOrLiteral(name)))
 
       case Term.Fn(name, args) =>
         val symbol = SymbolName(name)
         catalog.functions.get(symbol) match
-          case None => Left(List(TypeCheckError.UnknownFunction(name)))
+          case None      => Left(List(TypeCheckError.UnknownFunction(name)))
           case Some(sig) =>
             if sig.params.length != args.length then
               Left(List(TypeCheckError.ArityMismatch(name, sig.params.length, args.length)))
             else
               for
                 boundArgs <- bindTermsExpected(args, sig.params, env, catalog)
-                _ <- if sig.returns == expected then Right(())
-                     else Left(List(TypeCheckError.TypeMismatch(expected, sig.returns, s"function '$name' return")))
+                _         <-
+                  if sig.returns == expected then Right(())
+                  else
+                    Left(
+                      List(
+                        TypeCheckError
+                          .TypeMismatch(expected, sig.returns, s"function '$name' return")
+                      )
+                    )
               yield (BoundTerm.FnApp(symbol, boundArgs._1, sig.returns), boundArgs._2)
+        end match
 
-  /** Both sides already type-checked; a key is judged against the same
-    * `(left, right)` pair, so every conflicting variable accumulates (ADR-020).
-    * Keys are sorted for a deterministic error order across platforms. */
+  /**
+   * Both sides already type-checked; a key is judged against the same `(left, right)` pair, so
+   * every conflicting variable accumulates (ADR-020). Keys are sorted for a deterministic error
+   * order across platforms.
+   */
   private def mergeEnvs(left: Env, right: Env): Either[List[TypeCheckError], Env] =
-    val keys = (left.keySet union right.keySet).toList.sorted
+    val keys      = (left.keySet union right.keySet).toList.sorted
     val conflicts = keys.collect {
       case k if left.get(k).exists(a => right.get(k).exists(_ != a)) =>
         TypeCheckError.ConflictingTypes(k, left(k), right(k))
@@ -213,3 +241,5 @@ object QueryBinder:
     conflicts match
       case Nil => Right(keys.map(k => k -> left.getOrElse(k, right(k))).toMap)
       case cs  => Left(cs)
+
+end QueryBinder

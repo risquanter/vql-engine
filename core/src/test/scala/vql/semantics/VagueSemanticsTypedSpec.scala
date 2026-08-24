@@ -1,14 +1,30 @@
 package vql.semantics
 
-import vql.error.{QueryError, BindErrorDetail}
+import logic.{FOL, Formula, Term}
+import munit.FunSuite
+import vql.error.{BindErrorDetail, QueryError}
 import vql.logic.ParsedQuery
 import vql.quantifier.Quantifier
 import vql.sampling.SamplingParams
-import vql.typed.{BoundAtom, BoundFormula, BoundQuery, BoundTerm, BoundVar, FolModel, PredicateSig, RuntimeDispatcher, RuntimeModel, TypeCatalog, TypedSemantics, TypeId, SymbolName, Value, extract}
+import vql.typed.{
+  extract,
+  BoundAtom,
+  BoundFormula,
+  BoundQuery,
+  BoundTerm,
+  BoundVar,
+  FolModel,
+  PredicateSig,
+  RuntimeDispatcher,
+  RuntimeModel,
+  SymbolName,
+  TypeCatalog,
+  TypedSemantics,
+  TypeId,
+  Value,
+}
 import vql.typed.Extract.*
 import vql.typed.TypeDecl.{DomainType, ValueType}
-import logic.{FOL, Formula, Term}
-import munit.FunSuite
 
 class VagueSemanticsTypedSpec extends FunSuite:
 
@@ -17,9 +33,9 @@ class VagueSemanticsTypedSpec extends FunSuite:
   private val catalog = TypeCatalog.unsafe(
     types = Set(DomainType(asset)),
     predicates = Map(
-      SymbolName("leaf") -> PredicateSig(List(asset)),
-      SymbolName("coastal") -> PredicateSig(List(asset))
-    )
+      SymbolName("leaf")    -> PredicateSig(List(asset)),
+      SymbolName("coastal") -> PredicateSig(List(asset)),
+    ),
   )
 
   private val vA = Value(asset, "A")
@@ -30,7 +46,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     variable = "x",
     range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
     scope = Formula.Atom(FOL("coastal", List(Term.Var("x")))),
-    answerVars = Nil
+    answerVars = Nil,
   )
 
   test("evaluateTyped returns expected proportion for simple unary predicates"):
@@ -44,19 +60,20 @@ class VagueSemanticsTypedSpec extends FunSuite:
           case "coastal" => Right(args.headOption.exists(_.raw == "A"))
           case other     => Left(s"No predicate implementation for '$other'")
 
-      override def functionSymbols: Set[SymbolName] = Set.empty
-      override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"), SymbolName("coastal"))
+      override def functionSymbols: Set[SymbolName]  = Set.empty
+      override def predicateSymbols: Set[SymbolName] =
+        Set(SymbolName("leaf"), SymbolName("coastal"))
 
     val model = RuntimeModel(
       domains = Map(asset -> Set(vA, vB)),
-      dispatcher = dispatcher
+      dispatcher = dispatcher,
     )
 
     val fm = FolModel(catalog, model).fold(e => fail(s"FolModel construction failed: $e"), identity)
     val result = VagueSemantics.evaluateTyped(
       query = query,
       folModel = fm,
-      samplingParams = SamplingParams.exact
+      samplingParams = SamplingParams.exact,
     )
 
     assert(result.isRight)
@@ -65,22 +82,24 @@ class VagueSemanticsTypedSpec extends FunSuite:
     assertEquals(output.satisfyingElements.size, 1)
     assertEquals(output.result.proportion, 0.5)
 
-  test("evaluateTyped returns ModelValidationError when runtime model is missing declared predicate"):
+  test(
+    "evaluateTyped returns ModelValidationError when runtime model is missing declared predicate"
+  ):
     val dispatcher = new RuntimeDispatcher:
       override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] =
         Left(s"No function implementation for '${name.value}'")
 
       override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
         name.value match
-          case "leaf"  => Right(args.nonEmpty)
-          case other   => Left(s"No predicate implementation for '$other'")
+          case "leaf" => Right(args.nonEmpty)
+          case other  => Left(s"No predicate implementation for '$other'")
 
-      override def functionSymbols: Set[SymbolName] = Set.empty
+      override def functionSymbols: Set[SymbolName]  = Set.empty
       override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"))
 
     val invalidModel = RuntimeModel(
       domains = Map(asset -> Set(vA, vB)),
-      dispatcher = dispatcher
+      dispatcher = dispatcher,
     )
 
     val result = FolModel(catalog, invalidModel)
@@ -98,7 +117,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     // the Asset sort — in register this would be LeafId backed by String.
 
     val dispatcher = new RuntimeDispatcher:
-      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] =
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any]      =
         Left(s"No function implementation for '${name.value}'")
       override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
         name.value match
@@ -106,21 +125,26 @@ class VagueSemanticsTypedSpec extends FunSuite:
           case "coastal" => Right(args.headOption.exists(_.raw == "A"))
           case other     => Left(s"No predicate implementation for '$other'")
       override def functionSymbols: Set[SymbolName] = Set.empty
-      override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"), SymbolName("coastal"))
+      override def predicateSymbols: Set[SymbolName]                                           =
+        Set(SymbolName("leaf"), SymbolName("coastal"))
 
     val model = RuntimeModel(
       domains = Map(asset -> Set(vA, vB)),
-      dispatcher = dispatcher
+      dispatcher = dispatcher,
     )
 
     val fm = FolModel(catalog, model).fold(e => fail(s"FolModel construction failed: $e"), identity)
-    val output = VagueSemantics.evaluateTyped(
-      query = query,
-      folModel = fm,
-      samplingParams = SamplingParams.exact
-    ).toOption.get
+    val output = VagueSemantics
+      .evaluateTyped(
+        query = query,
+        folModel = fm,
+        samplingParams = SamplingParams.exact,
+      )
+      .toOption
+      .get
 
-    // Project Value witness set to consumer String via Extract[String] — no asInstanceOf at call site
+    // Project Value witness set to consumer String via Extract[String] — no asInstanceOf at call
+    // site
     val satisfying: Set[String] = output.satisfyingElements.flatMap(_.extract[String].toOption)
     assertEquals(satisfying, Set("A"))
 
@@ -135,26 +159,26 @@ class VagueSemanticsTypedSpec extends FunSuite:
       variable = "x",
       range = Formula.Atom(FOL("nonexistent_predicate", List(Term.Var("x")))),
       scope = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
-      answerVars = Nil
+      answerVars = Nil,
     )
-    val result = VagueSemantics.bindTyped(badQuery, catalog)
+    val result   = VagueSemantics.bindTyped(badQuery, catalog)
     result match
       case Left(e: QueryError.BindError) =>
         assert(e.messages.nonEmpty)
         assert(e.messages.exists(_.contains("nonexistent_predicate")))
-      case Left(other) => fail(s"Expected BindError, got $other")
-      case Right(_)    => fail("Expected Left for unknown predicate")
+      case Left(other)                   => fail(s"Expected BindError, got $other")
+      case Right(_)                      => fail("Expected Left for unknown predicate")
 
   test("evaluateTyped returns BindError (not ValidationError) for malformed query"):
-    val badQuery = ParsedQuery(
+    val badQuery   = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = "x",
       range = Formula.Atom(FOL("nonexistent_predicate", List(Term.Var("x")))),
       scope = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
-      answerVars = Nil
+      answerVars = Nil,
     )
     val dispatcher = new RuntimeDispatcher:
-      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] =
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any]      =
         Left("no function")
       override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
         name.value match
@@ -162,14 +186,15 @@ class VagueSemanticsTypedSpec extends FunSuite:
           case "coastal" => Right(false)
           case other     => Left(s"no predicate: $other")
       override def functionSymbols: Set[SymbolName] = Set.empty
-      override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"), SymbolName("coastal"))
-    val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = dispatcher)
+      override def predicateSymbols: Set[SymbolName]                                           =
+        Set(SymbolName("leaf"), SymbolName("coastal"))
+    val model      = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = dispatcher)
     val fm = FolModel(catalog, model).fold(e => fail(s"FolModel construction failed: $e"), identity)
     val result = VagueSemantics.evaluateTyped(badQuery, fm, samplingParams = SamplingParams.exact)
     result match
       case Left(_: QueryError.BindError) => assert(true)
-      case Left(other) => fail(s"Expected BindError, got $other")
-      case Right(_)    => fail("Expected Left")
+      case Left(other)                   => fail(s"Expected BindError, got $other")
+      case Right(_)                      => fail("Expected Left")
 
   // ==================== Structured bind-error detail (sort fidelity) ====================
 
@@ -183,23 +208,31 @@ class VagueSemanticsTypedSpec extends FunSuite:
     predicates = Map(
       SymbolName("leaf")   -> PredicateSig(List(asset)),
       SymbolName("big")    -> PredicateSig(List(asset, lossSort)),
-      SymbolName("likely") -> PredicateSig(List(asset, probSort))
+      SymbolName("likely") -> PredicateSig(List(asset, probSort)),
     ),
     literalValidators = Map(
       lossSort -> (s => s.toDoubleOption),
-      probSort -> (s => s.toDoubleOption.filter(d => d >= 0.0 && d <= 1.0))
-    )
+      probSort -> (s => s.toDoubleOption.filter(d => d >= 0.0 && d <= 1.0)),
+    ),
   )
 
   private val sortModel =
     val dispatcher = new RuntimeDispatcher:
-      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] = Left("no functions")
-      override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] = Right(true)
-      override def functionSymbols: Set[SymbolName] = Set.empty
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] = Left(
+        "no functions"
+      )
+      override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
+        Right(true)
+      override def functionSymbols: Set[SymbolName]  = Set.empty
       override def predicateSymbols: Set[SymbolName] =
         Set(SymbolName("leaf"), SymbolName("big"), SymbolName("likely"))
-    FolModel(sortCatalog, RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = dispatcher))
+    FolModel(
+      sortCatalog,
+      RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = dispatcher),
+    )
       .fold(e => fail(s"FolModel construction failed: $e"), identity)
+
+  end sortModel
 
   private def sortQuery(scope: Formula[FOL]): ParsedQuery =
     ParsedQuery(
@@ -207,15 +240,21 @@ class VagueSemanticsTypedSpec extends FunSuite:
       variable = "x",
       range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
       scope = scope,
-      answerVars = Nil
+      answerVars = Nil,
     )
 
   private def bindErrorFor(scope: Formula[FOL]): QueryError.BindError =
-    VagueSemantics.evaluateTyped(sortQuery(scope), sortModel, samplingParams = SamplingParams.exact) match
+    VagueSemantics.evaluateTyped(
+      sortQuery(scope),
+      sortModel,
+      samplingParams = SamplingParams.exact,
+    ) match
       case Left(e: QueryError.BindError) => e
       case other                         => fail(s"expected BindError, got $other")
 
-  test("AC-1/AC-7: a sole unparseable constant surfaces its sort name through evaluateTyped, with one rendered source"):
+  test(
+    "AC-1/AC-7: a sole unparseable constant surfaces its sort name through evaluateTyped, with one rendered source"
+  ):
     val e = bindErrorFor(Formula.Atom(FOL("big", List(Term.Var("x"), Term.Const("abc")))))
     e.details match
       case List(d: BindErrorDetail.UnparseableConstant) =>
@@ -239,7 +278,8 @@ class VagueSemanticsTypedSpec extends FunSuite:
 
   test("AC-6: BindErrorDetail is built from primitives only — no typed value crosses the boundary"):
     // The error layer holds no TypeId: a detail is constructed from String fields alone.
-    val d: BindErrorDetail = BindErrorDetail.UnparseableConstant("n", "Loss", "n", "cannot parse 'n' as Loss")
+    val d: BindErrorDetail =
+      BindErrorDetail.UnparseableConstant("n", "Loss", "n", "cannot parse 'n' as Loss")
     assertEquals(d.rendered, "cannot parse 'n' as Loss")
 
   // ==================== Binder error accumulation (ADR-020) ====================
@@ -247,6 +287,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
   // Scope fragments over the sortCatalog fixture (range is leaf(x), so x: Asset).
   private def bigConst(c: String): Formula[FOL] =
     Formula.Atom(FOL("big", List(Term.Var("x"), Term.Const(c))))
+
   private val leafArity2: Formula[FOL] =
     Formula.Atom(FOL("leaf", List(Term.Var("x"), Term.Var("x"))))
 
@@ -291,53 +332,58 @@ class VagueSemanticsTypedSpec extends FunSuite:
     // error is reported, because scope binds against the range's output environment.
     val q = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
-      variable   = "x",
-      range      = bigConst("abc"),
-      scope      = leafArity2,
-      answerVars = Nil
+      variable = "x",
+      range = bigConst("abc"),
+      scope = leafArity2,
+      answerVars = Nil,
     )
     val e = bindErrorForQuery(q, sortModel)
     assertEquals(e.details.length, 1)
     e.details.head match
       case d: BindErrorDetail.UnparseableConstant => assertEquals(d.sourceText, "abc")
-      case other                                  => fail(s"expected the range's UnparseableConstant, got $other")
+      case other => fail(s"expected the range's UnparseableConstant, got $other")
 
   test("AC-E: mergeEnvs reports every conflicting variable, not just the first"):
     // Two variables each inferred at Loss on the left and Probability on the right
     // of a conjunction; both conflicts surface at the merge.
-    val lossP = SymbolName("lossp")
-    val probP = SymbolName("probp")
+    val lossP           = SymbolName("lossp")
+    val probP           = SymbolName("probp")
     val conflictCatalog = TypeCatalog.unsafe(
       types = Set(DomainType(asset), ValueType(lossSort), ValueType(probSort)),
       predicates = Map(
         SymbolName("leaf") -> PredicateSig(List(asset)),
-        lossP -> PredicateSig(List(lossSort)),
-        probP -> PredicateSig(List(probSort))
-      )
+        lossP              -> PredicateSig(List(lossSort)),
+        probP              -> PredicateSig(List(probSort)),
+      ),
     )
-    val conflictModel =
+    val conflictModel   =
       val dispatcher = new RuntimeDispatcher:
-        override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] = Left("no functions")
-        override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] = Right(true)
-        override def functionSymbols: Set[SymbolName] = Set.empty
+        override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any]      =
+          Left("no functions")
+        override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
+          Right(true)
+        override def functionSymbols: Set[SymbolName]  = Set.empty
         override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"), lossP, probP)
-      FolModel(conflictCatalog, RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = dispatcher))
+      FolModel(
+        conflictCatalog,
+        RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = dispatcher),
+      )
         .fold(e => fail(s"FolModel construction failed: $e"), identity)
 
     def lossAtom(v: String) = Formula.Atom(FOL("lossp", List(Term.Var(v))))
     def probAtom(v: String) = Formula.Atom(FOL("probp", List(Term.Var(v))))
-    val scope = Formula.And(
+    val scope               = Formula.And(
       Formula.And(lossAtom("u"), lossAtom("v")),
-      Formula.And(probAtom("u"), probAtom("v"))
+      Formula.And(probAtom("u"), probAtom("v")),
     )
-    val q = ParsedQuery(
+    val q                   = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
-      variable   = "x",
-      range      = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
-      scope      = scope,
-      answerVars = Nil
+      variable = "x",
+      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      scope = scope,
+      answerVars = Nil,
     )
-    val e = bindErrorForQuery(q, conflictModel)
+    val e                   = bindErrorForQuery(q, conflictModel)
     assertEquals(e.details.length, 2)
     assert(e.messages.forall(_.contains("conflicting")), s"got ${e.messages}")
     assert(e.messages.exists(_.contains("'u'")), s"got ${e.messages}")
@@ -348,16 +394,19 @@ class VagueSemanticsTypedSpec extends FunSuite:
   private val loss = TypeId("Loss")
 
   private val catalogWithLoss = TypeCatalog.unsafe(
-    types = Set(DomainType(asset), DomainType(loss)),  // both are domain types — Loss can be quantified over
+    types = Set(
+      DomainType(asset),
+      DomainType(loss),
+    ), // both are domain types — Loss can be quantified over
     predicates = Map(
       SymbolName("leaf")    -> PredicateSig(List(asset)),
       SymbolName("coastal") -> PredicateSig(List(asset)),
-      SymbolName("hasloss") -> PredicateSig(List(loss))
-    )
+      SymbolName("hasloss") -> PredicateSig(List(loss)),
+    ),
   )
 
   private val losslessDispatcher = new RuntimeDispatcher:
-    override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] =
+    override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any]      =
       Left("no function")
     override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
       name.value match
@@ -366,7 +415,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
         case "hasloss" => Right(true)
         case other     => Left(s"no predicate: $other")
     override def functionSymbols: Set[SymbolName] = Set.empty
-    override def predicateSymbols: Set[SymbolName] =
+    override def predicateSymbols: Set[SymbolName]                                           =
       Set(SymbolName("leaf"), SymbolName("coastal"), SymbolName("hasloss"))
 
   test("ModelValidationError raised when enumerable type has no registered domain (root variable)"):
@@ -375,10 +424,10 @@ class VagueSemanticsTypedSpec extends FunSuite:
       variable = "l",
       range = Formula.Atom(FOL("hasloss", List(Term.Var("l")))),
       scope = Formula.True,
-      answerVars = Nil
+      answerVars = Nil,
     )
     // Loss is enumerable in catalogWithLoss; model omits Loss domain → FolModel construction fails
-    val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
+    val model  = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
     val result = FolModel(catalogWithLoss, model)
     result match
       case Left(e: QueryError.ModelValidationError) =>
@@ -392,9 +441,9 @@ class VagueSemanticsTypedSpec extends FunSuite:
       variable = "x",
       range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
       scope = Formula.Forall("l", Formula.Atom(FOL("hasloss", List(Term.Var("l"))))),
-      answerVars = Nil
+      answerVars = Nil,
     )
-    val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
+    val model  = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
     val result = FolModel(catalogWithLoss, model)
     result match
       case Left(e: QueryError.ModelValidationError) =>
@@ -408,9 +457,9 @@ class VagueSemanticsTypedSpec extends FunSuite:
       variable = "x",
       range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
       scope = Formula.Exists("l", Formula.Atom(FOL("hasloss", List(Term.Var("l"))))),
-      answerVars = Nil
+      answerVars = Nil,
     )
-    val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
+    val model  = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
     val result = FolModel(catalogWithLoss, model)
     result match
       case Left(e: QueryError.ModelValidationError) =>
@@ -427,21 +476,27 @@ class VagueSemanticsTypedSpec extends FunSuite:
     // A catalog where Loss is NOT enumerable (asset only) — validateAgainst only
     // checks Asset domain coverage, so it passes.
     val catalogAssetOnly = TypeCatalog.unsafe(
-      types = Set(DomainType(asset), ValueType(loss)),  // Loss is a value type — validateAgainst will not check Loss domain
+      types = Set(
+        DomainType(asset),
+        ValueType(loss),
+      ), // Loss is a value type — validateAgainst will not check Loss domain
       predicates = Map(
         SymbolName("hasloss") -> PredicateSig(List(loss))
-      )
+      ),
     )
     // Manually construct a BoundQuery over Loss, bypassing QueryBinder.bind
-    val boundQuery = BoundQuery(
+    val boundQuery       = BoundQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = BoundVar("l", loss),
-      range = BoundFormula.Atom(BoundAtom(SymbolName("hasloss"), List(BoundTerm.VarRef(BoundVar("l", loss))))),
+      range = BoundFormula.Atom(
+        BoundAtom(SymbolName("hasloss"), List(BoundTerm.VarRef(BoundVar("l", loss))))
+      ),
       scope = BoundFormula.True,
-      answerVars = Nil
+      answerVars = Nil,
     )
-    val model = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
-    // validateAgainst passes (only checks enumerable types); TypedSemantics.evaluate hits the fallback
+    val model  = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
+    // validateAgainst passes (only checks enumerable types); TypedSemantics.evaluate hits the
+    // fallback
     val result = TypedSemantics.evaluate(boundQuery, model, samplingParams = SamplingParams.exact)
     result match
       case Left(e: QueryError.DomainNotFoundError) =>
@@ -454,37 +509,40 @@ class VagueSemanticsTypedSpec extends FunSuite:
   // Verifies that the right branch of connectives is never dispatched when
   // the left branch already determines the truth value.
 
-  private def sentinelDispatcher(sentinel: SymbolName, onSentinelCalled: () => Unit): RuntimeDispatcher =
+  private def sentinelDispatcher(
+    sentinel: SymbolName,
+    onSentinelCalled: () => Unit,
+  ): RuntimeDispatcher =
     new RuntimeDispatcher:
       override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
         name.value match
-          case "leaf" => Right(true)
+          case "leaf"                   => Right(true)
           case s if s == sentinel.value =>
             onSentinelCalled()
             Left(s"SHOULD NOT BE DISPATCHED: $s")
-          case other => Left(s"unknown predicate: $other")
-      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] =
+          case other                    => Left(s"unknown predicate: $other")
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any]      =
         Left("no functions")
-      override def functionSymbols: Set[SymbolName] = Set.empty
+      override def functionSymbols: Set[SymbolName]  = Set.empty
       override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"), sentinel)
 
   test("And short-circuits: right branch not dispatched when left is False"):
-    val sentinel = SymbolName("and-sentinel")
+    val sentinel   = SymbolName("and-sentinel")
     var dispatched = false
-    val x = BoundVar("x", asset)
-    val scope = BoundFormula.And(
+    val x          = BoundVar("x", asset)
+    val scope      = BoundFormula.And(
       BoundFormula.False,
-      BoundFormula.Atom(BoundAtom(sentinel, List(BoundTerm.VarRef(x))))
+      BoundFormula.Atom(BoundAtom(sentinel, List(BoundTerm.VarRef(x)))),
     )
     val boundQuery = BoundQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
-      variable   = x,
-      range      = BoundFormula.Atom(BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x)))),
-      scope      = scope
+      variable = x,
+      range = BoundFormula.Atom(BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x)))),
+      scope = scope,
     )
-    val model = RuntimeModel(
-      domains    = Map(asset -> Set(vA, vB)),
-      dispatcher = sentinelDispatcher(sentinel, () => dispatched = true)
+    val model      = RuntimeModel(
+      domains = Map(asset -> Set(vA, vB)),
+      dispatcher = sentinelDispatcher(sentinel, () => dispatched = true),
     )
     val result = TypedSemantics.evaluate(boundQuery, model, samplingParams = SamplingParams.exact)
     assert(result.isRight, s"Expected Right, got $result")
@@ -492,47 +550,49 @@ class VagueSemanticsTypedSpec extends FunSuite:
     assertEquals(result.toOption.get.satisfyingElements.size, 0)
 
   test("Or short-circuits: right branch not dispatched when left is True"):
-    val sentinel = SymbolName("or-sentinel")
+    val sentinel   = SymbolName("or-sentinel")
     var dispatched = false
-    val x = BoundVar("x", asset)
-    val scope = BoundFormula.Or(
+    val x          = BoundVar("x", asset)
+    val scope      = BoundFormula.Or(
       BoundFormula.True,
-      BoundFormula.Atom(BoundAtom(sentinel, List(BoundTerm.VarRef(x))))
+      BoundFormula.Atom(BoundAtom(sentinel, List(BoundTerm.VarRef(x)))),
     )
     val boundQuery = BoundQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
-      variable   = x,
-      range      = BoundFormula.Atom(BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x)))),
-      scope      = scope
+      variable = x,
+      range = BoundFormula.Atom(BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x)))),
+      scope = scope,
     )
-    val model = RuntimeModel(
-      domains    = Map(asset -> Set(vA, vB)),
-      dispatcher = sentinelDispatcher(sentinel, () => dispatched = true)
+    val model      = RuntimeModel(
+      domains = Map(asset -> Set(vA, vB)),
+      dispatcher = sentinelDispatcher(sentinel, () => dispatched = true),
     )
     val result = TypedSemantics.evaluate(boundQuery, model, samplingParams = SamplingParams.exact)
     assert(result.isRight, s"Expected Right, got $result")
     assert(!dispatched, "Or right branch was dispatched despite left being True")
-    assertEquals(result.toOption.get.satisfyingElements.size, 2)  // Or(True, _) always satisfied
+    assertEquals(result.toOption.get.satisfyingElements.size, 2) // Or(True, _) always satisfied
 
   test("Imp short-circuits: consequent not dispatched when antecedent is False"):
-    val sentinel = SymbolName("imp-sentinel")
+    val sentinel   = SymbolName("imp-sentinel")
     var dispatched = false
-    val x = BoundVar("x", asset)
-    val scope = BoundFormula.Imp(
+    val x          = BoundVar("x", asset)
+    val scope      = BoundFormula.Imp(
       BoundFormula.False,
-      BoundFormula.Atom(BoundAtom(sentinel, List(BoundTerm.VarRef(x))))
+      BoundFormula.Atom(BoundAtom(sentinel, List(BoundTerm.VarRef(x)))),
     )
     val boundQuery = BoundQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
-      variable   = x,
-      range      = BoundFormula.Atom(BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x)))),
-      scope      = scope
+      variable = x,
+      range = BoundFormula.Atom(BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x)))),
+      scope = scope,
     )
-    val model = RuntimeModel(
-      domains    = Map(asset -> Set(vA, vB)),
-      dispatcher = sentinelDispatcher(sentinel, () => dispatched = true)
+    val model      = RuntimeModel(
+      domains = Map(asset -> Set(vA, vB)),
+      dispatcher = sentinelDispatcher(sentinel, () => dispatched = true),
     )
     val result = TypedSemantics.evaluate(boundQuery, model, samplingParams = SamplingParams.exact)
     assert(result.isRight, s"Expected Right, got $result")
     assert(!dispatched, "Imp consequent was dispatched despite antecedent being False")
-    assertEquals(result.toOption.get.satisfyingElements.size, 2)  // Imp(False, _) vacuously true
+    assertEquals(result.toOption.get.satisfyingElements.size, 2) // Imp(False, _) vacuously true
+
+end VagueSemanticsTypedSpec

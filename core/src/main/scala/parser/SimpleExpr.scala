@@ -1,20 +1,21 @@
 package parser
 
-import util.StringUtil.*
 import lexer.{Lexer, Token}
 import parser.Combinators.*
+import util.StringUtil.*
 
-/** Simple algebraic expression example from intro.ml
-  *
-  * Demonstrates precedence handling with right-associative operators.
-  *
-  * OCaml type definition:
-  *   type expression =
-  *      Var of string
-  *    | Const of int
-  *    | Add of expression * expression
-  *    | Mul of expression * expression
-  */
+/**
+ * Simple algebraic expression example from intro.ml
+ *
+ * Demonstrates precedence handling with right-associative operators.
+ *
+ * OCaml type definition:
+ *   type expression =
+ *      Var of string
+ *    | Const of int
+ *    | Add of expression * expression
+ *    | Mul of expression * expression
+ */
 enum Expr:
   case Var(name: String)
   case Const(value: Int)
@@ -22,11 +23,9 @@ enum Expr:
   case Mul(left: Expr, right: Expr)
 
   /**
-    * Grammar (in BNF-like notation):
-    * expression ::= product ('+' product)*
-    * product    ::= atom ('*' atom)*
-    * atom       ::= variable | constant | '(' expression ')'
-    */
+   * Grammar (in BNF-like notation): expression ::= product ('+' product)* product ::= atom ('*'
+   * atom)* atom ::= variable | constant | '(' expression ')'
+   */
 
 object SimpleExprParser:
   import Expr.*
@@ -51,23 +50,21 @@ object SimpleExprParser:
 
       case Token.Word(tok) :: rest =>
         // All-numeric → Const, otherwise Var.
-        if tok.forall(numeric) then
-          (Const(tok.toInt), rest)
-        else
-          (Var(tok), rest)
+        if tok.forall(numeric) then (Const(tok.toInt), rest)
+        else (Var(tok), rest)
 
       case other :: _ =>
         throw new Exception(s"Expected variable, constant, or '(', got: ${tokenLabel(other)}")
 
   /** Generic function to impose lexing and exhaustion checking on a parser */
   def makeParser(pfn: List[Token] => ParseResult[Expr])(s: String): Expr =
-    val tokens = Lexer.lex(explode(s))
+    val tokens       = Lexer.lex(explode(s))
     val (expr, rest) = pfn(tokens)
-    if rest.isEmpty then
-      expr
-    else
-      throw new Exception(s"Unparsed input: ${tokensLabel(rest)}")
+    if rest.isEmpty then expr
+    else throw new Exception(s"Unparsed input: ${tokensLabel(rest)}")
 
   /** Default parser for expressions (convenience method) */
   def parse(s: String): Expr =
     makeParser(parseExpression)(s)
+
+end SimpleExprParser

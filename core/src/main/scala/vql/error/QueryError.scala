@@ -1,85 +1,96 @@
 package vql.error
 
-/** Structured error types for vague quantifier evaluation.
-  *
-  * Encoded as a `sealed trait` with `case class` variants (not an `enum`) because
-  * each variant overrides `formatted` and/or `context` with distinct body logic.
-  * An `enum` would require a central match dispatch for those methods, which is less
-  * maintainable when the override bodies differ structurally. Uniform variants
-  * (TypeCheckError, RuntimeModelError, TypeCatalogError) use `enum` per ADR-006.
-  *
-  * This error hierarchy provides:
-  * - Type-safe error handling without exceptions
-  * - Composable error messages
-  * - Effect-system agnostic (works with Either, Try, ZIO, cats-effect)
-  * - No external dependencies (pure Scala 3)
-  *
-  * Usage with Either:
-  * {{{
-  * def parse(input: String): Either[QueryError, ParsedQuery] = ???
-  * }}}
-  * 
-  * Usage with ZIO (user's choice):
-  * {{{
-  * import zio.*
-  * def parse(input: String): IO[QueryError, ParsedQuery] = ???
-  * }}}
-  * 
-  * Usage with cats-effect (user's choice):
-  * {{{
-  * import cats.effect.IO
-  * def parse(input: String): IO[ParsedQuery] = ???  // Can handle QueryError
-  * }}}
-  */
+/**
+ * Structured error types for vague quantifier evaluation.
+ *
+ * Encoded as a `sealed trait` with `case class` variants (not an `enum`) because each variant
+ * overrides `formatted` and/or `context` with distinct body logic. An `enum` would require a
+ * central match dispatch for those methods, which is less maintainable when the override bodies
+ * differ structurally. Uniform variants (TypeCheckError, RuntimeModelError, TypeCatalogError) use
+ * `enum` per ADR-006.
+ *
+ * This error hierarchy provides:
+ *   - Type-safe error handling without exceptions
+ *   - Composable error messages
+ *   - Effect-system agnostic (works with Either, Try, ZIO, cats-effect)
+ *   - No external dependencies (pure Scala 3)
+ *
+ * Usage with Either:
+ * {{{
+ * def parse(input: String): Either[QueryError, ParsedQuery] = ???
+ * }}}
+ *
+ * Usage with ZIO (user's choice):
+ * {{{
+ * import zio.*
+ * def parse(input: String): IO[QueryError, ParsedQuery] = ???
+ * }}}
+ *
+ * Usage with cats-effect (user's choice):
+ * {{{
+ * import cats.effect.IO
+ * def parse(input: String): IO[ParsedQuery] = ???  // Can handle QueryError
+ * }}}
+ */
 sealed trait QueryError:
   /** Human-readable error message */
   def message: String
-  
+
   /** Optional context information */
   def context: Map[String, String] = Map.empty
-  
+
   /** Convert to exception for backward compatibility */
   def toThrowable: Throwable = QueryException(this)
-  
+
   /** Pretty-print error with context */
   def formatted: String =
     val ctx = if context.isEmpty then ""
-              else context.map { case (k, v) => s"  $k: $v" }.mkString("\n", "\n", "")
+    else context.map { case (k, v) => s"  $k: $v" }.mkString("\n", "\n", "")
     s"$message$ctx"
 
-/** Per-error detail for a bind-phase failure. Primitives only: the error layer
-  * must not depend on `vql.typed`, so a sort crosses this boundary as its
-  * `TypeId.value` `String`, never as a typed value. `rendered` is the single
-  * human-readable message for this error, produced by
-  * [[vql.semantics.VagueSemantics]]'s per-error renderer.
-  */
+end QueryError
+
+/**
+ * Per-error detail for a bind-phase failure. Primitives only: the error layer must not depend on
+ * `vql.typed`, so a sort crosses this boundary as its `TypeId.value` `String`, never as a typed
+ * value. `rendered` is the single human-readable message for this error, produced by
+ * [[vql.semantics.VagueSemantics]]'s per-error renderer.
+ */
 enum BindErrorDetail:
-  case UnparseableConstant(name: String, sortName: String, sourceText: String, rendered: String)
+
+  case UnparseableConstant(
+    name: String,
+    sortName: String,
+    sourceText: String,
+    rendered: String)
+
   case Other(rendered: String)
 
-  /** `rendered` is a stored value, not derived from other fields, so it is an
-    * abstract member the case parameters implement. A concrete pattern-matching
-    * `def rendered` would clash with the same-named case parameter and fail to
-    * compile (ADR-006 §3, which governs *derived* accessors).
-    */
+  /**
+   * `rendered` is a stored value, not derived from other fields, so it is an abstract member the
+   * case parameters implement. A concrete pattern-matching `def rendered` would clash with the
+   * same-named case parameter and fail to compile (ADR-006 §3, which governs *derived* accessors).
+   */
   def rendered: String
 
 object QueryError:
 
   // ==================== Parsing Errors ====================
-  
+
   /** Error during query parsing */
   case class ParseError(
     message: String,
     input: String,
     position: Option[Int] = None,
-    override val context: Map[String, String] = Map.empty
-  ) extends QueryError:
+    override val context: Map[String, String] = Map.empty)
+    extends QueryError:
+
     override def formatted: String =
-      val pos = position.map(p => s" at position $p").getOrElse("")
+      val pos     = position.map(p => s" at position $p").getOrElse("")
       val snippet = if input.length > 50 then input.take(50) + "..." else input
       s"Parse error$pos: $message\nInput: $snippet" +
-        (if context.isEmpty then "" else "\n" + context.map { case (k, v) => s"  $k: $v" }.mkString("\n"))
+        (if context.isEmpty then ""
+         else "\n" + context.map { case (k, v) => s"  $k: $v" }.mkString("\n"))
 
   // ==================== Validation Errors ====================
 
@@ -87,11 +98,13 @@ object QueryError:
   case class ValidationError(
     message: String,
     field: String,
-    override val context: Map[String, String] = Map.empty
-  ) extends QueryError:
+    override val context: Map[String, String] = Map.empty)
+    extends QueryError:
+
     override def formatted: String =
       s"Validation error in '$field': $message" +
-        (if context.isEmpty then "" else "\n" + context.map { case (k, v) => s"  $k: $v" }.mkString("\n"))
+        (if context.isEmpty then ""
+         else "\n" + context.map { case (k, v) => s"  $k: $v" }.mkString("\n"))
 
   // ==================== Evaluation Errors ====================
 
@@ -100,88 +113,96 @@ object QueryError:
     message: String,
     phase: String,
     cause: Option[Throwable] = None,
-    override val context: Map[String, String] = Map.empty
-  ) extends QueryError:
+    override val context: Map[String, String] = Map.empty)
+    extends QueryError:
+
     override def formatted: String =
       val causeMsg = cause.map(c => s"\nCause: ${c.getMessage}").getOrElse("")
       s"Evaluation error in $phase: $message$causeMsg" +
-        (if context.isEmpty then "" else "\n" + context.map { case (k, v) => s"  $k: $v" }.mkString("\n"))
+        (if context.isEmpty then ""
+         else "\n" + context.map { case (k, v) => s"  $k: $v" }.mkString("\n"))
 
   // ==================== FOL Semantics Errors ====================
 
-  /** Defensive fallback raised when evaluation reaches a type with no registered
-    * domain, despite passing binding. In a correctly wired system this should
-    * not be reachable: [[vql.typed.RuntimeModel.validateAgainst]] enforces domain
-    * coverage before queries are served.
-    * See also: [[vql.typed.TypedSemantics]]
-    */
+  /**
+   * Defensive fallback raised when evaluation reaches a type with no registered domain, despite
+   * passing binding. In a correctly wired system this should not be reachable:
+   * [[vql.typed.RuntimeModel.validateAgainst]] enforces domain coverage before queries are served.
+   * See also: [[vql.typed.TypedSemantics]]
+   */
   case class DomainNotFoundError(
     typeName: String,
-    availableTypes: Set[String]
-  ) extends QueryError:
+    availableTypes: Set[String])
+    extends QueryError:
     def message = s"No domain found for type '$typeName'"
+
     override val context = Map(
       "type"      -> typeName,
-      "available" -> availableTypes.mkString(", ")
+      "available" -> availableTypes.mkString(", "),
     )
+
     override def formatted: String =
       s"No domain found for type '$typeName'. " +
-      s"Available types with domains: ${availableTypes.mkString(", ")}"
+        s"Available types with domains: ${availableTypes.mkString(", ")}"
 
-  /** Raised during the typed bind phase when a constant or literal token is not
-    * found in the TypeCatalog: the name is neither a registered constant nor
-    * does a literal validator exist for the expected sort.
-    * Indicates a user query error — maps to HTTP 400 UNKNOWN_REFERENCE.
-    *
-    * Distinguished from [[BindError]] (which covers arity/type mismatches) so
-    * callers can surface targeted "did you mean …" guidance.
-    */
+  /**
+   * Raised during the typed bind phase when a constant or literal token is not found in the
+   * TypeCatalog: the name is neither a registered constant nor does a literal validator exist for
+   * the expected sort. Indicates a user query error — maps to HTTP 400 UNKNOWN_REFERENCE.
+   *
+   * Distinguished from [[BindError]] (which covers arity/type mismatches) so callers can surface
+   * targeted "did you mean …" guidance.
+   */
   case class UnknownConstantOrLiteralError(name: String) extends QueryError:
-    def message = s"Unknown constant or literal: '$name'"
+    def message          = s"Unknown constant or literal: '$name'"
     override val context = Map("constant" -> name)
 
-  /** Raised when a query fails the typed bind phase (type-check errors).
-    * Indicates a user query error — all instances map to HTTP 400.
-    *
-    * Carries one [[BindErrorDetail]] per error: primitives only, because the
-    * error layer must not depend on `vql.typed`. Each detail holds its own
-    * rendered message and, for an unparseable constant, the sort name a consumer
-    * needs to classify the failure. `messages` derives the human-readable string
-    * list from the details, so the two never drift.
-    */
+  /**
+   * Raised when a query fails the typed bind phase (type-check errors). Indicates a user query
+   * error — all instances map to HTTP 400.
+   *
+   * Carries one [[BindErrorDetail]] per error: primitives only, because the error layer must not
+   * depend on `vql.typed`. Each detail holds its own rendered message and, for an unparseable
+   * constant, the sort name a consumer needs to classify the failure. `messages` derives the
+   * human-readable string list from the details, so the two never drift.
+   */
   case class BindError(
-    details: List[BindErrorDetail]
-  ) extends QueryError:
+    details: List[BindErrorDetail])
+    extends QueryError:
     def messages: List[String] = details.map(_.rendered)
-    def message = s"Query type-checking failed: ${messages.mkString("; ")}"
-    override val context = Map("errors" -> messages.mkString("; "))
+    def message                = s"Query type-checking failed: ${messages.mkString("; ")}"
+    override val context       = Map("errors" -> messages.mkString("; "))
 
-  /** Raised when RuntimeModel.validateAgainst fails (dispatcher or domain
-    * coverage gaps). Indicates a wiring/infra error — all instances map to HTTP 500.
-    * Individual error messages are rendered strings; raw RuntimeModelError
-    * detail is not carried here due to vql.error → vql.typed package constraint.
-    */
+  /**
+   * Raised when RuntimeModel.validateAgainst fails (dispatcher or domain coverage gaps). Indicates
+   * a wiring/infra error — all instances map to HTTP 500. Individual error messages are rendered
+   * strings; raw RuntimeModelError detail is not carried here due to vql.error → vql.typed package
+   * constraint.
+   */
   case class ModelValidationError(
-    errors: List[String]
-  ) extends QueryError:
-    def message = s"Runtime model validation failed: ${errors.mkString("; ")}"
+    errors: List[String])
+    extends QueryError:
+    def message          = s"Runtime model validation failed: ${errors.mkString("; ")}"
     override val context = Map("errors" -> errors.mkString("; "))
 
   /** Unbound variable in valuation */
   case class UnboundVariableError(
     variableName: String,
-    boundVariables: Set[String]
-  ) extends QueryError:
+    boundVariables: Set[String])
+    extends QueryError:
     def message = s"Unbound variable: '$variableName'"
+
     override val context = Map(
-      "variable" -> variableName,
-      "bound_variables" -> boundVariables.mkString(", ")
+      "variable"        -> variableName,
+      "bound_variables" -> boundVariables.mkString(", "),
     )
 
-/** Exception wrapper for backward compatibility
-  * 
-  * Allows throwing QueryError as exception when needed,
-  * but encourages use of Either/IO instead.
-  */
+end QueryError
+
+/**
+ * Exception wrapper for backward compatibility
+ *
+ * Allows throwing QueryError as exception when needed, but encourages use of Either/IO instead.
+ */
 case class QueryException(error: QueryError) extends Exception(error.formatted):
   def getError: QueryError = error

@@ -8,29 +8,36 @@ enum BoundTerm:
 
   case VarRef(v: BoundVar)
 
-  /** A reference to a named constant declared in [[TypeCatalog.constants]].
-    *
-    * The constant's value is resolved at evaluation time by the runtime
-    * model; no payload is carried in the IR.
-    *
-    * @param name The constant's identifier as it appears in the query text.
-    * @param sort The declared sort of the constant.
-    */
+  /**
+   * A reference to a named constant declared in [[TypeCatalog.constants]].
+   *
+   * The constant's value is resolved at evaluation time by the runtime model; no payload is carried
+   * in the IR.
+   *
+   * @param name
+   *   The constant's identifier as it appears in the query text.
+   * @param sort
+   *   The declared sort of the constant.
+   */
   case ConstRef(name: String, sort: TypeId)
 
-  /** A resolved inline literal from the query text.
-    *
-    * @param sourceText The original source token (e.g. "10000000", "0.05").
-    * @param sort       The sort the literal was validated against.
-    * @param value      The parsed literal carrier produced by the sort's
-    *                   validator, held as `Any` (the consumer's chosen carrier,
-    *                   e.g. `Long`, `Double`); it flows into `Value.raw` at
-    *                   evaluation time. Dispatcher lambdas recover the typed
-    *                   view via `Extract[A]` (ADR-015 §2 / ADR-016).
-    */
+  /**
+   * A resolved inline literal from the query text.
+   *
+   * @param sourceText
+   *   The original source token (e.g. "10000000", "0.05").
+   * @param sort
+   *   The sort the literal was validated against.
+   * @param value
+   *   The parsed literal carrier produced by the sort's validator, held as `Any` (the consumer's
+   *   chosen carrier, e.g. `Long`, `Double`); it flows into `Value.raw` at evaluation time.
+   *   Dispatcher lambdas recover the typed view via `Extract[A]` (ADR-015 §2 / ADR-016).
+   */
   case LiteralRef(sourceText: String, sort: TypeId, value: Any)
 
   case FnApp(name: SymbolName, args: List[BoundTerm], sort: TypeId)
+
+end BoundTerm
 
 case class BoundAtom(name: SymbolName, args: List[BoundTerm])
 
@@ -46,17 +53,16 @@ enum BoundFormula:
   case Forall(v: BoundVar, body: BoundFormula)
   case Exists(v: BoundVar, body: BoundFormula)
 
-/** The typed intermediate language for one vague query (ADR-001 §3).
-  *
-  * `range` is a sort-checked range formula: it selects the population the
-  * quantifier ranges over. A single-atom range is a `BoundFormula.Atom`; the
-  * range semantics — compound population, closed-world negation over the active
-  * domain — are specified in ADR-017.
-  */
+/**
+ * The typed intermediate language for one vague query (ADR-001 §3).
+ *
+ * `range` is a sort-checked range formula: it selects the population the quantifier ranges over. A
+ * single-atom range is a `BoundFormula.Atom`; the range semantics — compound population,
+ * closed-world negation over the active domain — are specified in ADR-017.
+ */
 case class BoundQuery(
   quantifier: Quantifier,
   variable: BoundVar,
   range: BoundFormula,
   scope: BoundFormula,
-  answerVars: List[BoundVar] = Nil
-)
+  answerVars: List[BoundVar] = Nil)
