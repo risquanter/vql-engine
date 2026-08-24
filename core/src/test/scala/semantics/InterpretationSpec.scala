@@ -2,11 +2,11 @@ package semantics
 
 import munit.FunSuite
 
-/** Tests for Interpretation composition primitives (ADR-005 §1).
-  *
-  * Verifies monoid laws for Map-merge composition and Option.orElse
-  * fallback chains.
-  */
+/**
+ * Tests for Interpretation composition primitives (ADR-005 §1).
+ *
+ * Verifies monoid laws for Map-merge composition and Option.orElse fallback chains.
+ */
 class InterpretationSpec extends FunSuite:
 
   // ==================== Test Fixtures ====================
@@ -15,24 +15,27 @@ class InterpretationSpec extends FunSuite:
   val domain5 = Domain(Set(4, 5))
 
   val fnA: Map[String, List[Int] => Int] = Map(
-    "a" -> ((_: List[Int]) => 1),
-    "shared" -> ((_: List[Int]) => 10)
+    "a"      -> ((_: List[Int]) => 1),
+    "shared" -> ((_: List[Int]) => 10),
   )
+
   val fnB: Map[String, List[Int] => Int] = Map(
-    "b" -> ((_: List[Int]) => 2),
-    "shared" -> ((_: List[Int]) => 20)
+    "b"      -> ((_: List[Int]) => 2),
+    "shared" -> ((_: List[Int]) => 20),
   )
+
   val fnC: Map[String, List[Int] => Int] = Map(
     "c" -> ((_: List[Int]) => 3)
   )
 
   val predA: Map[String, List[Int] => Boolean] = Map(
-    "pa" -> ((args: List[Int]) => args.headOption.contains(1)),
-    "common" -> ((_: List[Int]) => true)
+    "pa"     -> ((args: List[Int]) => args.headOption.contains(1)),
+    "common" -> ((_: List[Int]) => true),
   )
+
   val predB: Map[String, List[Int] => Boolean] = Map(
-    "pb" -> ((args: List[Int]) => args.headOption.contains(2)),
-    "common" -> ((_: List[Int]) => false)
+    "pb"     -> ((args: List[Int]) => args.headOption.contains(2)),
+    "common" -> ((_: List[Int]) => false),
   )
 
   val interpA = Interpretation(domain3, fnA, predA)
@@ -41,7 +44,7 @@ class InterpretationSpec extends FunSuite:
   // ==================== withFunctions ====================
 
   test("withFunctions merges new functions") {
-    val extra = Map("x" -> ((_: List[Int]) => 42))
+    val extra  = Map("x" -> ((_: List[Int]) => 42))
     val merged = interpA.withFunctions(extra)
     assertEquals(merged.getFunction("a")(Nil), 1)
     assertEquals(merged.getFunction("x")(Nil), 42)
@@ -49,7 +52,7 @@ class InterpretationSpec extends FunSuite:
 
   test("withFunctions right-biases on collision") {
     val override_ = Map("a" -> ((_: List[Int]) => 99))
-    val merged = interpA.withFunctions(override_)
+    val merged    = interpA.withFunctions(override_)
     assertEquals(merged.getFunction("a")(Nil), 99)
   }
 
@@ -62,7 +65,7 @@ class InterpretationSpec extends FunSuite:
   // ==================== withPredicates ====================
 
   test("withPredicates merges new predicates") {
-    val extra = Map("px" -> ((_: List[Int]) => true))
+    val extra  = Map("px" -> ((_: List[Int]) => true))
     val merged = interpA.withPredicates(extra)
     assert(merged.getPredicate("pa")(List(1)))
     assert(merged.getPredicate("px")(Nil))
@@ -70,7 +73,7 @@ class InterpretationSpec extends FunSuite:
 
   test("withPredicates right-biases on collision") {
     val override_ = Map("common" -> ((_: List[Int]) => false))
-    val merged = interpA.withPredicates(override_)
+    val merged    = interpA.withPredicates(override_)
     assertEquals(merged.getPredicate("common")(Nil), false)
   }
 
@@ -96,8 +99,8 @@ class InterpretationSpec extends FunSuite:
 
   test("combine merges functions (right-biased)") {
     val combined = interpA.combine(interpB)
-    assertEquals(combined.getFunction("a")(Nil), 1)     // from A
-    assertEquals(combined.getFunction("b")(Nil), 2)     // from B
+    assertEquals(combined.getFunction("a")(Nil), 1)       // from A
+    assertEquals(combined.getFunction("b")(Nil), 2)       // from B
     assertEquals(combined.getFunction("shared")(Nil), 20) // B wins
   }
 
@@ -110,8 +113,8 @@ class InterpretationSpec extends FunSuite:
 
   test("combine associativity") {
     val interpC = Interpretation(Domain(Set(6)), fnC, Map.empty)
-    val ab_c = interpA.combine(interpB).combine(interpC)
-    val a_bc = interpA.combine(interpB.combine(interpC))
+    val ab_c    = interpA.combine(interpB).combine(interpC)
+    val a_bc    = interpA.combine(interpB.combine(interpC))
     // Same domain
     assertEquals(ab_c.domain.elements, a_bc.domain.elements)
     // Same function results
@@ -121,7 +124,7 @@ class InterpretationSpec extends FunSuite:
   }
 
   test("combine identity: i combine empty == i") {
-    val empty = Interpretation[Int](Domain(Set(0)), Map.empty, Map.empty)
+    val empty    = Interpretation[Int](Domain(Set(0)), Map.empty, Map.empty)
     // We verify the map-merge identity: x ++ Map.empty == x
     val combined = interpA.combine(Interpretation(domain3, Map.empty, Map.empty))
     assertEquals(combined.getFunction("a")(Nil), 1)
@@ -133,10 +136,10 @@ class InterpretationSpec extends FunSuite:
 
   test("withFunctionFallback: map entries take priority over fallback") {
     val fallback: String => Option[List[Int] => Int] = {
-      case "a" => Some(_ => 999)      // would conflict
+      case "a" => Some(_ => 999) // would conflict
       case _   => None
     }
-    val withFb = interpA.withFunctionFallback(fallback)
+    val withFb                                       = interpA.withFunctionFallback(fallback)
     // Map entry wins
     assertEquals(withFb.getFunction("a")(Nil), 1)
   }
@@ -146,14 +149,14 @@ class InterpretationSpec extends FunSuite:
       case "dynamic" => Some(_ => 42)
       case _         => None
     }
-    val withFb = interpA.withFunctionFallback(fallback)
+    val withFb                                       = interpA.withFunctionFallback(fallback)
     assertEquals(withFb.getFunction("dynamic")(Nil), 42)
   }
 
   test("withFunctionFallback: throws when both map and fallback miss") {
     val fallback: String => Option[List[Int] => Int] = _ => None
-    val withFb = interpA.withFunctionFallback(fallback)
-    val ex = intercept[Exception] {
+    val withFb                                       = interpA.withFunctionFallback(fallback)
+    val ex                                           = intercept[Exception] {
       withFb.getFunction("nonexistent")(Nil)
     }
     assert(ex.getMessage.contains("Uninterpreted function: nonexistent"))
@@ -166,5 +169,7 @@ class InterpretationSpec extends FunSuite:
     assertEquals(withFb.getFunction("42")(Nil), 42)
     assertEquals(withFb.getFunction("-7")(Nil), -7)
     // Non-numeric still throws
-    intercept[Exception] { withFb.getFunction("xyz")(Nil) }
+    intercept[Exception](withFb.getFunction("xyz")(Nil))
   }
+
+end InterpretationSpec

@@ -2,14 +2,14 @@ package vql.typed
 
 import munit.FunSuite
 
-/** Tests for [[LiteralParser]] (ADR-015 §1).
-  *
-  * Coverage:
-  *   - Long parser: positive/negative integers; rejects non-numeric, rejects
-  *     decimal text (no implicit float→long).
-  *   - Double parser: decimals; integer literals widen to Double; rejects
-  *     non-numeric.
-  */
+/**
+ * Tests for [[LiteralParser]] (ADR-015 §1).
+ *
+ * Coverage:
+ *   - Long parser: positive/negative integers; rejects non-numeric, rejects decimal text (no
+ *     implicit float→long).
+ *   - Double parser: decimals; integer literals widen to Double; rejects non-numeric.
+ */
 class LiteralParserSpec extends FunSuite:
 
   test("LiteralParser[Long] parses positive integers"):
@@ -48,3 +48,5 @@ class LiteralParserSpec extends FunSuite:
   test("asValidator[Double] returns Some(parsed) widening from integer text"):
     val v: String => Option[Any] = LiteralParser.asValidator[Double]
     assertEquals(v("42"), Some(42.0))
+
+end LiteralParserSpec

@@ -1,19 +1,19 @@
 package vql.typed
 
+import munit.FunSuite
 import vql.quantifier.{Quantifier, VagueQuantifier}
 import vql.result.{EvaluationOutput, VagueQueryResult}
 import vql.sampling.{ProportionEstimator, SamplingParams}
-import munit.FunSuite
 
-/** IR-level tests for formula ranges (ADR-017 §§1–3).
-  *
-  * Constructs `BoundQuery` values programmatically — no parser or `ParsedQuery`
-  * involvement — and asserts on the extracted range set `D_R`.
-  *
-  * Fixture: sort `Item` with active domain `{i1,i2,i3,i4}`, sort `Tag` with
-  * `{t1,t2}`. `p` holds on `{i1,i2}`, `q` holds on `{i2,i3}`, `r` holds on the
-  * pairs `{(i1,t1),(i3,t2)}`.
-  */
+/**
+ * IR-level tests for formula ranges (ADR-017 §§1–3).
+ *
+ * Constructs `BoundQuery` values programmatically — no parser or `ParsedQuery` involvement — and
+ * asserts on the extracted range set `D_R`.
+ *
+ * Fixture: sort `Item` with active domain `{i1,i2,i3,i4}`, sort `Tag` with `{t1,t2}`. `p` holds on
+ * `{i1,i2}`, `q` holds on `{i2,i3}`, `r` holds on the pairs `{(i1,t1),(i3,t2)}`.
+ */
 class CompoundRangeSpec extends FunSuite:
 
   private val item = TypeId("Item")
@@ -31,7 +31,7 @@ class CompoundRangeSpec extends FunSuite:
   private val rPairs = Set(("i1", "t1"), ("i3", "t2"))
 
   private val dispatcher = new RuntimeDispatcher:
-    override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] =
+    override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any]      =
       Left(s"no function: ${name.value}")
     override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
       name.value match
@@ -40,12 +40,12 @@ class CompoundRangeSpec extends FunSuite:
         case "r"   => Right(rPairs.contains((args.head.raw.toString, args(1).raw.toString)))
         case other => Left(s"unknown predicate: $other")
     override def functionSymbols: Set[SymbolName] = Set.empty
-    override def predicateSymbols: Set[SymbolName] =
+    override def predicateSymbols: Set[SymbolName]                                           =
       Set(SymbolName("p"), SymbolName("q"), SymbolName("r"))
 
   private val model = RuntimeModel(
-    domains    = Map(item -> Set(i1, i2, i3, i4), tag -> Set(t1, t2)),
-    dispatcher = dispatcher
+    domains = Map(item -> Set(i1, i2, i3, i4), tag -> Set(t1, t2)),
+    dispatcher = dispatcher,
   )
 
   private val x = BoundVar("x", item)
@@ -60,9 +60,9 @@ class CompoundRangeSpec extends FunSuite:
   private def rangeQuery(range: BoundFormula): BoundQuery =
     BoundQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
-      variable   = x,
-      range      = range,
-      scope      = BoundFormula.True
+      variable = x,
+      range = range,
+      scope = BoundFormula.True,
     )
 
   private def rangeElementsOf(range: BoundFormula): Set[Value] =
@@ -80,7 +80,7 @@ class CompoundRangeSpec extends FunSuite:
     assertEquals(rangeElementsOf(BoundFormula.Not(px)), Set(i3, i4))
 
   test("AC-1 existential range extracts { d | ∃a. r(d,a) }"):
-    val a = BoundVar("a", tag)
+    val a     = BoundVar("a", tag)
     val range = BoundFormula.Exists(a, atom("r", BoundTerm.VarRef(x), BoundTerm.VarRef(a)))
     assertEquals(rangeElementsOf(range), Set(i1, i3))
 
@@ -99,15 +99,17 @@ class CompoundRangeSpec extends FunSuite:
     assertEquals(output.result.domainSize, 1) // |D_R|, not |Item| = 4
     assertEquals(output.satisfyingElements, Set(i2))
 
-  test("AC-3 regression: single-atom range (BoundFormula.Atom) yields the expected full EvaluationOutput"):
+  test(
+    "AC-3 regression: single-atom range (BoundFormula.Atom) yields the expected full EvaluationOutput"
+  ):
     // range p(x) = {i1,i2}; scope q(x) satisfied on {i2}
     val boundQuery = BoundQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
-      variable   = x,
-      range      = px, // the prior single-atom shape, now wrapped as BoundFormula.Atom
-      scope      = qx
+      variable = x,
+      range = px, // the prior single-atom shape, now wrapped as BoundFormula.Atom
+      scope = qx,
     )
-    val output = TypedSemantics
+    val output     = TypedSemantics
       .evaluate(boundQuery, model, samplingParams = SamplingParams.exact)
       .fold(e => fail(s"evaluate failed: $e"), identity)
 
@@ -119,10 +121,13 @@ class CompoundRangeSpec extends FunSuite:
     val expected = EvaluationOutput(
       result = VagueQueryResult.fromEstimate(
         VagueQuantifier.fromQuantifier(Quantifier.About(1, 2, 0.01)),
-        ProportionEstimator.estimateFromCount(successes = 1, sampleSize = 2, params = SamplingParams.exact),
-        domainSize = 2
+        ProportionEstimator
+          .estimateFromCount(successes = 1, sampleSize = 2, params = SamplingParams.exact),
+        domainSize = 2,
       ),
-      rangeElements      = Set(i1, i2),
-      satisfyingElements = Set(i2)
+      rangeElements = Set(i1, i2),
+      satisfyingElements = Set(i2),
     )
     assertEquals(output, expected)
+
+end CompoundRangeSpec

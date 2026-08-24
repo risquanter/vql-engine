@@ -1,30 +1,30 @@
 package util
 
-import munit.FunSuite
 import StringUtil.*
+import munit.FunSuite
 
 class StringUtilSpec extends FunSuite:
-  
+
   test("explode converts string to char list") {
     assertEquals(explode("abc"), List('a', 'b', 'c'))
     assertEquals(explode(""), List())
     assertEquals(explode("x"), List('x'))
   }
-  
+
   test("implode converts char list to string") {
     assertEquals(implode(List('a', 'b', 'c')), "abc")
     assertEquals(implode(List()), "")
     assertEquals(implode(List('x')), "x")
   }
-  
+
   test("explode and implode are inverses") {
     val s = "hello world"
     assertEquals(implode(explode(s)), s)
-    
+
     val chars = List('t', 'e', 's', 't')
     assertEquals(explode(implode(chars)), chars)
   }
-  
+
   test("matches creates character predicate") {
     val isVowel = matches("aeiou")
     assert(isVowel('a'))
@@ -32,7 +32,7 @@ class StringUtilSpec extends FunSuite:
     assert(!isVowel('b'))
     assert(!isVowel('x'))
   }
-  
+
   test("space predicate") {
     assert(space(' '))
     assert(space('\t'))
@@ -41,7 +41,7 @@ class StringUtilSpec extends FunSuite:
     assert(!space('a'))
     assert(!space('1'))
   }
-  
+
   test("numeric predicate") {
     assert(numeric('0'))
     assert(numeric('5'))
@@ -49,7 +49,7 @@ class StringUtilSpec extends FunSuite:
     assert(!numeric('a'))
     assert(!numeric(' '))
   }
-  
+
   test("alphanumeric predicate") {
     assert(alphanumeric('a'))
     assert(alphanumeric('Z'))
@@ -59,7 +59,7 @@ class StringUtilSpec extends FunSuite:
     assert(!alphanumeric(' '))
     assert(!alphanumeric('!'))
   }
-  
+
   test("symbolic predicate") {
     assert(symbolic('+'))
     assert(symbolic('-'))
@@ -70,7 +70,7 @@ class StringUtilSpec extends FunSuite:
     assert(!symbolic('a'))
     assert(!symbolic('0'))
   }
-  
+
   test("punctuation predicate") {
     assert(punctuation('('))
     assert(punctuation(')'))
@@ -79,7 +79,7 @@ class StringUtilSpec extends FunSuite:
     assert(!punctuation('a'))
     assert(!punctuation('+'))
   }
-  
+
   test("forall checks all characters") {
     assert(forall(numeric, explode("123")))
     assert(forall(numeric, explode("0")))
@@ -87,7 +87,7 @@ class StringUtilSpec extends FunSuite:
     assert(!forall(numeric, explode("a23")))
     assert(forall(numeric, explode(""))) // vacuously true
   }
-  
+
   test("isNumeric helper") {
     assert(isNumeric("123"))
     assert(isNumeric("0"))
@@ -97,21 +97,21 @@ class StringUtilSpec extends FunSuite:
     assert(!isNumeric(""))
     assert(!isNumeric(" "))
   }
-  
+
   test("character classification on real examples") {
     // Variable name: foo_bar'
     val varChars = explode("foo_bar'")
     assert(forall(alphanumeric, varChars))
-    
+
     // Operator: <==>
     val opChars = explode("<==>")
     assert(forall(symbolic, opChars))
-    
+
     // Number: 42
     val numChars = explode("42")
     assert(forall(numeric, numChars))
   }
-  
+
   test("mixed character types") {
     val mixed = explode("x+y")
     assert(alphanumeric('x'))
@@ -120,3 +120,5 @@ class StringUtilSpec extends FunSuite:
     assert(!forall(alphanumeric, mixed))
     assert(!forall(symbolic, mixed))
   }
+
+end StringUtilSpec
