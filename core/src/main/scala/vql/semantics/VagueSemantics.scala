@@ -85,15 +85,31 @@ object VagueSemantics:
 
   /**
    * Project a typed bind error down to the primitives-only [[BindErrorDetail]] carried across the
-   * error/typed boundary. The sort crosses as its `TypeId.value` `String` (ADR-015). Runs in the
-   * facade, the layer that already imports both `vql.error` and `vql.typed`.
+   * error/typed boundary — one arm per [[TypeCheckError]] variant. A sort crosses as its
+   * `TypeId.value` `String` (ADR-015). Runs in the facade, the layer that already imports both
+   * `vql.error` and `vql.typed`. The match is exhaustive with no catch-all, so a new
+   * `TypeCheckError` variant fails to compile here until it is projected to a `BindErrorDetail`.
    */
   private def toBindErrorDetail(error: TypeCheckError): BindErrorDetail =
+    import BindErrorDetail as D
+    val rendered = renderTypeError(error)
     error match
       case TypeCheckError.UnparseableConstant(name, sort, sourceText) =>
-        BindErrorDetail.UnparseableConstant(name, sort.value, sourceText, renderTypeError(error))
-      case _                                                          =>
-        BindErrorDetail.Other(renderTypeError(error))
+        D.UnparseableConstant(name, sort.value, sourceText, rendered)
+      case TypeCheckError.TypeMismatch(expected, actual, context) =>
+        D.TypeMismatch(expected.value, actual.value, context, rendered)
+      case TypeCheckError.ConflictingTypes(name, left, right) =>
+        D.ConflictingTypes(name, left.value, right.value, rendered)
+      case TypeCheckError.ArityMismatch(symbol, expected, actual) =>
+        D.ArityMismatch(symbol, expected, actual, rendered)
+      case TypeCheckError.UnknownConstantOrLiteral(name) =>
+        D.UnknownConstantOrLiteral(name, rendered)
+      case TypeCheckError.UnknownPredicate(name)    => D.UnknownPredicate(name, rendered)
+      case TypeCheckError.UnknownFunction(name)     => D.UnknownFunction(name, rendered)
+      case TypeCheckError.UnboundAnswerVar(name)    => D.UnboundAnswerVar(name, rendered)
+      case TypeCheckError.UnconstrainedVar(name)    => D.UnconstrainedVar(name, rendered)
+      case TypeCheckError.TypeNotQuantifiable(name) => D.TypeNotQuantifiable(name, rendered)
+      case TypeCheckError.UnexpectedFreeVar(name)   => D.UnexpectedFreeVar(name, rendered)
 
   /**
    * Evaluate a parsed query through the typed pipeline using a pre-validated [[FolModel]].

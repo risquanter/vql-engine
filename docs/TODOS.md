@@ -456,3 +456,73 @@ register AppError change it forces. Version TBD, after 0.13.1.
 register's M2/M3 timing versus its readiness to do the import rewrite. Engine
 recommends fragment-first as above; register may request the reverse given
 advance notice of the target versions.
+
+---
+
+## T-012 — First-class literal type tags in the grammar (node-name vs id, generalisable)
+
+**Status:** PENDING — recorded, not scheduled. The concrete driver (register's
+need to force a query author to state whether a quoted literal names a tree node
+or is a node id) is met instead by **distinct register-side predicates over
+dedicated literal sorts**, entirely within the existing position-decides-sort
+binding — no grammar change and no domain-returning functions. Register registers
+`named(x, "…")` (its second argument a `NodeNameLiteral` sort whose literal
+validator is a name→id lookup) and `has_id(x, "…")` (second argument a
+`NodeIdLiteral` sort whose validator parses the id), plus `eq(x, y)` for
+node-to-node identity. Because each kind occupies a different predicate slot, each
+slot's sort carries a single-purpose validator and nothing guesses. This item
+records the more general alternative — author-declared literal kinds in the
+grammar — for when tagged literals are wanted across many sorts rather than being
+handled per-predicate as register does for nodes alone.
+
+**Problem it addresses:** today a quoted literal carries no type tag. Its sort is
+decided entirely by the parameter position it occupies — `bindTermExpected` runs
+the single `literalValidator` registered for the expected sort. So two literals
+that should mean different things — a node id versus a node name — are
+indistinguishable to the language whenever they can occupy the same position; the
+only disambiguation available within a single position is inside one validator
+that guesses. Register sidesteps this by not letting the two kinds share a
+position — it narrowed the structural `Node` sort's validator to name-only and
+routed ids through a separate `has_id` predicate / `NodeIdLiteral` sort — but that
+is a per-predicate workaround, not a general facility: there is still nowhere in
+the grammar for the author to declare the intended kind of a literal.
+
+**What this item is:** add a literal-kind tag to the language itself — e.g.
+`name"IT Risk"` versus `id"01BX…"` (prefixed string literals), or an equivalent
+sigil — so the author states the kind at the literal and the type-checker
+enforces it. Unlike the T-004 function approach, this generalises: any sort could
+carry explicitly-tagged literal forms, not just nodes.
+
+**Blast radius (why it is a language change, not a consumer change):**
+- **Lexer / `Token`** — a new lexeme for the tag (a prefix on `StringLit`, or a
+  new token).
+- **`Term` AST** — `Term.Const(name)` gains a kind, or a new tagged-literal
+  variant. This is a core node the parser, binder, printer, semantics, and
+  fragment check all pattern-match on.
+- **Parser** — emit the kind.
+- **`QueryBinder.bindTermExpected`** — select the resolver by (expected sort,
+  kind) rather than expected sort alone.
+- **`TypeCatalog` public API** — `literalValidators` keyed by sort *and* kind;
+  ripples to `apply` / `unsafe` / `collectErrors` and every consumer (register).
+- **`TypeCheckError`** — a new case for a kind with no validator / a kind
+  mismatch.
+- **`FOLPrinter`** — round-trip the tag.
+- Wide test surface across all the above.
+- **Release:** a breaking Central release (early-semver minor, pre-1.0),
+  coordinated with the register pin bump per the release-sequencing discipline
+  above.
+
+**Why deferred, not done now:** the immediate node/id disambiguation is already
+solved register-side with no grammar change — distinct `named` / `has_id`
+predicates over dedicated `NodeNameLiteral` / `NodeIdLiteral` sorts, each sort's
+validator single-purpose. First-class tagged literals are worth their
+cross-cutting cost only if tagged literals are wanted broadly across sorts, which
+no current use case needs. Re-open when a second sort needs author-declared
+literal kinds and the per-predicate approach stops scaling.
+
+**Context:** register node-name-vs-id explicit-typing analysis (2026-08-24);
+`vql/typed/QueryBinder.scala` `bindTermExpected`, `logic/Term.scala`,
+`vql/typed/TypeCatalog.scala`. Alternative taken: register-side distinct
+node-reference predicates (`eq` / `named` / `has_id`) over dedicated literal
+sorts, disambiguating by predicate slot at bind time — not domain-returning
+functions (T-004), not a grammar change (this item).

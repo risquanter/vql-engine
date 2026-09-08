@@ -301,11 +301,14 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val e = bindErrorFor(Formula.And(bigConst("abc"), leafArity2))
     assertEquals(e.details.length, 2)
     e.details match
-      case List(d: BindErrorDetail.UnparseableConstant, o: BindErrorDetail.Other) =>
+      case List(d: BindErrorDetail.UnparseableConstant, a: BindErrorDetail.ArityMismatch) =>
         assertEquals(d.sortName, "Loss")
         assertEquals(d.sourceText, "abc")
-        assert(o.rendered.contains("leaf"), s"second detail was '${o.rendered}'")
-      case other => fail(s"expected [UnparseableConstant, Other], got $other")
+        assertEquals(a.symbol, "leaf")
+        assertEquals(a.expected, 1)
+        assertEquals(a.actual, 2)
+        assert(a.rendered.contains("leaf"), s"second detail was '${a.rendered}'")
+      case other => fail(s"expected [UnparseableConstant, ArityMismatch], got $other")
 
   test("AC-B: a consumer's forall over details runs over the whole list (AC-2 as a pipeline test)"):
     // register classifies UNKNOWN_REFERENCE iff EVERY detail is a recoverable
@@ -388,6 +391,12 @@ class VagueSemanticsTypedSpec extends FunSuite:
     assert(e.messages.forall(_.contains("conflicting")), s"got ${e.messages}")
     assert(e.messages.exists(_.contains("'u'")), s"got ${e.messages}")
     assert(e.messages.exists(_.contains("'v'")), s"got ${e.messages}")
+    // Each detail is a structured ConflictingTypes carrying both sorts as primitive names.
+    e.details.foreach {
+      case c: BindErrorDetail.ConflictingTypes =>
+        assertEquals(Set(c.leftSort, c.rightSort), Set("Loss", "Probability"))
+      case other => fail(s"expected ConflictingTypes details, got $other")
+    }
 
   // ==================== ModelValidationError (missing domain) tests ====================
 

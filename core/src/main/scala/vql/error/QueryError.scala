@@ -51,10 +51,13 @@ sealed trait QueryError:
 end QueryError
 
 /**
- * Per-error detail for a bind-phase failure. Primitives only: the error layer must not depend on
- * `vql.typed`, so a sort crosses this boundary as its `TypeId.value` `String`, never as a typed
- * value. `rendered` is the single human-readable message for this error, produced by
- * [[vql.semantics.VagueSemantics]]'s per-error renderer.
+ * Per-error detail for a bind-phase failure — one case per [[vql.typed.TypeCheckError]] variant.
+ * Primitives only: the error layer must not depend on `vql.typed`, so a sort crosses this boundary
+ * as its `TypeId.value` `String`, never as a typed value. `rendered` is the single human-readable
+ * message for this error, produced by [[vql.semantics.VagueSemantics]]'s per-error renderer.
+ *
+ * The projection from `TypeCheckError` is exhaustive (no catch-all case): a new `TypeCheckError`
+ * variant is a compile error in the facade fold until a matching case is added here.
  */
 enum BindErrorDetail:
 
@@ -64,7 +67,37 @@ enum BindErrorDetail:
     sourceText: String,
     rendered: String)
 
-  case Other(rendered: String)
+  case TypeMismatch(
+    expectedSort: String,
+    actualSort: String,
+    context: String,
+    rendered: String)
+
+  case ConflictingTypes(
+    name: String,
+    leftSort: String,
+    rightSort: String,
+    rendered: String)
+
+  case ArityMismatch(
+    symbol: String,
+    expected: Int,
+    actual: Int,
+    rendered: String)
+
+  case UnknownPredicate(name: String, rendered: String)
+
+  case UnknownFunction(name: String, rendered: String)
+
+  case UnknownConstantOrLiteral(name: String, rendered: String)
+
+  case UnboundAnswerVar(name: String, rendered: String)
+
+  case UnconstrainedVar(name: String, rendered: String)
+
+  case TypeNotQuantifiable(name: String, rendered: String)
+
+  case UnexpectedFreeVar(name: String, rendered: String)
 
   /**
    * `rendered` is a stored value, not derived from other fields, so it is an abstract member the

@@ -3,6 +3,28 @@
 This project follows early-semver (pre-1.0): breaking changes bump the minor
 version.
 
+## 0.17.0
+
+### Changed (breaking)
+
+- **`vql.error.BindErrorDetail` now has one case per `TypeCheckError` variant,
+  and the `Other` catch-all is removed.** Where 0.15.0/0.16.0 gave only
+  `UnparseableConstant` its fields as data and folded every other bind error to
+  `Other(rendered)`, all 11 variants now carry their fields as primitives:
+  `TypeMismatch(expectedSort, actualSort, context, rendered)`,
+  `ConflictingTypes(name, leftSort, rightSort, rendered)`,
+  `ArityMismatch(symbol, expected, actual, rendered)`, and the `name`-bearing
+  cases `UnknownPredicate`, `UnknownFunction`, `UnknownConstantOrLiteral`,
+  `UnboundAnswerVar`, `UnconstrainedVar`, `TypeNotQuantifiable`,
+  `UnexpectedFreeVar`. A sort still crosses the error/typed boundary as its
+  `TypeId.value` `String`, so `vql.error` still imports nothing from `vql.typed`.
+  A consumer matching `BindErrorDetail.Other` no longer compiles and must match
+  the specific cases or a wildcard. `rendered`, and therefore `BindError`'s
+  derived `messages` / `message` / `context`, is byte-identical — the renderer
+  did not change. The facade fold (`VagueSemantics.toBindErrorDetail`) is now
+  exhaustive with no wildcard, so a future `TypeCheckError` variant is a compile
+  error there until it is projected. See ADR-021.
+
 ## 0.16.0
 
 ### Changed (breaking)
