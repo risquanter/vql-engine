@@ -46,7 +46,7 @@ lazy val folEngine = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "vql-engine",
     libraryDependencies ++= Seq(
-      "org.scalameta"  %%% "munit"   % "1.3.5" % Test,
+      "org.scalameta"  %%% "munit"   % "1.3.6" % Test,
       "com.risquanter" %%% "hdr-rng" % "0.1.0",
     ),
   )
