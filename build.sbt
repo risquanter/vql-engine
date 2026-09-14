@@ -1,4 +1,4 @@
-val scala3Version = "3.8.4"
+val scala3Version = "3.9.0"
 
 ThisBuild / organization := "com.risquanter"
 ThisBuild / version      := "0.17.0"
