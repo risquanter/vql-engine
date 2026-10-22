@@ -46,7 +46,7 @@ jobs:
           git_user_signingkey: true
 
       - name: Run Scala Steward
-        uses: scala-steward-org/scala-steward-action@6162b21b93d4be314a61ce0462fd026630132fee # v2.96.0
+        uses: scala-steward-org/scala-steward-action@3e5cae868160200afda12b57c150e56cede989ab # v2.97.0
         with:
           # A fine-grained PAT scoped to this repository (Contents and Pull
           # requests write), not the default GITHUB_TOKEN: GitHub suppresses
