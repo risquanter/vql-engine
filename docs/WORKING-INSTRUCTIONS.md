@@ -1,6 +1,10 @@
 # Working Instructions
 
 This document defines the working protocol for all changes in this repository.
+`CLAUDE.md` at the repository root holds the gates and the plan gate and points
+here; this document holds the procedure. Which decision records bear on a change
+is decided by the `vql-adr-constraints` skill
+(`.claude/skills/vql-adr-constraints/SKILL.md`).
 
 ---
 
@@ -64,23 +68,12 @@ Before writing any code, agent must:
    The verdict table is what forces those out into the open.
 3. **Identify potential conflicts** with proposed changes
 4. **Document alignment or deviations** in planning proposal
-4. **Notify user immediately** if any deviation is detected:
-   ```markdown
-   ⚠️ **ADR Deviation Detected**
-   
-   **Affected ADR:** ADR-XXX (Title)
-   **Deviation:** [Specific conflict description]
-   **Proposed approach:** [What you plan to do]
-   **ADR states:** [What the ADR requires]
-   
-   **Options:**
-   - A) Modify proposal to comply with ADR-XXX
-   - B) Update ADR-XXX to accommodate new requirements
-   - C) [Other alternatives]
-   
-   **Decision required:** How should we proceed?
-   ```
-5. **Wait for user decision** before proceeding
+5. **Notify user immediately** if any deviation is detected, in the global
+   `decision-guide` format: the affected ADR and what it states, the
+   deviation, what you plan to do, and the options — at least changing the
+   proposal to comply and changing the ADR — each with a concrete example and
+   its pros and cons, and your recommendation labelled as yours
+6. **Wait for user decision** before proceeding
 
 #### 2. Review Phase (After Implementation)
 
@@ -89,49 +82,23 @@ After implementing changes, agent must:
 1. **Re-validate all code** against accepted ADRs
 2. **Check for unintended deviations** introduced during implementation
 3. **Document compliance** in completion report
-4. **Notify user immediately** if any deviation is found:
-   ```markdown
-   ⚠️ **ADR Compliance Issue Detected**
-   
-   **Affected ADR:** ADR-XXX (Title)
-   **Issue:** [What was violated]
-   **Code location:** `path/to/file.scala:line`
-   **Current implementation:** [What was done]
-   **ADR requirement:** [What should have been done]
-   
-   **Remediation options:**
-   - A) Refactor code to comply with ADR-XXX
-   - B) Update ADR-XXX if requirements have changed
-   
-   **Decision required:** How should we resolve this?
-   ```
+4. **Notify user immediately** if any deviation is found, in the global
+   `decision-guide` format: the affected ADR and what it requires, the code
+   location as `path/to/file.scala:line`, what was done, and the options — at
+   least refactoring the code to comply and changing the ADR — each with a
+   concrete example and its pros and cons, and your recommendation labelled as
+   yours
 5. **Wait for user decision** before marking phase complete
 
 ### Validation Requirements
 
-At each phase, validate implementation against:
-
-1. **Accepted ADRs**:
-   - ADR-001: Many-Sorted Query Binding — typed IL compilation
-   - ADR-002: Parser-Combinator Style
-   - ADR-003: HDR Deterministic Sampling
-   - ADR-004: Tagless Initial Architecture
-   - ADR-006: ADT Encoding (`enum` vs `sealed trait`)
-   - ADR-007: Preserve OCaml-Ported Parser Combinator Core
-   - ADR-012: Error Channel Policy — `require` vs `Either`
-   - ADR-014: Domain Type Quantifiability
-   - ADR-015: Symmetric Value Boundaries
-   - ADR-017: Formula Ranges and the Satisfying-Set Boundary
-   - ADR-018: Structural Fragment Membership over the Parse Tree
-   - ADR-019: Structured Bind-Error Detail across the Error/Typed Boundary
-   - ADR-020: Binder Error Accumulation across Independent Subtrees
-
-2. **Proposed ADRs** (validate once accepted):
-   - ADR-016: Carrier Witness on Symmetric Value Typeclasses
-
-   (ADR-00X is the meta template governing ADR structure. ADR-005/008/009/010,
-   which covered the retired untyped backend, are archived under
-   `docs/archive/` and are not validated against.)
+At each phase, validate implementation against every record in force. The set,
+each record's status and what it governs are Layer 2 of the
+`vql-adr-constraints` skill, which is the one list kept. An `Accepted` record is
+validated against. A `Proposed` record is validated against once it is
+accepted. ADR-00X is the meta template governing ADR structure. The records
+under `docs/archive/` covered the retired untyped backend and are not validated
+against.
 
 ### ADR Lifecycle
 
@@ -189,14 +156,11 @@ changes: typing, layering, error channels, encoding, value boundaries.]
 **Alignment notes:** [How this phase aligns with existing ADRs]
 
 ### Validation Checklist
-- [ ] Compliant with ADR-001 (typed query binding)
-- [ ] Compliant with ADR-002/ADR-007 (parser style, OCaml core preservation)
-- [ ] Compliant with ADR-004 (layering: foundation never imports vague)
-- [ ] Compliant with ADR-006 (ADT encoding)
-- [ ] Compliant with ADR-012 (error channels)
-- [ ] Compliant with ADR-014 (quantifiability checks)
-- [ ] Compliant with ADR-015 (value boundaries, no `asInstanceOf`)
-- [ ] [Additional validations as ADRs are accepted]
+- [ ] The records Layer 1 of `vql-adr-constraints` names for this kind of work
+      were read in full
+- [ ] The per-ADR verdict above covers every record in force
+- [ ] Every Layer 3 row naming a record this phase touches was checked
+- [ ] Every Layer 4 row that applies names the register record that becomes wrong
 
 ### Tasks
 1. [Specific task]
@@ -304,21 +268,12 @@ User will confirm at these points:
 
 **Litmus test:** If the change affects anything a user/consumer of the API would notice → ASK FIRST.
 
-**Format for decision requests:**
-```markdown
-⚠️ **Decision Required**
-
-**Context:** [What I was implementing]
-**Issue:** [What problem arose]
-
-**Options:**
-- A) [Option with tradeoffs]
-- B) [Alternative with different tradeoffs]
-- C) [Other alternatives]
-
-**My assessment:** [Which I'd lean toward and why]
-**Decision needed:** Which option should I implement?
-```
+**Format for decision requests:** the global `decision-guide` format — what
+was being implemented and what problem arose, every viable option with a
+concrete example of how it plays out and its pros and cons, your
+recommendation labelled as yours, and one closed question. A point with only
+one workable answer is not a decision: state it, say what you would do, and
+wait for a go.
 
 ---
 

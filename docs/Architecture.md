@@ -144,8 +144,12 @@ and [ADR-012](ADR-012.md).
 | [ADR-012](ADR-012.md) | Error Channel Policy — `require` vs `Either` |
 | [ADR-014](ADR-014.md) | Domain Type Quantifiability — two orthogonal validation checks |
 | [ADR-015](ADR-015.md) | Symmetric Value Boundaries — `LiteralParser` / `Extract` typeclasses |
+| [ADR-016](ADR-016-carrier-witness-on-symmetric-value-typeclasses.md) | Carrier Witness on Symmetric Value Typeclasses (Proposed) |
 | [ADR-017](ADR-017.md) | Formula Ranges and the Satisfying-Set Boundary |
 | [ADR-018](ADR-018.md) | Structural Fragment Membership over the Parse Tree |
+| [ADR-019](ADR-019.md) | Structured Bind-Error Detail across the Error/Typed Boundary |
+| [ADR-020](ADR-020.md) | Binder Error Accumulation across Independent Subtrees |
+| [ADR-021](ADR-021.md) | Structured Bind-Error Detail for Every `TypeCheckError` Variant |
 
 ---
 
@@ -157,8 +161,8 @@ No external runtime dependencies beyond `com.risquanter::hdr-rng`.
 Test framework: munit 1.0.4.
 
 ```
-sbt test          # 795 tests (JVM + Scala.js)
-sbt publishLocal  # com.risquanter::vql-engine:0.14.0
+sbt test          # the whole suite, JVM and Scala.js
+sbt publishLocal  # com.risquanter::vql-engine at the version in build.sbt
 ```
 
 ---
