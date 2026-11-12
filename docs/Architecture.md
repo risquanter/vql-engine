@@ -156,8 +156,8 @@ once in `vql.error` (ADR-023). See [ADR-002](ADR-002.md) and
 | [ADR-019](ADR-019.md) | Structured Bind-Error Detail across the Error/Typed Boundary (Superseded by ADR-023) |
 | [ADR-020](ADR-020.md) | Binder Error Accumulation across Independent Subtrees |
 | [ADR-021](ADR-021.md) | Structured Bind-Error Detail for Every `TypeCheckError` Variant (Superseded by ADR-023) |
-| [ADR-022](ADR-022.md) | Typed Refusals (Proposed) |
-| [ADR-023](ADR-023.md) | Errors Declared Once above a Shared Identifier Package (Proposed) |
+| [ADR-022](ADR-022.md) | Typed Refusals |
+| [ADR-023](ADR-023.md) | Errors Declared Once above a Shared Identifier Package |
 
 ---
 

@@ -15,7 +15,7 @@ It has four layers, and they answer four different questions:
 3. **Where records meet** — the pairs whose combination neither record states alone.
 4. **Where a record meets the consumer's** — the vql-engine records that a decision record in register depends on, so a change here can make a register record wrong.
 
-**Which records are in force.** A record in `docs/` whose status is `Accepted` is in force and is validated against. A record whose status is `Proposed` is routed here so its content is found, and is validated against only once it is accepted (`docs/WORKING-INSTRUCTIONS.md`, "Proposed ADRs (validate once accepted)"). ADR-016, ADR-022 and ADR-023 are such records. A record whose status is `Superseded` is not in force; the record that supersedes it is routed in its place. The records under `docs/archive/` covered the retired untyped backend and are not in force.
+**Which records are in force.** A record in `docs/` whose status is `Accepted` is in force and is validated against. A record whose status is `Proposed` is routed here so its content is found, and is validated against only once it is accepted (`docs/WORKING-INSTRUCTIONS.md`, "Proposed ADRs (validate once accepted)"). ADR-016 is the one such record. A record whose status is `Superseded` is not in force; the record that supersedes it is routed in its place. The records under `docs/archive/` covered the retired untyped backend and are not in force.
 
 **The verdict covers every record.** Layer 1 decides which records are read in full for a change. It does not narrow the planning-phase review: that review records a verdict for every record in force, relevant or not, with a one-line basis (`docs/WORKING-INSTRUCTIONS.md`, "Record an explicit per-ADR verdict for every active ADR"). Layer 1 is what makes the "relevant" column right.
 
@@ -126,8 +126,8 @@ ADR-003 rules out `scala.util.Random`, `java.util.Random` and `commons-math3`. N
 | ADR-019 | `ADR-019.md` | Superseded by ADR-023 | Bind-error detail across the error/typed boundary: primitive fields, one renderer, the fold in the facade |
 | ADR-020 | `ADR-020.md` | Accepted | Binder error accumulation: only across same-input siblings, the strict accumulating product, conflict accumulation in `mergeEnvs` |
 | ADR-021 | `ADR-021.md` | Superseded by ADR-023 | One `BindErrorDetail` case per `TypeCheckError` variant and an exhaustive facade fold |
-| ADR-022 | `ADR-022.md` | Proposed | Typed refusals: one case per sentence template, token kinds and bounded text types, the literal alphabet, `SourcePosition`, boundaries that convert only the parsers' own failures |
-| ADR-023 | `ADR-023.md` | Proposed | Errors declared once in `vql.error`, `TypeId` and `SymbolName` in `vql.id`, the import directions between `vql.id`, `vql.error` and `vql.typed` |
+| ADR-022 | `ADR-022.md` | Accepted | Typed refusals: one case per sentence template, token kinds and bounded text types, the literal alphabet, `SourcePosition`, boundaries that convert only the parsers' own failures |
+| ADR-023 | `ADR-023.md` | Accepted | Errors declared once in `vql.error`, `TypeId` and `SymbolName` in `vql.id`, the import directions between `vql.id`, `vql.error` and `vql.typed` |
 | — | `ADR-00X.md` | Active | The authoring template for a record. Not a decision record |
 
 ---
