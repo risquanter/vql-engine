@@ -3,7 +3,7 @@ package vql.typed
 import TypeDecl.*
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
-import vql.error.QueryError
+import vql.error.{QueryError, RuntimeModelError}
 import vql.logic.ParsedQuery
 import vql.quantifier.Quantifier
 import vql.sampling.SamplingParams
@@ -449,7 +449,8 @@ class MapDispatcherSpec extends FunSuite:
     val result               = FolModel(catalog, incompleteModel)
     result match
       case Left(e: QueryError.ModelValidationError) =>
-        assert(e.errors.exists(_.contains("gt_prob")))
+        assertEquals(e.details, List(RuntimeModelError.MissingPredicateImplementation(symGtProb)))
+        assertEquals(e.errors, List("missing predicate: gt_prob"))
       case Left(other) => fail(s"Expected ModelValidationError, got $other")
       case Right(_)    => fail("Expected Left for incomplete dispatcher")
 

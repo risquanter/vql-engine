@@ -1,5 +1,7 @@
 package vql.typed
 
+import vql.error.RuntimeModelError
+
 /**
  * A sort-tagged runtime value produced by `TypedSemantics.evaluate`.
  *

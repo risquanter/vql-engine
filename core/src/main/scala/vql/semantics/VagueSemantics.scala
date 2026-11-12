@@ -1,7 +1,7 @@
 package vql.semantics
 
 import logic.{FOL, Formula}
-import vql.error.{BindErrorDetail, QueryError}
+import vql.error.{QueryError, TypeCheckError}
 import vql.logic.ParsedQuery
 import vql.result.EvaluationOutput
 import vql.sampling.{HDRConfig, SamplingParams}
@@ -10,7 +10,6 @@ import vql.typed.{
   FolModel,
   QueryBinder,
   TypeCatalog,
-  TypeCheckError,
   TypedSemantics,
   Value,
 }
@@ -56,60 +55,8 @@ object VagueSemantics:
         }
         if others.isEmpty && unknowns.nonEmpty then
           QueryError.UnknownConstantOrLiteralError(unknowns.head)
-        else QueryError.BindError(details = errors.map(toBindErrorDetail))
+        else QueryError.BindError(details = errors)
       }
-
-  /**
-   * Single source of a bind error's human-readable string. Both a detail's `rendered` and any
-   * message list flow from here — rendering is not forked.
-   */
-  private def renderTypeError(error: TypeCheckError): String =
-    error match
-      case TypeCheckError.UnknownPredicate(name)                  => s"unknown predicate: $name"
-      case TypeCheckError.UnknownFunction(name)                   => s"unknown function: $name"
-      case TypeCheckError.ArityMismatch(symbol, expected, actual) =>
-        s"arity mismatch for '$symbol': expected $expected, actual $actual"
-      case TypeCheckError.UnknownConstantOrLiteral(name) => s"unknown constant or literal: $name"
-      case TypeCheckError.TypeMismatch(expected, actual, context) =>
-        s"type mismatch in $context: expected ${expected.value}, actual ${actual.value}"
-      case TypeCheckError.UnboundAnswerVar(name) => s"unbound answer variable: $name"
-      case TypeCheckError.UnconstrainedVar(name) => s"unconstrained quantifier variable: $name"
-      case TypeCheckError.ConflictingTypes(name, left, right)      =>
-        s"conflicting inferred types for '$name': ${left.value} vs ${right.value}"
-      case TypeCheckError.TypeNotQuantifiable(name)                =>
-        s"type '$name' is not a domain type and cannot be quantified over"
-      case TypeCheckError.UnparseableConstant(_, sort, sourceText) =>
-        s"cannot parse '$sourceText' as ${sort.value}"
-      case TypeCheckError.UnexpectedFreeVar(name)                  =>
-        s"unexpected free variable '$name': a satisfying-set formula may only mention its one variable"
-
-  /**
-   * Project a typed bind error down to the primitives-only [[BindErrorDetail]] carried across the
-   * error/typed boundary — one arm per [[TypeCheckError]] variant. A sort crosses as its
-   * `TypeId.value` `String` (ADR-015). Runs in the facade, the layer that already imports both
-   * `vql.error` and `vql.typed`. The match is exhaustive with no catch-all, so a new
-   * `TypeCheckError` variant fails to compile here until it is projected to a `BindErrorDetail`.
-   */
-  private def toBindErrorDetail(error: TypeCheckError): BindErrorDetail =
-    import BindErrorDetail as D
-    val rendered = renderTypeError(error)
-    error match
-      case TypeCheckError.UnparseableConstant(name, sort, sourceText) =>
-        D.UnparseableConstant(name, sort.value, sourceText, rendered)
-      case TypeCheckError.TypeMismatch(expected, actual, context) =>
-        D.TypeMismatch(expected.value, actual.value, context, rendered)
-      case TypeCheckError.ConflictingTypes(name, left, right) =>
-        D.ConflictingTypes(name, left.value, right.value, rendered)
-      case TypeCheckError.ArityMismatch(symbol, expected, actual) =>
-        D.ArityMismatch(symbol, expected, actual, rendered)
-      case TypeCheckError.UnknownConstantOrLiteral(name) =>
-        D.UnknownConstantOrLiteral(name, rendered)
-      case TypeCheckError.UnknownPredicate(name)    => D.UnknownPredicate(name, rendered)
-      case TypeCheckError.UnknownFunction(name)     => D.UnknownFunction(name, rendered)
-      case TypeCheckError.UnboundAnswerVar(name)    => D.UnboundAnswerVar(name, rendered)
-      case TypeCheckError.UnconstrainedVar(name)    => D.UnconstrainedVar(name, rendered)
-      case TypeCheckError.TypeNotQuantifiable(name) => D.TypeNotQuantifiable(name, rendered)
-      case TypeCheckError.UnexpectedFreeVar(name)   => D.UnexpectedFreeVar(name, rendered)
 
   /**
    * Evaluate a parsed query through the typed pipeline using a pre-validated [[FolModel]].
@@ -155,7 +102,7 @@ object VagueSemantics:
       bound <- QueryBinder
         .bindSatisfyingFormula(formula, variable, folModel.catalog)
         .left
-        .map(errors => QueryError.BindError(details = errors.map(toBindErrorDetail)))
+        .map(errors => QueryError.BindError(details = errors))
       (boundFormula, boundVar) = bound
       result <- TypedSemantics.satisfyingSet(boundFormula, boundVar, folModel.model)
     yield result

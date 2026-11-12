@@ -1,13 +1,15 @@
 package vql.error
 
+import vql.id.TypeId
+
 /**
  * Structured error types for vague quantifier evaluation.
  *
  * Encoded as a `sealed trait` with `case class` variants (not an `enum`) because each variant
  * overrides `formatted` and/or `context` with distinct body logic. An `enum` would require a
  * central match dispatch for those methods, which is less maintainable when the override bodies
- * differ structurally. Uniform variants (TypeCheckError, RuntimeModelError, TypeCatalogError) use
- * `enum` per ADR-006.
+ * differ structurally. Uniform variants ([[TypeCheckError]], [[RuntimeModelError]]) use `enum` per
+ * ADR-006.
  *
  * This error hierarchy provides:
  *   - Type-safe error handling without exceptions
@@ -49,62 +51,6 @@ sealed trait QueryError:
     s"$message$ctx"
 
 end QueryError
-
-/**
- * Per-error detail for a bind-phase failure — one case per [[vql.typed.TypeCheckError]] variant.
- * Primitives only: the error layer must not depend on `vql.typed`, so a sort crosses this boundary
- * as its `TypeId.value` `String`, never as a typed value. `rendered` is the single human-readable
- * message for this error, produced by [[vql.semantics.VagueSemantics]]'s per-error renderer.
- *
- * The projection from `TypeCheckError` is exhaustive (no catch-all case): a new `TypeCheckError`
- * variant is a compile error in the facade fold until a matching case is added here.
- */
-enum BindErrorDetail:
-
-  case UnparseableConstant(
-    name: String,
-    sortName: String,
-    sourceText: String,
-    rendered: String)
-
-  case TypeMismatch(
-    expectedSort: String,
-    actualSort: String,
-    context: String,
-    rendered: String)
-
-  case ConflictingTypes(
-    name: String,
-    leftSort: String,
-    rightSort: String,
-    rendered: String)
-
-  case ArityMismatch(
-    symbol: String,
-    expected: Int,
-    actual: Int,
-    rendered: String)
-
-  case UnknownPredicate(name: String, rendered: String)
-
-  case UnknownFunction(name: String, rendered: String)
-
-  case UnknownConstantOrLiteral(name: String, rendered: String)
-
-  case UnboundAnswerVar(name: String, rendered: String)
-
-  case UnconstrainedVar(name: String, rendered: String)
-
-  case TypeNotQuantifiable(name: String, rendered: String)
-
-  case UnexpectedFreeVar(name: String, rendered: String)
-
-  /**
-   * `rendered` is a stored value, not derived from other fields, so it is an abstract member the
-   * case parameters implement. A concrete pattern-matching `def rendered` would clash with the
-   * same-named case parameter and fail to compile (ADR-006 §3, which governs *derived* accessors).
-   */
-  def rendered: String
 
 object QueryError:
 
@@ -164,19 +110,19 @@ object QueryError:
    * See also: [[vql.typed.TypedSemantics]]
    */
   case class DomainNotFoundError(
-    typeName: String,
-    availableTypes: Set[String])
+    typeName: TypeId,
+    availableTypes: Set[TypeId])
     extends QueryError:
-    def message = s"No domain found for type '$typeName'"
+    def message = s"No domain found for type '${typeName.value}'"
 
     override val context = Map(
-      "type"      -> typeName,
-      "available" -> availableTypes.mkString(", "),
+      "type"      -> typeName.value,
+      "available" -> availableTypes.map(_.value).mkString(", "),
     )
 
     override def formatted: String =
-      s"No domain found for type '$typeName'. " +
-        s"Available types with domains: ${availableTypes.mkString(", ")}"
+      s"No domain found for type '${typeName.value}'. " +
+        s"Available types with domains: ${availableTypes.map(_.value).mkString(", ")}"
 
   /**
    * Raised during the typed bind phase when a constant or literal token is not found in the
@@ -194,27 +140,25 @@ object QueryError:
    * Raised when a query fails the typed bind phase (type-check errors). Indicates a user query
    * error — all instances map to HTTP 400.
    *
-   * Carries one [[BindErrorDetail]] per error: primitives only, because the error layer must not
-   * depend on `vql.typed`. Each detail holds its own rendered message and, for an unparseable
-   * constant, the sort name a consumer needs to classify the failure. `messages` derives the
-   * human-readable string list from the details, so the two never drift.
+   * Carries the binder's [[TypeCheckError]] values unchanged, every one the binder accumulated.
+   * `messages` derives the human-readable string list from them, so the two never drift.
    */
   case class BindError(
-    details: List[BindErrorDetail])
+    details: List[TypeCheckError])
     extends QueryError:
-    def messages: List[String] = details.map(_.rendered)
+    def messages: List[String] = details.map(_.message)
     def message                = s"Query type-checking failed: ${messages.mkString("; ")}"
     override val context       = Map("errors" -> messages.mkString("; "))
 
   /**
-   * Raised when RuntimeModel.validateAgainst fails (dispatcher or domain coverage gaps). Indicates
-   * a wiring/infra error — all instances map to HTTP 500. Individual error messages are rendered
-   * strings; raw RuntimeModelError detail is not carried here due to vql.error → vql.typed package
-   * constraint.
+   * Raised when `RuntimeModel.validateAgainst` fails (dispatcher or domain coverage gaps).
+   * Indicates a wiring error, not a query error. Carries every [[RuntimeModelError]] found;
+   * `errors` derives their sentences.
    */
   case class ModelValidationError(
-    errors: List[String])
+    details: List[RuntimeModelError])
     extends QueryError:
+    def errors: List[String] = details.map(_.message)
     def message          = s"Runtime model validation failed: ${errors.mkString("; ")}"
     override val context = Map("errors" -> errors.mkString("; "))
 

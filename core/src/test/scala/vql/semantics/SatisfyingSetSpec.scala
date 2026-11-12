@@ -2,7 +2,7 @@ package vql.semantics
 
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
-import vql.error.QueryError
+import vql.error.{QueryError, TypeCheckError}
 import vql.typed.{
   FolModel,
   PredicateSig,
@@ -11,7 +11,6 @@ import vql.typed.{
   RuntimeModel,
   SymbolName,
   TypeCatalog,
-  TypeCheckError,
   TypeId,
   Value,
 }
@@ -125,7 +124,7 @@ class SatisfyingSetSpec extends FunSuite:
     val f            = atom("gt_loss", Term.mkVar("l"), Term.mkVar("l"))
     QueryBinder.bindSatisfyingFormula(f, "l", valueCatalog) match
       case Left(errs) =>
-        assert(errs.contains(TypeCheckError.TypeNotQuantifiable("Loss")), s"got $errs")
+        assert(errs.contains(TypeCheckError.TypeNotQuantifiable(TypeId("Loss"))), s"got $errs")
       case Right(_)   => fail("expected Left for a value-type variable")
 
   test("facade surfaces an unexpected free variable as a BindError"):

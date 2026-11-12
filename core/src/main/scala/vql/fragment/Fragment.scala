@@ -23,7 +23,7 @@ enum Fragment:
 /**
  * The specific fragment rule a formula broke. Returned as the `Left` of [[FragmentCheck.check]],
  * carrying the first violation in pre-order, left-to-right traversal. Mirrors the typed-error house
- * style of `vql.typed.TypeCheckError`.
+ * style of `vql.error.TypeCheckError`.
  */
 enum FragmentViolation:
   /** Targeting: a `Forall`/`Exists` node is present. */

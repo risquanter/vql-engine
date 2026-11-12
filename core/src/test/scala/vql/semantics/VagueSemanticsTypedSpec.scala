@@ -2,7 +2,7 @@ package vql.semantics
 
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
-import vql.error.{BindErrorDetail, QueryError}
+import vql.error.{QueryError, TypeCheckError}
 import vql.logic.ParsedQuery
 import vql.quantifier.Quantifier
 import vql.sampling.SamplingParams
@@ -15,6 +15,7 @@ import vql.typed.{
   BoundVar,
   FolModel,
   PredicateSig,
+  QueryBinder,
   RuntimeDispatcher,
   RuntimeModel,
   SymbolName,
@@ -253,34 +254,38 @@ class VagueSemanticsTypedSpec extends FunSuite:
       case other                         => fail(s"expected BindError, got $other")
 
   test(
-    "AC-1/AC-7: a sole unparseable constant surfaces its sort name through evaluateTyped, with one rendered source"
+    "AC-1/AC-7: a sole unparseable constant surfaces its sort name through evaluateTyped, with one message source"
   ):
     val e = bindErrorFor(Formula.Atom(FOL("big", List(Term.mkVar("x"), Term.mkConst("abc")))))
     e.details match
-      case List(d: BindErrorDetail.UnparseableConstant) =>
-        assertEquals(d.sortName, "Loss")
+      case List(d: TypeCheckError.UnparseableConstant) =>
+        assertEquals(d.sort, TypeId("Loss"))
         assertEquals(d.sourceText, "abc")
-        // AC-7: the detail's rendered string is the very string the message list carries
-        assertEquals(e.messages, List(d.rendered))
+        // AC-7: the error's message is the very string the message list carries
+        assertEquals(e.messages, List(d.message))
       case other => fail(s"expected one UnparseableConstant detail, got $other")
 
-  test("AC-3: a homogeneous non-node unparseable carries both sort name and rendered message"):
+  test("AC-3: a homogeneous non-node unparseable carries both its sort and its message"):
     val e = bindErrorFor(Formula.Atom(FOL("likely", List(Term.mkVar("x"), Term.mkConst("2.0")))))
     e.details match
-      case List(d: BindErrorDetail.UnparseableConstant) =>
-        assertEquals(d.sortName, "Probability")
-        assert(d.rendered.contains("2.0"), s"rendered was '${d.rendered}'")
+      case List(d: TypeCheckError.UnparseableConstant) =>
+        assertEquals(d.sort, TypeId("Probability"))
+        assert(d.message.contains("2.0"), s"message was '${d.message}'")
       case other => fail(s"expected one UnparseableConstant detail, got $other")
+
+  test("BindError.details holds the binder's TypeCheckError values unchanged"):
+    val query = sortQuery(Formula.And(bigConst("abc"), leafArity2))
+    QueryBinder.bind(query, sortCatalog) match
+      case Left(errors) => assertEquals(bindErrorFor(Formula.And(bigConst("abc"), leafArity2)).details, errors)
+      case Right(_)     => fail("expected the binder to refuse the query")
 
   test("AC-5: messages match the plain rendered strings a text-only consumer reads"):
     val e = bindErrorFor(Formula.Atom(FOL("big", List(Term.mkVar("x"), Term.mkConst("abc")))))
     assertEquals(e.messages, List("cannot parse 'abc' as Loss"))
 
-  test("AC-6: BindErrorDetail is built from primitives only — no typed value crosses the boundary"):
-    // The error layer holds no TypeId: a detail is constructed from String fields alone.
-    val d: BindErrorDetail =
-      BindErrorDetail.UnparseableConstant("n", "Loss", "n", "cannot parse 'n' as Loss")
-    assertEquals(d.rendered, "cannot parse 'n' as Loss")
+  test("AC-6: a bind error's message is derived from its fields"):
+    val d: TypeCheckError = TypeCheckError.UnparseableConstant("n", TypeId("Loss"), "n")
+    assertEquals(d.message, "cannot parse 'n' as Loss")
 
   // ==================== Binder error accumulation (ADR-020) ====================
 
@@ -301,13 +306,13 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val e = bindErrorFor(Formula.And(bigConst("abc"), leafArity2))
     assertEquals(e.details.length, 2)
     e.details match
-      case List(d: BindErrorDetail.UnparseableConstant, a: BindErrorDetail.ArityMismatch) =>
-        assertEquals(d.sortName, "Loss")
+      case List(d: TypeCheckError.UnparseableConstant, a: TypeCheckError.ArityMismatch) =>
+        assertEquals(d.sort, TypeId("Loss"))
         assertEquals(d.sourceText, "abc")
         assertEquals(a.symbol, "leaf")
         assertEquals(a.expected, 1)
         assertEquals(a.actual, 2)
-        assert(a.rendered.contains("leaf"), s"second detail was '${a.rendered}'")
+        assert(a.message.contains("leaf"), s"second detail was '${a.message}'")
       case other => fail(s"expected [UnparseableConstant, ArityMismatch], got $other")
 
   test("AC-B: a consumer's forall over details runs over the whole list (AC-2 as a pipeline test)"):
@@ -315,8 +320,8 @@ class VagueSemanticsTypedSpec extends FunSuite:
     // unparseable constant; that predicate now runs over a real multi-element list.
     def allUnparseableLoss(e: QueryError.BindError): Boolean =
       e.details.forall {
-        case d: BindErrorDetail.UnparseableConstant => d.sortName == "Loss"
-        case _                                      => false
+        case d: TypeCheckError.UnparseableConstant => d.sort == TypeId("Loss")
+        case _                                     => false
       }
     // Mixed list: one unparseable + one arity error → predicate false (BIND_FAILED).
     assert(!allUnparseableLoss(bindErrorFor(Formula.And(bigConst("abc"), leafArity2))))
@@ -343,7 +348,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val e = bindErrorForQuery(q, sortModel)
     assertEquals(e.details.length, 1)
     e.details.head match
-      case d: BindErrorDetail.UnparseableConstant => assertEquals(d.sourceText, "abc")
+      case d: TypeCheckError.UnparseableConstant => assertEquals(d.sourceText, "abc")
       case other => fail(s"expected the range's UnparseableConstant, got $other")
 
   test("AC-E: mergeEnvs reports every conflicting variable, not just the first"):
@@ -391,10 +396,10 @@ class VagueSemanticsTypedSpec extends FunSuite:
     assert(e.messages.forall(_.contains("conflicting")), s"got ${e.messages}")
     assert(e.messages.exists(_.contains("'u'")), s"got ${e.messages}")
     assert(e.messages.exists(_.contains("'v'")), s"got ${e.messages}")
-    // Each detail is a structured ConflictingTypes carrying both sorts as primitive names.
+    // Each detail is a structured ConflictingTypes carrying both sorts.
     e.details.foreach {
-      case c: BindErrorDetail.ConflictingTypes =>
-        assertEquals(Set(c.leftSort, c.rightSort), Set("Loss", "Probability"))
+      case c: TypeCheckError.ConflictingTypes =>
+        assertEquals(Set(c.left, c.right), Set(TypeId("Loss"), TypeId("Probability")))
       case other => fail(s"expected ConflictingTypes details, got $other")
     }
 
@@ -509,8 +514,8 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val result = TypedSemantics.evaluate(boundQuery, model, samplingParams = SamplingParams.exact)
     result match
       case Left(e: QueryError.DomainNotFoundError) =>
-        assertEquals(e.typeName, "Loss")
-        assert(e.availableTypes.contains("Asset"))
+        assertEquals(e.typeName, TypeId("Loss"))
+        assert(e.availableTypes.contains(TypeId("Asset")))
       case Left(other) => fail(s"Expected DomainNotFoundError, got $other")
       case Right(_)    => fail("Expected Left")
 

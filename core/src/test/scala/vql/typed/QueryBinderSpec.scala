@@ -3,6 +3,7 @@ package vql.typed
 import TypeDecl.*
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
+import vql.error.TypeCheckError
 import vql.logic.ParsedQuery
 import vql.quantifier.Quantifier
 
@@ -110,8 +111,8 @@ class QueryBinderSpec extends FunSuite:
       answerVars = Nil,
     )
     QueryBinder.bind(query, catalogWithValueType) match
-      case Left(List(TypeCheckError.TypeNotQuantifiable(name))) =>
-        assertEquals(name, "Loss")
+      case Left(List(TypeCheckError.TypeNotQuantifiable(sort))) =>
+        assertEquals(sort, TypeId("Loss"))
       case Left(other) => fail(s"Expected TypeNotQuantifiable, got $other")
       case Right(_)    => fail("Expected Left for value-type root variable")
 
@@ -124,8 +125,8 @@ class QueryBinderSpec extends FunSuite:
       answerVars = Nil,
     )
     QueryBinder.bind(query, catalogWithValueType) match
-      case Left(List(TypeCheckError.TypeNotQuantifiable(name))) =>
-        assertEquals(name, "Loss")
+      case Left(List(TypeCheckError.TypeNotQuantifiable(sort))) =>
+        assertEquals(sort, TypeId("Loss"))
       case Left(other) => fail(s"Expected TypeNotQuantifiable, got $other")
       case Right(_)    => fail("Expected Left for value-type nested Forall")
 
@@ -138,8 +139,8 @@ class QueryBinderSpec extends FunSuite:
       answerVars = Nil,
     )
     QueryBinder.bind(query, catalogWithValueType) match
-      case Left(List(TypeCheckError.TypeNotQuantifiable(name))) =>
-        assertEquals(name, "Loss")
+      case Left(List(TypeCheckError.TypeNotQuantifiable(sort))) =>
+        assertEquals(sort, TypeId("Loss"))
       case Left(other) => fail(s"Expected TypeNotQuantifiable, got $other")
       case Right(_)    => fail("Expected Left for value-type nested Exists")
 
@@ -189,7 +190,7 @@ class QueryBinderSpec extends FunSuite:
       answerVars = Nil,
     )
     QueryBinder.bind(query, catalogWithValueType) match
-      case Left(errs) if errs.contains(TypeCheckError.TypeNotQuantifiable("Loss")) => ()
+      case Left(errs) if errs.contains(TypeCheckError.TypeNotQuantifiable(TypeId("Loss"))) => ()
       case Left(other) => fail(s"expected TypeNotQuantifiable(Loss), got $other")
       case Right(_)    => fail("expected Left for inner range quantifier over value type")
 

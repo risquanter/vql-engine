@@ -2,6 +2,7 @@ package vql.typed
 
 import lexer.VariableText
 import logic.{FOL, Formula, Term}
+import vql.error.TypeCheckError
 import vql.logic.ParsedQuery
 
 object QueryBinder:
@@ -17,7 +18,7 @@ object QueryBinder:
         .toRight(List(TypeCheckError.UnconstrainedVar(query.variable)))
       _                 <-
         if catalog.domainTypes.contains(quantifiedVarSort) then Right(())
-        else Left(List(TypeCheckError.TypeNotQuantifiable(quantifiedVarSort.value)))
+        else Left(List(TypeCheckError.TypeNotQuantifiable(quantifiedVarSort)))
       scopeResult       <- bindFormula(query.scope, envAfterRange, catalog)
       (boundScope, envAfterScope) = scopeResult
       boundAnswers <- bindAnswerVars(query.answerVars, envAfterScope)
@@ -54,7 +55,7 @@ object QueryBinder:
         case extras => Left(extras.map(TypeCheckError.UnexpectedFreeVar.apply))
       _    <-
         if catalog.domainTypes.contains(sort) then Right(())
-        else Left(List(TypeCheckError.TypeNotQuantifiable(sort.value)))
+        else Left(List(TypeCheckError.TypeNotQuantifiable(sort)))
     yield (bound, BoundVar(variable, sort))
 
   private def bindAnswerVars(names: List[String], env: Env): Either[List[TypeCheckError], List[
@@ -130,7 +131,7 @@ object QueryBinder:
           case None       => Left(List(TypeCheckError.UnconstrainedVar(name)))
           case Some(sort) =>
             if !catalog.domainTypes.contains(sort) then
-              Left(List(TypeCheckError.TypeNotQuantifiable(sort.value)))
+              Left(List(TypeCheckError.TypeNotQuantifiable(sort)))
             else
               val escaped     = envAfterBody - name
               val outerMerged = env ++ escaped

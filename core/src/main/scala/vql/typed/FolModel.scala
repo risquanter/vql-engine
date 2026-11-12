@@ -28,4 +28,4 @@ object FolModel:
   def apply(catalog: TypeCatalog, model: RuntimeModel): Either[QueryError, FolModel] =
     model.validateAgainst(catalog) match
       case Right(_)     => Right(new FolModel(catalog, model))
-      case Left(errors) => Left(QueryError.ModelValidationError(errors = errors.map(_.message)))
+      case Left(errors) => Left(QueryError.ModelValidationError(details = errors))

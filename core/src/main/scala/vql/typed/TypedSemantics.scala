@@ -30,8 +30,8 @@ object TypedSemantics:
         .get(query.variable.sort)
         .toRight(
           QueryError.DomainNotFoundError(
-            typeName = query.variable.sort.value,
-            availableTypes = model.domains.keySet.map(_.value),
+            typeName = query.variable.sort,
+            availableTypes = model.domains.keySet,
           )
         )
       rangeElements <- collectRangeElements(query, model, baseEnv, rootDomain)
@@ -65,8 +65,8 @@ object TypedSemantics:
       case None         =>
         Left(
           QueryError.DomainNotFoundError(
-            typeName = variable.sort.value,
-            availableTypes = model.domains.keySet.map(_.value),
+            typeName = variable.sort,
+            availableTypes = model.domains.keySet,
           )
         )
       case Some(domain) =>
@@ -199,8 +199,8 @@ object TypedSemantics:
           case None         =>
             Left(
               QueryError.DomainNotFoundError(
-                typeName = v.sort.value,
-                availableTypes = model.domains.keySet.map(_.value),
+                typeName = v.sort,
+                availableTypes = model.domains.keySet,
               )
             )
           case Some(domain) =>
@@ -219,8 +219,8 @@ object TypedSemantics:
           case None         =>
             Left(
               QueryError.DomainNotFoundError(
-                typeName = v.sort.value,
-                availableTypes = model.domains.keySet.map(_.value),
+                typeName = v.sort,
+                availableTypes = model.domains.keySet,
               )
             )
           case Some(domain) =>
