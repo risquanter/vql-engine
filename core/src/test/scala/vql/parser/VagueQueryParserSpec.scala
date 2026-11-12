@@ -418,7 +418,7 @@ class VagueQueryParserSpec extends munit.FunSuite:
   }
 
   // -----------------------------------------------------------------------
-  // F1 + F2 end-to-end tests (PLAN-QUERY-NODE-NAME-LITERALS §5.3)
+  // End-to-end tests of quoted node-name literals
   // Quoted node-name literals must round-trip through lex → parse → ParsedQuery
   // as Term.Const carrying the inner content (no surrounding quotes).
   // -----------------------------------------------------------------------
@@ -428,8 +428,8 @@ class VagueQueryParserSpec extends munit.FunSuite:
     assertEquals(rangeAtom(q).predicate, "leaf_descendant_of")
     assertEquals(rangeAtom(q).terms.length, 2)
     // First arg is the bound variable x; second arg is the quoted literal.
-    assertEquals(rangeAtom(q).terms.head, Term.Var("x"))
-    assertEquals(rangeAtom(q).terms(1), Term.Const("IT Risk"))
+    assertEquals(rangeAtom(q).terms.head, Term.mkVar("x"))
+    assertEquals(rangeAtom(q).terms(1), Term.mkConst("IT Risk"))
   }
 
   test("P2: single-word quoted literal carries content without surrounding quotes") {
@@ -438,7 +438,7 @@ class VagueQueryParserSpec extends munit.FunSuite:
     )
     assertEquals(rangeAtom(q).predicate, "child_of")
     assertEquals(rangeAtom(q).terms.length, 2)
-    assertEquals(rangeAtom(q).terms(1), Term.Const("Operations"))
+    assertEquals(rangeAtom(q).terms(1), Term.mkConst("Operations"))
   }
 
   test("P3: mixed bare + quoted args — bare stays Var, quoted becomes Const") {
@@ -447,8 +447,8 @@ class VagueQueryParserSpec extends munit.FunSuite:
     )
     assertEquals(rangeAtom(q).predicate, "capital")
     assertEquals(rangeAtom(q).terms.length, 2)
-    assertEquals(rangeAtom(q).terms.head, Term.Var("x"))
-    assertEquals(rangeAtom(q).terms(1), Term.Const("Vienna"))
+    assertEquals(rangeAtom(q).terms.head, Term.mkVar("x"))
+    assertEquals(rangeAtom(q).terms(1), Term.mkConst("Vienna"))
   }
 
 end VagueQueryParserSpec

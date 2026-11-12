@@ -71,33 +71,33 @@ class SatisfyingSetSpec extends FunSuite:
 
   test("negation is the closed-world complement over the active domain (AC-5)"):
     // ~p(x) with p = {a,b} → {c,d}
-    assertEquals(satisfyingSet(Formula.Not(atom("p", Term.Var("x")))), Set(c, d))
+    assertEquals(satisfyingSet(Formula.Not(atom("p", Term.mkVar("x")))), Set(c, d))
 
   test("conjunction is the intersection (AC-5)"):
     // p(x) /\ q(x) with p = {a,b}, q = {b,c} → {b}
     assertEquals(
-      satisfyingSet(Formula.And(atom("p", Term.Var("x")), atom("q", Term.Var("x")))),
+      satisfyingSet(Formula.And(atom("p", Term.mkVar("x")), atom("q", Term.mkVar("x")))),
       Set(b),
     )
 
   test("existential quantifies over an inner variable (AC-5)"):
     // { x | ∃a. r(x, a) } with r = {(a,b),(c,d)} → {a, c}
-    val f = Formula.Exists("a", atom("r", Term.Var("x"), Term.Var("a")))
+    val f = Formula.mkExists("a", atom("r", Term.mkVar("x"), Term.mkVar("a")))
     assertEquals(satisfyingSet(f), Set(a, c))
 
   test("an unsatisfiable formula yields the empty set (AC-5)"):
-    val f = Formula.And(atom("p", Term.Var("x")), Formula.Not(atom("p", Term.Var("x"))))
+    val f = Formula.And(atom("p", Term.mkVar("x")), Formula.Not(atom("p", Term.mkVar("x"))))
     assertEquals(satisfyingSet(f), Set.empty[Value])
 
   // ==================== Exactness and determinism ====================
 
   test("exactness: result equals the brute-force domain filter"):
-    val f     = atom("p", Term.Var("x"))
+    val f     = atom("p", Term.mkVar("x"))
     val brute = Set(a, b, c, d).filter(v => v == a || v == b)
     assertEquals(satisfyingSet(f), brute)
 
   test("determinism: two evaluations produce equal sets"):
-    val f = Formula.Or(atom("p", Term.Var("x")), atom("q", Term.Var("x")))
+    val f = Formula.Or(atom("p", Term.mkVar("x")), atom("q", Term.mkVar("x")))
     assertEquals(satisfyingSet(f), satisfyingSet(f))
     assertEquals(satisfyingSet(f), Set(a, b, c))
 
@@ -105,13 +105,13 @@ class SatisfyingSetSpec extends FunSuite:
 
   test("rejects a formula with an extra free variable (UnexpectedFreeVar)"):
     // r(x, y): y is a second free variable, not the satisfying-set variable.
-    val f = atom("r", Term.Var("x"), Term.Var("y"))
+    val f = atom("r", Term.mkVar("x"), Term.mkVar("y"))
     QueryBinder.bindSatisfyingFormula(f, "x", catalog) match
       case Left(errs) => assert(errs.contains(TypeCheckError.UnexpectedFreeVar("y")), s"got $errs")
       case Right(_)   => fail("expected Left for extra free variable")
 
   test("rejects a formula that does not contain the variable (UnconstrainedVar)"):
-    val f = atom("p", Term.Var("x"))
+    val f = atom("p", Term.mkVar("x"))
     QueryBinder.bindSatisfyingFormula(f, "z", catalog) match
       case Left(errs) => assert(errs.contains(TypeCheckError.UnconstrainedVar("z")), s"got $errs")
       case Right(_)   => fail("expected Left when the variable is absent")
@@ -122,14 +122,14 @@ class SatisfyingSetSpec extends FunSuite:
       types = Set(ValueType(loss)),
       predicates = Map(SymbolName("gt_loss") -> PredicateSig(List(loss, loss))),
     )
-    val f            = atom("gt_loss", Term.Var("l"), Term.Var("l"))
+    val f            = atom("gt_loss", Term.mkVar("l"), Term.mkVar("l"))
     QueryBinder.bindSatisfyingFormula(f, "l", valueCatalog) match
       case Left(errs) =>
         assert(errs.contains(TypeCheckError.TypeNotQuantifiable("Loss")), s"got $errs")
       case Right(_)   => fail("expected Left for a value-type variable")
 
   test("facade surfaces an unexpected free variable as a BindError"):
-    val f = atom("r", Term.Var("x"), Term.Var("y"))
+    val f = atom("r", Term.mkVar("x"), Term.mkVar("y"))
     VagueSemantics.satisfyingSet(f, "x", folModel) match
       case Left(e: QueryError.BindError) =>
         assert(e.messages.exists(_.contains("y")), s"got ${e.messages}")

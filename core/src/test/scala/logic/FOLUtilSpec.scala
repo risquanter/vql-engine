@@ -286,4 +286,9 @@ class FOLUtilSpec extends FunSuite:
     assertEquals(result, parseOk("forall x . exists y . P(x, y, w)"))
   }
 
+  test("subst throws when it must rename a decimal-named bound variable"):
+    // forall 0.5. p(0.5, y) with y := 0.5 captures the bound 0.5, and its variant 0.5' is no name
+    val fm = Forall("0.5", Atom(FOL("p", List(Var("0.5"), Var("y")))))
+    intercept[IllegalArgumentException](subst(Map("y" -> Var("0.5")), fm))
+
 end FOLUtilSpec

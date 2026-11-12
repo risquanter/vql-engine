@@ -1,8 +1,11 @@
 package vql.typed
 
+import lexer.VariableText
 import vql.quantifier.Quantifier
 
-case class BoundVar(name: String, sort: TypeId)
+/** A variable with its sort. Throws `IllegalArgumentException` for a name no query text can produce. */
+case class BoundVar(name: String, sort: TypeId):
+  require(VariableText.admits(name), "A variable name must be a word or a decimal")
 
 enum BoundTerm:
 

@@ -78,4 +78,29 @@ class TermSpec extends FunSuite:
       case _              => fail("Should be Fn")
   }
 
+  // ── building functions ────────────────────────────────────────────
+
+  private val unproducibleNames: List[String] = List("", "risk-id", "a b")
+
+  test("mkVar builds the Var for a word and a decimal"):
+    assertEquals(mkVar("x"), Var("x"))
+    assertEquals(mkVar("0.5"), Var("0.5"))
+
+  test("mkFn builds the Fn for a word, a decimal and a term operator"):
+    assertEquals(mkFn("f", List(Var("x"))), Fn("f", List(Var("x"))))
+    assertEquals(mkFn("0.5", Nil), Fn("0.5", Nil))
+    for op <- List("+", "-", "*", "/", "^", "::") do assertEquals(mkFn(op, Nil), Fn(op, Nil))
+
+  test("mkConst builds the Const for digits, a decimal, nil and literal content"):
+    for c <- List("42", "0.05", "nil", "IT Risk", "") do assertEquals(mkConst(c), Const(c))
+
+  test("each building function refuses a name no query text can produce"):
+    for name <- unproducibleNames do
+      intercept[IllegalArgumentException](mkVar(name))
+      intercept[IllegalArgumentException](mkFn(name, Nil))
+    intercept[IllegalArgumentException](mkConst("a<b"))
+
+  test("mkFn refuses a relation and punctuation as a function name"):
+    for op <- List("<", "=", "(", ",") do intercept[IllegalArgumentException](mkFn(op, Nil))
+
 end TermSpec

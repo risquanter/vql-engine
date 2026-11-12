@@ -78,15 +78,42 @@ enum SymbolText:
 
 object SymbolText:
 
-  /** Whether `name` is a word, a decimal or a `GrammarSymbol`'s text. */
-  def admits(name: String): Boolean =
-    GrammarSymbol.fromText(name).isDefined || VariableText.admits(name)
+  /** The relations `FOLAtomParser.parseInfixAtom` names an atom by. */
+  private val predicateOperators: Set[GrammarSymbol] = Set(
+    GrammarSymbol.Equal,
+    GrammarSymbol.Less,
+    GrammarSymbol.LessEqual,
+    GrammarSymbol.Greater,
+    GrammarSymbol.GreaterEqual,
+  )
 
-  /** Throws `IllegalArgumentException` unless `admits(name)`. */
+  /** The operators `TermParser` names a function application by. */
+  private val functionOperators: Set[GrammarSymbol] = Set(
+    GrammarSymbol.Cons,
+    GrammarSymbol.Plus,
+    GrammarSymbol.Minus,
+    GrammarSymbol.Times,
+    GrammarSymbol.Divide,
+    GrammarSymbol.Power,
+  )
+
+  /** Whether `name` is a word, a decimal, or one of `=`, `<`, `<=`, `>`, `>=`. */
+  def admitsPredicate(name: String): Boolean =
+    VariableText.admits(name) || GrammarSymbol.fromText(name).exists(predicateOperators)
+
+  /** Whether `name` is a word, a decimal, or one of `+`, `-`, `*`, `/`, `^`, `::`. */
+  def admitsFunction(name: String): Boolean =
+    VariableText.admits(name) || GrammarSymbol.fromText(name).exists(functionOperators)
+
+  /**
+   * Reads a predicate or function name. Throws `IllegalArgumentException` unless
+   * `admitsPredicate(name)` or `admitsFunction(name)`.
+   */
   def of(name: String): SymbolText =
     GrammarSymbol.fromText(name) match
-      case Some(symbol) => Operator(symbol)
-      case None         =>
+      case Some(symbol) if predicateOperators(symbol) || functionOperators(symbol) =>
+        Operator(symbol)
+      case _                                                                     =>
         VariableText.of(name) match
           case VariableText.Word(text)    => Word(text)
           case VariableText.Decimal(text) => Decimal(text)

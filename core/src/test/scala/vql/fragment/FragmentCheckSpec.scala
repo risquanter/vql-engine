@@ -14,42 +14,42 @@ class FragmentCheckSpec extends FunSuite:
   private def atom(name: String, terms: Term*): Formula[FOL] =
     Formula.Atom(FOL(name, terms.toList))
 
-  import Term.{Const, Fn, Var}
+  import Term.{mkConst, mkFn, mkVar}
 
   // ==================== Targeting: admit ====================
 
   test("targeting admits a bare atom over variables"):
-    assertEquals(FragmentCheck.check(atom("p", Var("x")), Fragment.Targeting), Right(()))
+    assertEquals(FragmentCheck.check(atom("p", mkVar("x")), Fragment.Targeting), Right(()))
 
   test("targeting admits inline literals (Term.Const) and variables"):
     // p(x, 42): the literal is a Const, not a function application
     assertEquals(
-      FragmentCheck.check(atom("p", Var("x"), Const("42")), Fragment.Targeting),
+      FragmentCheck.check(atom("p", mkVar("x"), mkConst("42")), Fragment.Targeting),
       Right(()),
     )
 
   test("targeting admits connectives over admissible atoms"):
-    val f = Formula.And(atom("p", Var("x")), Formula.Not(atom("q", Var("y"))))
+    val f = Formula.And(atom("p", mkVar("x")), Formula.Not(atom("q", mkVar("y"))))
     assertEquals(FragmentCheck.check(f, Fragment.Targeting), Right(()))
 
   // ==================== Targeting: reject ====================
 
   test("targeting rejects a universal quantifier"):
-    val f = Formula.Forall("x", atom("p", Var("x")))
+    val f = Formula.mkForall("x", atom("p", mkVar("x")))
     assertEquals(
       FragmentCheck.check(f, Fragment.Targeting),
       Left(FragmentViolation.QuantifierNotAllowed),
     )
 
   test("targeting rejects an existential quantifier"):
-    val f = Formula.Exists("x", atom("p", Var("x")))
+    val f = Formula.mkExists("x", atom("p", mkVar("x")))
     assertEquals(
       FragmentCheck.check(f, Fragment.Targeting),
       Left(FragmentViolation.QuantifierNotAllowed),
     )
 
   test("targeting rejects a function-application term, naming the function"):
-    val f = atom("p", Fn("f", List(Var("x"))))
+    val f = atom("p", mkFn("f", List(mkVar("x"))))
     assertEquals(
       FragmentCheck.check(f, Fragment.Targeting),
       Left(FragmentViolation.FunctionApplicationNotAllowed("f")),
@@ -57,14 +57,14 @@ class FragmentCheckSpec extends FunSuite:
 
   test("targeting rejects an arithmetic operator term (it is a Term.Fn)"):
     // gt(x + y, z): `+` is a function application
-    val f = atom("gt", Fn("+", List(Var("x"), Var("y"))), Var("z"))
+    val f = atom("gt", mkFn("+", List(mkVar("x"), mkVar("y"))), mkVar("z"))
     assertEquals(
       FragmentCheck.check(f, Fragment.Targeting),
       Left(FragmentViolation.FunctionApplicationNotAllowed("+")),
     )
 
   test("targeting reports the outermost function of a nested application"):
-    val f = atom("p", Fn("f", List(Fn("g", List(Var("x"))))))
+    val f = atom("p", mkFn("f", List(mkFn("g", List(mkVar("x"))))))
     assertEquals(
       FragmentCheck.check(f, Fragment.Targeting),
       Left(FragmentViolation.FunctionApplicationNotAllowed("f")),
@@ -76,21 +76,21 @@ class FragmentCheckSpec extends FunSuite:
   test("the left operand's violation is reported before the right operand's"):
     // left has a Fn, right has a quantifier: the Fn (left) wins
     val f =
-      Formula.And(atom("p", Fn("f", List(Var("x")))), Formula.Exists("y", atom("q", Var("y"))))
+      Formula.And(atom("p", mkFn("f", List(mkVar("x")))), Formula.mkExists("y", atom("q", mkVar("y"))))
     assertEquals(
       FragmentCheck.check(f, Fragment.Targeting),
       Left(FragmentViolation.FunctionApplicationNotAllowed("f")),
     )
 
   test("a right-side quantifier is reported when the left operand is admissible"):
-    val f = Formula.And(atom("p", Var("x")), Formula.Exists("y", atom("q", Var("y"))))
+    val f = Formula.And(atom("p", mkVar("x")), Formula.mkExists("y", atom("q", mkVar("y"))))
     assertEquals(
       FragmentCheck.check(f, Fragment.Targeting),
       Left(FragmentViolation.QuantifierNotAllowed),
     )
 
   test("a quantifier node is reported before a function application inside its body"):
-    val f = Formula.Forall("x", atom("p", Fn("f", List(Var("x")))))
+    val f = Formula.mkForall("x", atom("p", mkFn("f", List(mkVar("x")))))
     assertEquals(
       FragmentCheck.check(f, Fragment.Targeting),
       Left(FragmentViolation.QuantifierNotAllowed),
@@ -99,42 +99,42 @@ class FragmentCheckSpec extends FunSuite:
   // ==================== Screening: depth ====================
 
   test("Screening(0) admits a quantifier-free formula"):
-    assertEquals(FragmentCheck.check(atom("p", Var("x")), Fragment.Screening(0)), Right(()))
+    assertEquals(FragmentCheck.check(atom("p", mkVar("x")), Fragment.Screening(0)), Right(()))
 
   test("Screening(0) rejects any quantifier, identical to targeting's quantifier rule"):
-    val f = Formula.Forall("x", atom("p", Var("x")))
+    val f = Formula.mkForall("x", atom("p", mkVar("x")))
     assertEquals(
       FragmentCheck.check(f, Fragment.Screening(0)),
       Left(FragmentViolation.QuantifierDepthExceeded(0, 1)),
     )
 
   test("Screening(1) admits one level of nesting"):
-    val f = Formula.Forall("x", atom("p", Var("x")))
+    val f = Formula.mkForall("x", atom("p", mkVar("x")))
     assertEquals(FragmentCheck.check(f, Fragment.Screening(1)), Right(()))
 
   test("Screening(1) rejects two nested quantifiers, reporting the actual depth"):
-    val f = Formula.Exists("x", Formula.Exists("y", atom("r", Var("x"), Var("y"))))
+    val f = Formula.mkExists("x", Formula.mkExists("y", atom("r", mkVar("x"), mkVar("y"))))
     assertEquals(
       FragmentCheck.check(f, Fragment.Screening(1)),
       Left(FragmentViolation.QuantifierDepthExceeded(1, 2)),
     )
 
   test("Screening(2) admits two nested quantifiers"):
-    val f = Formula.Exists("x", Formula.Exists("y", atom("r", Var("x"), Var("y"))))
+    val f = Formula.mkExists("x", Formula.mkExists("y", atom("r", mkVar("x"), mkVar("y"))))
     assertEquals(FragmentCheck.check(f, Fragment.Screening(2)), Right(()))
 
   test("side-by-side quantifiers do not add: only nesting counts"):
     // (∃x. p(x)) /\ (∃y. q(y)): each branch nests one deep, so depth is 1, not 2
     val f = Formula.And(
-      Formula.Exists("x", atom("p", Var("x"))),
-      Formula.Exists("y", atom("q", Var("y"))),
+      Formula.mkExists("x", atom("p", mkVar("x"))),
+      Formula.mkExists("y", atom("q", mkVar("y"))),
     )
     assertEquals(FragmentCheck.check(f, Fragment.Screening(1)), Right(()))
 
   test("found reports the maximum nesting depth across the whole tree"):
     // one branch nests three deep; found must be 3
-    val deep = Formula.Forall("x", Formula.Forall("y", Formula.Forall("z", atom("r", Var("x")))))
-    val f    = Formula.And(atom("p", Var("w")), deep)
+    val deep = Formula.mkForall("x", Formula.mkForall("y", Formula.mkForall("z", atom("r", mkVar("x")))))
+    val f    = Formula.And(atom("p", mkVar("w")), deep)
     assertEquals(
       FragmentCheck.check(f, Fragment.Screening(1)),
       Left(FragmentViolation.QuantifierDepthExceeded(1, 3)),
@@ -142,12 +142,12 @@ class FragmentCheckSpec extends FunSuite:
 
   test("screening bounds quantifiers only, not function applications"):
     // ∀x. gt(f(x), 0): a Fn is present but screening ignores it; depth 1 ≤ 1
-    val f = Formula.Forall("x", atom("gt", Fn("f", List(Var("x"))), Const("0")))
+    val f = Formula.mkForall("x", atom("gt", mkFn("f", List(mkVar("x"))), mkConst("0")))
     assertEquals(FragmentCheck.check(f, Fragment.Screening(1)), Right(()))
 
   test("negative k rejects even a quantifier-free formula (total, degenerate)"):
     assertEquals(
-      FragmentCheck.check(atom("p", Var("x")), Fragment.Screening(-1)),
+      FragmentCheck.check(atom("p", mkVar("x")), Fragment.Screening(-1)),
       Left(FragmentViolation.QuantifierDepthExceeded(-1, 0)),
     )
 

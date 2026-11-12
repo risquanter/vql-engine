@@ -23,58 +23,58 @@ class FOLPrinterSpec extends FunSuite:
   // ==================== Term Printing Tests ====================
 
   test("print variable") {
-    val tm = Term.Var("x")
+    val tm = Term.mkVar("x")
     assertEquals(printTerm(tm), "x")
   }
 
   test("print constant") {
-    val tm = Term.Const("42")
+    val tm = Term.mkConst("42")
     assertEquals(printTerm(tm), "42")
   }
 
   test("print nullary function") {
-    val tm = Term.Fn("c", Nil)
+    val tm = Term.mkFn("c", Nil)
     assertEquals(printTerm(tm), "c")
   }
 
   test("print unary function") {
-    val tm = Term.Fn("f", List(Term.Var("x")))
+    val tm = Term.mkFn("f", List(Term.mkVar("x")))
     assertEquals(printTerm(tm), "f(x)")
   }
 
   test("print binary function") {
-    val tm = Term.Fn("f", List(Term.Var("x"), Term.Var("y")))
+    val tm = Term.mkFn("f", List(Term.mkVar("x"), Term.mkVar("y")))
     assertEquals(printTerm(tm), "f(x, y)")
   }
 
   test("print nested function") {
-    val tm = Term.Fn("f", List(Term.Fn("g", List(Term.Var("x")))))
+    val tm = Term.mkFn("f", List(Term.mkFn("g", List(Term.mkVar("x")))))
     assertEquals(printTerm(tm), "f(g(x))")
   }
 
   test("print infix plus") {
-    val tm = Term.Fn("+", List(Term.Var("x"), Term.Var("y")))
+    val tm = Term.mkFn("+", List(Term.mkVar("x"), Term.mkVar("y")))
     assertEquals(printTerm(tm), "x + y")
   }
 
   test("print infix multiply") {
-    val tm = Term.Fn("*", List(Term.Var("x"), Term.Var("y")))
+    val tm = Term.mkFn("*", List(Term.mkVar("x"), Term.mkVar("y")))
     assertEquals(printTerm(tm), "x * y")
   }
 
   test("print nested infix operators") {
-    val tm = Term.Fn(
+    val tm = Term.mkFn(
       "+",
       List(
-        Term.Var("x"),
-        Term.Fn("*", List(Term.Var("y"), Term.Var("z"))),
+        Term.mkVar("x"),
+        Term.mkFn("*", List(Term.mkVar("y"), Term.mkVar("z"))),
       ),
     )
     assertEquals(printTerm(tm), "x + y * z")
   }
 
   test("print cons operator") {
-    val tm = Term.Fn("::", List(Term.Var("x"), Term.Var("xs")))
+    val tm = Term.mkFn("::", List(Term.mkVar("x"), Term.mkVar("xs")))
     assertEquals(printTerm(tm), "x :: xs")
   }
 
@@ -86,32 +86,32 @@ class FOLPrinterSpec extends FunSuite:
   }
 
   test("print unary predicate") {
-    val atom = FOL("P", List(Term.Var("x")))
+    val atom = FOL("P", List(Term.mkVar("x")))
     assertEquals(printAtom(atom), "P(x)")
   }
 
   test("print binary predicate") {
-    val atom = FOL("P", List(Term.Var("x"), Term.Var("y")))
+    val atom = FOL("P", List(Term.mkVar("x"), Term.mkVar("y")))
     assertEquals(printAtom(atom), "P(x, y)")
   }
 
   test("print equality") {
-    val atom = FOL("=", List(Term.Var("x"), Term.Var("y")))
+    val atom = FOL("=", List(Term.mkVar("x"), Term.mkVar("y")))
     assertEquals(printAtom(atom), "x = y")
   }
 
   test("print less than") {
-    val atom = FOL("<", List(Term.Var("x"), Term.Var("y")))
+    val atom = FOL("<", List(Term.mkVar("x"), Term.mkVar("y")))
     assertEquals(printAtom(atom), "x < y")
   }
 
   test("print less than or equal") {
-    val atom = FOL("<=", List(Term.Var("x"), Term.Var("y")))
+    val atom = FOL("<=", List(Term.mkVar("x"), Term.mkVar("y")))
     assertEquals(printAtom(atom), "x <= y")
   }
 
   test("print greater than") {
-    val atom = FOL(">", List(Term.Var("x"), Term.Var("y")))
+    val atom = FOL(">", List(Term.mkVar("x"), Term.mkVar("y")))
     assertEquals(printAtom(atom), "x > y")
   }
 
@@ -119,8 +119,8 @@ class FOLPrinterSpec extends FunSuite:
     val atom = FOL(
       "<",
       List(
-        Term.Var("x"),
-        Term.Fn("+", List(Term.Var("y"), Term.Const("1"))),
+        Term.mkVar("x"),
+        Term.mkFn("+", List(Term.mkVar("y"), Term.mkConst("1"))),
       ),
     )
     assertEquals(printAtom(atom), "x < y + 1")
@@ -137,69 +137,69 @@ class FOLPrinterSpec extends FunSuite:
   }
 
   test("print atomic formula") {
-    val fm = Formula.Atom(FOL("P", List(Term.Var("x"))))
+    val fm = Formula.Atom(FOL("P", List(Term.mkVar("x"))))
     assertEquals(printFormula(fm), "P(x)")
   }
 
   test("print negation") {
-    val fm = Formula.Not(Formula.Atom(FOL("P", List(Term.Var("x")))))
+    val fm = Formula.Not(Formula.Atom(FOL("P", List(Term.mkVar("x")))))
     assertEquals(printFormula(fm), "~P(x)")
   }
 
   test("print conjunction") {
     val fm = Formula.And(
-      Formula.Atom(FOL("P", List(Term.Var("x")))),
-      Formula.Atom(FOL("Q", List(Term.Var("y")))),
+      Formula.Atom(FOL("P", List(Term.mkVar("x")))),
+      Formula.Atom(FOL("Q", List(Term.mkVar("y")))),
     )
     assertEquals(printFormula(fm), "P(x) /\\ Q(y)")
   }
 
   test("print disjunction") {
     val fm = Formula.Or(
-      Formula.Atom(FOL("P", List(Term.Var("x")))),
-      Formula.Atom(FOL("Q", List(Term.Var("y")))),
+      Formula.Atom(FOL("P", List(Term.mkVar("x")))),
+      Formula.Atom(FOL("Q", List(Term.mkVar("y")))),
     )
     assertEquals(printFormula(fm), "P(x) \\/ Q(y)")
   }
 
   test("print implication") {
     val fm = Formula.Imp(
-      Formula.Atom(FOL("P", List(Term.Var("x")))),
-      Formula.Atom(FOL("Q", List(Term.Var("x")))),
+      Formula.Atom(FOL("P", List(Term.mkVar("x")))),
+      Formula.Atom(FOL("Q", List(Term.mkVar("x")))),
     )
     assertEquals(printFormula(fm), "P(x) ==> Q(x)")
   }
 
   test("print iff") {
     val fm = Formula.Iff(
-      Formula.Atom(FOL("P", List(Term.Var("x")))),
-      Formula.Atom(FOL("Q", List(Term.Var("x")))),
+      Formula.Atom(FOL("P", List(Term.mkVar("x")))),
+      Formula.Atom(FOL("Q", List(Term.mkVar("x")))),
     )
     assertEquals(printFormula(fm), "P(x) <=> Q(x)")
   }
 
   test("print forall") {
-    val fm = Formula.Forall("x", Formula.Atom(FOL("P", List(Term.Var("x")))))
+    val fm = Formula.mkForall("x", Formula.Atom(FOL("P", List(Term.mkVar("x")))))
     assertEquals(printFormula(fm), "forall x. P(x)")
   }
 
   test("print exists") {
-    val fm = Formula.Exists("x", Formula.Atom(FOL("P", List(Term.Var("x")))))
+    val fm = Formula.mkExists("x", Formula.Atom(FOL("P", List(Term.mkVar("x")))))
     assertEquals(printFormula(fm), "exists x. P(x)")
   }
 
   test("print nested quantifiers") {
-    val fm = Formula.Forall(
+    val fm = Formula.mkForall(
       "x",
-      Formula.Forall("y", Formula.Atom(FOL("P", List(Term.Var("x"), Term.Var("y"))))),
+      Formula.mkForall("y", Formula.Atom(FOL("P", List(Term.mkVar("x"), Term.mkVar("y"))))),
     )
     assertEquals(printFormula(fm), "forall x y. P(x, y)")
   }
 
   test("print mixed quantifiers") {
-    val fm = Formula.Forall(
+    val fm = Formula.mkForall(
       "x",
-      Formula.Exists("y", Formula.Atom(FOL("<", List(Term.Var("x"), Term.Var("y"))))),
+      Formula.mkExists("y", Formula.Atom(FOL("<", List(Term.mkVar("x"), Term.mkVar("y"))))),
     )
     assertEquals(printFormula(fm), "forall x. exists y. x < y")
   }
@@ -319,18 +319,18 @@ class FOLPrinterSpec extends FunSuite:
   // ==================== Edge Cases ====================
 
   test("print deeply nested formula") {
-    val fm      = Formula.Forall(
+    val fm      = Formula.mkForall(
       "x",
-      Formula.Exists(
+      Formula.mkExists(
         "y",
         Formula.Imp(
           Formula.And(
-            Formula.Atom(FOL("P", List(Term.Var("x")))),
-            Formula.Atom(FOL("Q", List(Term.Var("y")))),
+            Formula.Atom(FOL("P", List(Term.mkVar("x")))),
+            Formula.Atom(FOL("Q", List(Term.mkVar("y")))),
           ),
           Formula.Or(
-            Formula.Atom(FOL("R", List(Term.Var("x")))),
-            Formula.Not(Formula.Atom(FOL("S", List(Term.Var("y"))))),
+            Formula.Atom(FOL("R", List(Term.mkVar("x")))),
+            Formula.Not(Formula.Atom(FOL("S", List(Term.mkVar("y"))))),
           ),
         ),
       ),
@@ -342,13 +342,13 @@ class FOLPrinterSpec extends FunSuite:
   }
 
   test("print multiple consecutive foralls") {
-    val fm = Formula.Forall(
+    val fm = Formula.mkForall(
       "x",
-      Formula.Forall(
+      Formula.mkForall(
         "y",
-        Formula.Forall(
+        Formula.mkForall(
           "z",
-          Formula.Atom(FOL("P", List(Term.Var("x"), Term.Var("y"), Term.Var("z")))),
+          Formula.Atom(FOL("P", List(Term.mkVar("x"), Term.mkVar("y"), Term.mkVar("z")))),
         ),
       ),
     )
@@ -356,13 +356,13 @@ class FOLPrinterSpec extends FunSuite:
   }
 
   test("print multiple consecutive exists") {
-    val fm = Formula.Exists(
+    val fm = Formula.mkExists(
       "x",
-      Formula.Exists(
+      Formula.mkExists(
         "y",
-        Formula.Exists(
+        Formula.mkExists(
           "z",
-          Formula.Atom(FOL("P", List(Term.Var("x"), Term.Var("y"), Term.Var("z")))),
+          Formula.Atom(FOL("P", List(Term.mkVar("x"), Term.mkVar("y"), Term.mkVar("z")))),
         ),
       ),
     )
@@ -370,12 +370,12 @@ class FOLPrinterSpec extends FunSuite:
   }
 
   test("convenience method: print formula") {
-    val fm = Formula.Atom(FOL("P", List(Term.Var("x"))))
+    val fm = Formula.Atom(FOL("P", List(Term.mkVar("x"))))
     assertEquals(print(fm), "P(x)")
   }
 
   test("convenience method: print term") {
-    val tm = Term.Fn("f", List(Term.Var("x")))
+    val tm = Term.mkFn("f", List(Term.mkVar("x")))
     assertEquals(print(tm), "f(x)")
   }
 

@@ -154,7 +154,7 @@ object FOLUtil:
    */
   def generalize[A](fm: Formula[A], atomVars: A => List[String]): Formula[A] =
     val freeVars = fv(fm, atomVars)
-    freeVars.foldRight(fm)((x, f) => Formula.Forall(x, f))
+    freeVars.foldRight(fm)((x, f) => Formula.mkForall(x, f))
 
   /** Universal closure for FOL formulas */
   def generalizeFOL(fm: Formula[FOL]): Formula[FOL] =
@@ -246,9 +246,9 @@ object FOLUtil:
       case Formula.Iff(p, q)          =>
         Formula.Iff(subst(substMap, p), subst(substMap, q))
       case Formula.Forall(x, p)       =>
-        substQuant(substMap, x, p, Formula.Forall.apply)
+        substQuant(substMap, x, p, Formula.mkForall)
       case Formula.Exists(x, p)       =>
-        substQuant(substMap, x, p, Formula.Exists.apply)
+        substQuant(substMap, x, p, Formula.mkExists)
 
   /**
    * Helper for substitution in quantified formulas
@@ -274,7 +274,7 @@ object FOLUtil:
     else x
 
     // Build new substitution: map x to Var(x'), and keep other mappings
-    val newSubstMap = substMap + (x -> Term.Var(x2))
+    val newSubstMap = substMap + (x -> Term.mkVar(x2))
     quant(x2, subst(newSubstMap, p))
 
   end substQuant

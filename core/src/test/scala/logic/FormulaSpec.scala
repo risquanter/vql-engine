@@ -85,4 +85,16 @@ class FormulaSpec extends FunSuite:
       case _                         => fail("Should be Imp(And, Atom)")
   }
 
+  // ── quantifier building functions ─────────────────────────────────
+
+  test("mkForall and mkExists build the quantified formula for a word and a decimal"):
+    for x <- List("x", "0.5") do
+      assertEquals(mkForall(x, True), Forall(x, True))
+      assertEquals(mkExists(x, True), Exists(x, True))
+
+  test("mkForall and mkExists refuse a variable name no query text can produce"):
+    for x <- List("", "risk-id", "a b") do
+      intercept[IllegalArgumentException](mkForall(x, True))
+      intercept[IllegalArgumentException](mkExists(x, True))
+
 end FormulaSpec

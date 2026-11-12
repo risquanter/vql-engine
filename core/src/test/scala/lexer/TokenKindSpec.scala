@@ -79,17 +79,35 @@ class TokenKindSpec extends FunSuite:
     assertEquals(VariableText.of("0.5"), VariableText.Decimal(DecimalText("0.5")))
     assertEquals(VariableText.of("0.5").value, "0.5")
 
-  test("SymbolText.of reads a word, a decimal and each operator"):
+  private val predicateOperators: List[String] = List("=", "<", "<=", ">", ">=")
+  private val functionOperators: List[String]  = List("+", "-", "*", "/", "^", "::")
+
+  test("SymbolText.of reads a word, a decimal and each name operator"):
     assertEquals(SymbolText.of("large"), SymbolText.Word(WordText("large")))
     assertEquals(SymbolText.of("0.5"), SymbolText.Decimal(DecimalText("0.5")))
-    for symbol <- operators do
-      assertEquals(SymbolText.of(symbol.text), SymbolText.Operator(symbol))
-      assertEquals(SymbolText.of(symbol.text).value, symbol.text)
+    for text <- predicateOperators ++ functionOperators do
+      assertEquals(SymbolText.of(text), SymbolText.Operator(GrammarSymbol.fromText(text).get))
+      assertEquals(SymbolText.of(text).value, text)
+
+  test("a predicate name admits the relations, and a function name the term operators"):
+    for text <- predicateOperators do
+      assert(SymbolText.admitsPredicate(text), text)
+      assert(!SymbolText.admitsFunction(text), text)
+    for text <- functionOperators do
+      assert(SymbolText.admitsFunction(text), text)
+      assert(!SymbolText.admitsPredicate(text), text)
+    for name <- List("large", "0.5", "it's") do
+      assert(SymbolText.admitsPredicate(name) && SymbolText.admitsFunction(name), name)
+
+  test("no operator outside the name operators is a symbol name"):
+    for text <- List("(", ",", ".", "/\\", "==>", "~") do
+      assert(!SymbolText.admitsPredicate(text) && !SymbolText.admitsFunction(text), text)
+      intercept[IllegalArgumentException](SymbolText.of(text))
 
   test("names no query text can produce are not admitted, and of throws for them"):
     for name <- unproducibleNames do
       assert(!VariableText.admits(name), name)
-      assert(!SymbolText.admits(name), name)
+      assert(!SymbolText.admitsPredicate(name) && !SymbolText.admitsFunction(name), name)
       intercept[IllegalArgumentException](VariableText.of(name))
       intercept[IllegalArgumentException](SymbolText.of(name))
 

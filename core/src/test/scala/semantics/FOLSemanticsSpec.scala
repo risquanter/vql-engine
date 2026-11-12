@@ -69,29 +69,29 @@ class FOLSemanticsSpec extends FunSuite:
 
   test("eval variable") {
     val v    = Valuation(Map("x" -> 5))
-    val term = Term.Var("x")
+    val term = Term.mkVar("x")
     assertEquals(evalTerm(term, intModel.interpretation, v), 5)
   }
 
   test("eval constant") {
-    val term = Term.Const("1")
+    val term = Term.mkConst("1")
     assertEquals(evalTerm(term, intModel.interpretation, emptyVal), 1)
   }
 
   test("eval function application") {
     val v    = Valuation(Map("x" -> 3, "y" -> 4))
-    val term = Term.Fn("+", List(Term.Var("x"), Term.Var("y")))
+    val term = Term.mkFn("+", List(Term.mkVar("x"), Term.mkVar("y")))
     assertEquals(evalTerm(term, intModel.interpretation, v), 7)
   }
 
   test("eval nested function") {
     val v    = Valuation(Map("x" -> 2, "y" -> 3))
     // (x + y) * 2
-    val term = Term.Fn(
+    val term = Term.mkFn(
       "*",
       List(
-        Term.Fn("+", List(Term.Var("x"), Term.Var("y"))),
-        Term.Const("2"),
+        Term.mkFn("+", List(Term.mkVar("x"), Term.mkVar("y"))),
+        Term.mkConst("2"),
       ),
     )
     assertEquals(evalTerm(term, intModel.interpretation, v), 10)
@@ -100,11 +100,11 @@ class FOLSemanticsSpec extends FunSuite:
   test("eval complex arithmetic") {
     val v    = Valuation(Map("x" -> 3))
     // x * x - 1
-    val term = Term.Fn(
+    val term = Term.mkFn(
       "-",
       List(
-        Term.Fn("*", List(Term.Var("x"), Term.Var("x"))),
-        Term.Const("1"),
+        Term.mkFn("*", List(Term.mkVar("x"), Term.mkVar("x"))),
+        Term.mkConst("1"),
       ),
     )
     assertEquals(evalTerm(term, intModel.interpretation, v), 8)
@@ -333,12 +333,12 @@ class FOLSemanticsSpec extends FunSuite:
     val v = Valuation(Map("x" -> 3, "y" -> 4))
 
     assertEquals(
-      evalTerm(Term.Fn("+", List(Term.Var("x"), Term.Var("y"))), intModel.interpretation, v),
+      evalTerm(Term.mkFn("+", List(Term.mkVar("x"), Term.mkVar("y"))), intModel.interpretation, v),
       7,
     )
 
     assertEquals(
-      evalTerm(Term.Fn("*", List(Term.Var("x"), Term.Var("y"))), intModel.interpretation, v),
+      evalTerm(Term.mkFn("*", List(Term.mkVar("x"), Term.mkVar("y"))), intModel.interpretation, v),
       12,
     )
   }
@@ -358,7 +358,7 @@ class FOLSemanticsSpec extends FunSuite:
     val v         = Valuation(Map("x" -> true, "y" -> false))
 
     // Test that true is interpreted correctly
-    val trueTerm = Term.Const("true")
+    val trueTerm = Term.mkConst("true")
     assertEquals(evalTerm(trueTerm, boolModel.interpretation, v), true)
   }
 
@@ -385,11 +385,11 @@ class FOLSemanticsSpec extends FunSuite:
   test("term evaluation with nested operators") {
     val v    = Valuation(Map("x" -> 2))
     // ((x + 1) * (x - 1))
-    val term = Term.Fn(
+    val term = Term.mkFn(
       "*",
       List(
-        Term.Fn("+", List(Term.Var("x"), Term.Const("1"))),
-        Term.Fn("-", List(Term.Var("x"), Term.Const("1"))),
+        Term.mkFn("+", List(Term.mkVar("x"), Term.mkConst("1"))),
+        Term.mkFn("-", List(Term.mkVar("x"), Term.mkConst("1"))),
       ),
     )
     // (2 + 1) * (2 - 1) = 3 * 1 = 3

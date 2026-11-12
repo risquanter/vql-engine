@@ -81,24 +81,24 @@ class FormulaParserSpec extends FunSuite:
 
   test("parse universal quantifier") {
     val result = parseFromString("forall x . p")
-    assertEquals(result, Forall("x", Atom("p")))
+    assertEquals(result, mkForall("x", Atom("p")))
   }
 
   test("parse existential quantifier") {
     val result = parseFromString("exists x . p")
-    assertEquals(result, Exists("x", Atom("p")))
+    assertEquals(result, mkExists("x", Atom("p")))
   }
 
   test("parse multiple quantified variables (forall x y)") {
     val result = parseFromString("forall x y . p")
     // Should parse as: forall x. forall y. p
-    assertEquals(result, Forall("x", Forall("y", Atom("p"))))
+    assertEquals(result, mkForall("x", mkForall("y", Atom("p"))))
   }
 
   test("parse multiple quantified variables (exists x y z)") {
     val result = parseFromString("exists x y z . p")
     // Should parse as: exists x. exists y. exists z. p
-    assertEquals(result, Exists("x", Exists("y", Exists("z", Atom("p")))))
+    assertEquals(result, mkExists("x", mkExists("y", mkExists("z", Atom("p")))))
   }
 
   test("parse parenthesized formula") {
@@ -163,12 +163,12 @@ class FormulaParserSpec extends FunSuite:
 
   test("parse quantifier with conjunction") {
     val result = parseFromString("forall x . p /\\ q")
-    assertEquals(result, Forall("x", And(Atom("p"), Atom("q"))))
+    assertEquals(result, mkForall("x", And(Atom("p"), Atom("q"))))
   }
 
   test("parse nested quantifiers") {
     val result = parseFromString("forall x . exists y . p")
-    assertEquals(result, Forall("x", Exists("y", Atom("p"))))
+    assertEquals(result, mkForall("x", mkExists("y", Atom("p"))))
   }
 
   test("parse parentheses override precedence") {
@@ -180,7 +180,7 @@ class FormulaParserSpec extends FunSuite:
   test("parse complex nested formula") {
     // forall x . (p ==> q) /\ (r \/ s)
     val result   = parseFromString("forall x . ( p ==> q ) /\\ ( r \\/ s )")
-    val expected = Forall(
+    val expected = mkForall(
       "x",
       And(
         Imp(Atom("p"), Atom("q")),

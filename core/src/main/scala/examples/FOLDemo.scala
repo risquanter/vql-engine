@@ -62,24 +62,24 @@ def buildingFormulasDemo(): Unit =
   println("Terms (individual objects and expressions):")
 
   // Variables represent unknowns
-  val x = Term.Var("x")
-  val y = Term.Var("y")
+  val x = Term.mkVar("x")
+  val y = Term.mkVar("y")
   println(s"  Variable x: $x")
   println(s"  Variable y: $y")
 
   // Constants represent specific objects
-  val john = Term.Const("john")
-  val five = Term.Const("5")
+  val john = Term.mkConst("john")
+  val five = Term.mkConst("5")
   println(s"  Constant john: $john")
   println(s"  Constant 5: $five")
 
   // Functions combine terms
-  val age = Term.Fn("age", List(Term.Var("x")))
+  val age = Term.mkFn("age", List(Term.mkVar("x")))
   println(s"  Function age(x): $age")
 
   // The Term class has methods like +, -, *, / for building expressions
-  val expr1 = Term.Fn("+", List(Term.Var("x"), Term.Const("2"))) // x + 2
-  val expr2 = Term.Fn("*", List(Term.Const("3"), Term.Var("y"))) // 3 * y
+  val expr1 = Term.mkFn("+", List(Term.mkVar("x"), Term.mkConst("2"))) // x + 2
+  val expr2 = Term.mkFn("*", List(Term.mkConst("3"), Term.mkVar("y"))) // 3 * y
   println(s"  Expression x + 2: $expr1")
   println(s"  Expression 3 * y: $expr2")
   println()
@@ -87,9 +87,9 @@ def buildingFormulasDemo(): Unit =
   // Atomic formulas: predicates and relations
   println("Atomic formulas (basic statements):")
 
-  val pred1 = Formula.Atom(FOL("human", List(Term.Const("socrates"))))     // human(socrates)
-  val pred2 = Formula.Atom(FOL("mortal", List(Term.Var("x"))))             // mortal(x)
-  val rel   = Formula.Atom(FOL("=", List(Term.Var("x"), Term.Const("5")))) // x = 5
+  val pred1 = Formula.Atom(FOL("human", List(Term.mkConst("socrates"))))     // human(socrates)
+  val pred2 = Formula.Atom(FOL("mortal", List(Term.mkVar("x"))))             // mortal(x)
+  val rel   = Formula.Atom(FOL("=", List(Term.mkVar("x"), Term.mkConst("5")))) // x = 5
   println(s"  human(socrates): $pred1")
   println(s"  mortal(x): $pred2")
   println(s"  x = 5: $rel")
@@ -118,17 +118,17 @@ def buildingFormulasDemo(): Unit =
   println("Quantified formulas:")
 
   // Universal: forall x. P(x)
-  val universal = Formula.Forall("x", Formula.Atom(FOL("P", List(Term.Var("x")))))
+  val universal = Formula.mkForall("x", Formula.Atom(FOL("P", List(Term.mkVar("x")))))
   println(s"  Universal ∀x.P(x): ${FOLPrinter.printFormula(universal)}")
 
   // Existential: exists y. Q(y)
-  val existential = Formula.Exists("y", Formula.Atom(FOL("Q", List(Term.Var("y")))))
+  val existential = Formula.mkExists("y", Formula.Atom(FOL("Q", List(Term.mkVar("y")))))
   println(s"  Existential ∃y.Q(y): ${FOLPrinter.printFormula(existential)}")
 
   // Nested: forall x. exists y. R(x, y)
-  val nested = Formula.Forall(
+  val nested = Formula.mkForall(
     "x",
-    Formula.Exists("y", Formula.Atom(FOL("R", List(Term.Var("x"), Term.Var("y"))))),
+    Formula.mkExists("y", Formula.Atom(FOL("R", List(Term.mkVar("x"), Term.mkVar("y"))))),
   )
   println(s"  Nested ∀x.∃y.R(x,y): ${FOLPrinter.printFormula(nested)}")
   println()
@@ -191,15 +191,15 @@ def printingDemo(): Unit =
   println("-" * 80)
 
   // Build a complex formula
-  val formula = Formula.Forall(
+  val formula = Formula.mkForall(
     "x",
     Formula.Imp(
-      Formula.Atom(FOL("human", List(Term.Var("x")))),
-      Formula.Exists(
+      Formula.Atom(FOL("human", List(Term.mkVar("x")))),
+      Formula.mkExists(
         "y",
         Formula.And(
-          Formula.Atom(FOL("parent", List(Term.Var("y"), Term.Var("x")))),
-          Formula.Atom(FOL("human", List(Term.Var("y")))),
+          Formula.Atom(FOL("parent", List(Term.mkVar("y"), Term.mkVar("x")))),
+          Formula.Atom(FOL("human", List(Term.mkVar("y")))),
         ),
       ),
     ),
@@ -280,22 +280,22 @@ def simpleModelDemo(): Unit =
   println("Queries:")
 
   // Is bob parent of alice? (using constants - no valuation needed)
-  val q1 = Formula.Atom(FOL("parent", List(Term.Const("bob"), Term.Const("alice"))))
+  val q1 = Formula.Atom(FOL("parent", List(Term.mkConst("bob"), Term.mkConst("alice"))))
   println(s"  parent(bob, alice)? ${FOLSemantics.holds(q1, model, Valuation(Map.empty))}")
 
   // Is alice parent of bob?
-  val q2 = Formula.Atom(FOL("parent", List(Term.Const("alice"), Term.Const("bob"))))
+  val q2 = Formula.Atom(FOL("parent", List(Term.mkConst("alice"), Term.mkConst("bob"))))
   println(s"  parent(alice, bob)? ${FOLSemantics.holds(q2, model, Valuation(Map.empty))}")
 
   // Are alice and charlie siblings?
-  val q3 = Formula.Atom(FOL("sibling", List(Term.Const("alice"), Term.Const("charlie"))))
+  val q3 = Formula.Atom(FOL("sibling", List(Term.mkConst("alice"), Term.mkConst("charlie"))))
   println(s"  sibling(alice, charlie)? ${FOLSemantics.holds(q3, model, Valuation(Map.empty))}")
   println()
 
   // Quantified query: "Everyone has a parent"
-  val everyoneHasParent = Formula.Forall(
+  val everyoneHasParent = Formula.mkForall(
     "x",
-    Formula.Exists("y", Formula.Atom(FOL("parent", List(Term.Var("y"), Term.Var("x"))))),
+    Formula.mkExists("y", Formula.Atom(FOL("parent", List(Term.mkVar("y"), Term.mkVar("x"))))),
   )
 
   println(s"Query: ${FOLPrinter.printFormula(everyoneHasParent)}")
@@ -386,15 +386,15 @@ def arithmeticModelDemo(): Unit =
   println(s"  2 + 3 = 5? ${FOLSemantics.holds(sum, model, Valuation(Map.empty))}")
 
   // 4 is even
-  val evenFour = Formula.Atom(FOL("even", List(Term.Const("4"))))
+  val evenFour = Formula.Atom(FOL("even", List(Term.mkConst("4"))))
   println(s"  4 is even? ${FOLSemantics.holds(evenFour, model, Valuation(Map.empty))}")
 
   // 7 is prime
-  val primeSeven = Formula.Atom(FOL("prime", List(Term.Const("7"))))
+  val primeSeven = Formula.Atom(FOL("prime", List(Term.mkConst("7"))))
   println(s"  7 is prime? ${FOLSemantics.holds(primeSeven, model, Valuation(Map.empty))}")
 
   // 3 < 5
-  val comparison = Formula.Atom(FOL("<", List(Term.Const("3"), Term.Const("5"))))
+  val comparison = Formula.Atom(FOL("<", List(Term.mkConst("3"), Term.mkConst("5"))))
   println(s"  3 < 5? ${FOLSemantics.holds(comparison, model, Valuation(Map.empty))}")
   println()
 
@@ -429,7 +429,7 @@ def quantifiersDemo(): Unit =
 
   // Universal quantification: "All numbers are even"
   println("1. Universal quantification (forall):")
-  val allEven = Formula.Forall("x", Formula.Atom(FOL("even", List(Term.Var("x")))))
+  val allEven = Formula.mkForall("x", Formula.Atom(FOL("even", List(Term.mkVar("x")))))
   println(s"   Formula: ${FOLPrinter.printFormula(allEven)}")
   println(s"   Meaning: \"All numbers are even\"")
   println(s"   True? ${FOLSemantics.holds(allEven, model, Valuation(Map.empty))}")
@@ -438,7 +438,7 @@ def quantifiersDemo(): Unit =
 
   // Existential quantification: "Some number is even"
   println("2. Existential quantification (exists):")
-  val someEven = Formula.Exists("x", Formula.Atom(FOL("even", List(Term.Var("x")))))
+  val someEven = Formula.mkExists("x", Formula.Atom(FOL("even", List(Term.mkVar("x")))))
   println(s"   Formula: ${FOLPrinter.printFormula(someEven)}")
   println(s"   Meaning: \"Some number is even\"")
   println(s"   True? ${FOLSemantics.holds(someEven, model, Valuation(Map.empty))}")
@@ -447,9 +447,9 @@ def quantifiersDemo(): Unit =
 
   // Nested quantifiers: "For every x, there exists y such that x < y"
   println("3. Nested quantifiers:")
-  val hasGreater = Formula.Forall(
+  val hasGreater = Formula.mkForall(
     "x",
-    Formula.Exists("y", Formula.Atom(FOL("<", List(Term.Var("x"), Term.Var("y"))))),
+    Formula.mkExists("y", Formula.Atom(FOL("<", List(Term.mkVar("x"), Term.mkVar("y"))))),
   )
 
   println(s"   Formula: ${FOLPrinter.printFormula(hasGreater)}")
@@ -460,13 +460,13 @@ def quantifiersDemo(): Unit =
 
   // Quantifier order matters!
   println("4. Quantifier order matters:")
-  val version1 = Formula.Forall(
+  val version1 = Formula.mkForall(
     "x",
-    Formula.Exists("y", Formula.Atom(FOL("<", List(Term.Var("x"), Term.Var("y"))))),
+    Formula.mkExists("y", Formula.Atom(FOL("<", List(Term.mkVar("x"), Term.mkVar("y"))))),
   )
-  val version2 = Formula.Exists(
+  val version2 = Formula.mkExists(
     "y",
-    Formula.Forall("x", Formula.Atom(FOL("<", List(Term.Var("x"), Term.Var("y"))))),
+    Formula.mkForall("x", Formula.Atom(FOL("<", List(Term.mkVar("x"), Term.mkVar("y"))))),
   )
 
   println(s"   ∀x.∃y. x < y: ${FOLSemantics.holds(version1, model, Valuation(Map.empty))}")
@@ -531,16 +531,16 @@ def entailmentDemo(): Unit =
   val model          = Model(interpretation)
 
   // The premises
-  val premise1 = Formula.Forall(
+  val premise1 = Formula.mkForall(
     "x",
     Formula.Imp(
-      Formula.Atom(FOL("human", List(Term.Var("x")))),
-      Formula.Atom(FOL("mortal", List(Term.Var("x")))),
+      Formula.Atom(FOL("human", List(Term.mkVar("x")))),
+      Formula.Atom(FOL("mortal", List(Term.mkVar("x")))),
     ),
   )
 
-  val premise2   = Formula.Atom(FOL("human", List(Term.Const("socrates"))))
-  val conclusion = Formula.Atom(FOL("mortal", List(Term.Const("socrates"))))
+  val premise2   = Formula.Atom(FOL("human", List(Term.mkConst("socrates"))))
+  val conclusion = Formula.Atom(FOL("mortal", List(Term.mkConst("socrates"))))
 
   // Check if premises and conclusion hold
   println("In our model:")
@@ -555,7 +555,7 @@ def entailmentDemo(): Unit =
   println()
 
   // Invalid entailment: trying to conclude something not implied
-  val invalidConclusion = Formula.Atom(FOL("human", List(Term.Const("fido"))))
+  val invalidConclusion = Formula.Atom(FOL("human", List(Term.mkConst("fido"))))
   println("Testing invalid entailment:")
   println(
     s"  Can we conclude human(fido)? ${FOLSemantics.entails(premises, invalidConclusion, model)}"

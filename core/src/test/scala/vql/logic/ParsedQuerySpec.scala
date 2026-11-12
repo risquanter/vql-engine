@@ -18,8 +18,8 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = mkAbout(1, 2),
       variable = "x",
-      range = Atom(FOL("country", List(Var("x")))),
-      scope = Atom(FOL("large", List(Var("x")))),
+      range = Atom(FOL("country", List(mkVar("x")))),
+      scope = Atom(FOL("large", List(mkVar("x")))),
       answerVars = Nil,
     )
     assert(q.isBoolean)
@@ -31,8 +31,8 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = mkAbout(1, 2),
       variable = "x",
-      range = Atom(FOL("city", List(Var("x"), Var("y")))),
-      scope = Atom(FOL("large", List(Var("x")))),
+      range = Atom(FOL("city", List(mkVar("x"), mkVar("y")))),
+      scope = Atom(FOL("large", List(mkVar("x")))),
       answerVars = List("y"),
     )
     assert(!q.isBoolean)
@@ -44,12 +44,12 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = mkAtLeast(3, 4),
       variable = "x",
-      range = Atom(FOL("country", List(Var("x")))),
-      scope = Exists(
+      range = Atom(FOL("country", List(mkVar("x")))),
+      scope = mkExists(
         "y",
         And(
-          Atom(FOL("hasGDP", List(Var("x"), Var("y")))),
-          Atom(FOL("<", List(Var("y"), Const("20")))),
+          Atom(FOL("hasGDP", List(mkVar("x"), mkVar("y")))),
+          Atom(FOL("<", List(mkVar("y"), mkConst("20")))),
         ),
       ),
     )
@@ -62,7 +62,7 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = aboutHalf,
       variable = "x",
-      range = Atom(FOL("country", List(Var("x")))),
+      range = Atom(FOL("country", List(mkVar("x")))),
       scope = True,
     )
     assertEquals(q.rangeVars, Set("x"))
@@ -72,7 +72,7 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = aboutHalf,
       variable = "x",
-      range = Atom(FOL("city_of", List(Var("x"), Var("y")))),
+      range = Atom(FOL("city_of", List(mkVar("x"), mkVar("y")))),
       scope = True,
       answerVars = List("y"),
     )
@@ -87,8 +87,8 @@ class ParsedQuerySpec extends FunSuite:
         FOL(
           "relation",
           List(
-            Fn("f", List(Var("x"))),
-            Var("y"),
+            mkFn("f", List(mkVar("x"))),
+            mkVar("y"),
           ),
         )
       ),
@@ -102,8 +102,8 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = aboutHalf,
       variable = "x",
-      range = Atom(FOL("country", List(Var("x")))),
-      scope = Atom(FOL("large", List(Var("x")))),
+      range = Atom(FOL("country", List(mkVar("x")))),
+      scope = Atom(FOL("large", List(mkVar("x")))),
     )
     assert(q.scopeVars.contains("x"))
   }
@@ -118,8 +118,8 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = aboutHalf,
       variable = "x",
-      range = Atom(FOL("country", List(Var("x")))),
-      scope = Forall("y", Exists("z", Atom(FOL("P", List(Var("x"), Var("y"), Var("z")))))),
+      range = Atom(FOL("country", List(mkVar("x")))),
+      scope = mkForall("y", mkExists("z", Atom(FOL("P", List(mkVar("x"), mkVar("y"), mkVar("z")))))),
     )
     assertEquals(q.scopeVars, Set("x", "y", "z"))
   }
@@ -128,8 +128,8 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = aboutHalf,
       variable = "x",
-      range = Atom(FOL("country", List(Var("x")))),
-      scope = Atom(FOL("capital", List(Const("Paris")))),
+      range = Atom(FOL("country", List(mkVar("x")))),
+      scope = Atom(FOL("capital", List(mkConst("Paris")))),
     )
     // Constants don't contribute to variables
     assert(!q.scopeVars.contains("Paris"))
@@ -142,7 +142,7 @@ class ParsedQuerySpec extends FunSuite:
       mk(
         mkAbout(1, 2),
         "x",
-        FOL("country", List(Var("y"))), // x not in range!
+        FOL("country", List(mkVar("y"))), // x not in range!
         True,
       )
     }
@@ -154,7 +154,7 @@ class ParsedQuerySpec extends FunSuite:
       mk(
         mkAbout(1, 2),
         "x",
-        FOL("city_of", List(Var("x"), Var("y"))), // y in range
+        FOL("city_of", List(mkVar("x"), mkVar("y"))), // y in range
         True,
         Nil,                                      // but y not in answer vars!
       )
@@ -166,8 +166,8 @@ class ParsedQuerySpec extends FunSuite:
     val q = mk(
       mkAbout(1, 2),
       "x",
-      FOL("city_of", List(Var("x"), Var("y"))),
-      Atom(FOL("large", List(Var("x")))),
+      FOL("city_of", List(mkVar("x"), mkVar("y"))),
+      Atom(FOL("large", List(mkVar("x")))),
       List("y"),
     )
     assertEquals(q.rangeVars, Set("x", "y"))
@@ -177,8 +177,8 @@ class ParsedQuerySpec extends FunSuite:
     val q = mk(
       mkAbout(1, 2),
       "x",
-      FOL("country", List(Var("x"))),
-      Atom(FOL("large", List(Var("x")))),
+      FOL("country", List(mkVar("x"))),
+      Atom(FOL("large", List(mkVar("x")))),
     )
     assert(q.isBoolean)
   }
@@ -245,7 +245,7 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = aboutHalf,
       variable = "x",
-      range = Atom(FOL("country", List(Var("x")))),
+      range = Atom(FOL("country", List(mkVar("x")))),
       scope = True,
     )
     assert(q.isBoolean)
@@ -255,7 +255,7 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = aboutHalf,
       variable = "x",
-      range = Atom(FOL("city", List(Var("x"), Var("y")))),
+      range = Atom(FOL("city", List(mkVar("x"), mkVar("y")))),
       scope = True,
       answerVars = List("y"),
     )
@@ -266,7 +266,7 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = aboutHalf,
       variable = "x",
-      range = Atom(FOL("city", List(Var("x"), Var("y")))),
+      range = Atom(FOL("city", List(mkVar("x"), mkVar("y")))),
       scope = True,
       answerVars = List("y"),
     )
@@ -277,7 +277,7 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = aboutHalf,
       variable = "x",
-      range = Atom(FOL("relation", List(Var("x"), Var("y"), Var("z")))),
+      range = Atom(FOL("relation", List(mkVar("x"), mkVar("y"), mkVar("z")))),
       scope = True,
       answerVars = List("y", "z"),
     )
@@ -295,12 +295,12 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = mkAtLeast(2, 3),
       variable = "x",
-      range = Atom(FOL("country", List(Var("x")))),
+      range = Atom(FOL("country", List(mkVar("x")))),
       scope = And(
-        Atom(FOL("large", List(Var("x")))),
+        Atom(FOL("large", List(mkVar("x")))),
         Or(
-          Atom(FOL("wealthy", List(Var("x")))),
-          Atom(FOL("educated", List(Var("x")))),
+          Atom(FOL("wealthy", List(mkVar("x")))),
+          Atom(FOL("educated", List(mkVar("x")))),
         ),
       ),
     )
@@ -313,10 +313,10 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = almostAll,
       variable = "x",
-      range = Atom(FOL("country", List(Var("x")))),
+      range = Atom(FOL("country", List(mkVar("x")))),
       scope = Imp(
-        Atom(FOL("large", List(Var("x")))),
-        Atom(FOL("diverse", List(Var("x")))),
+        Atom(FOL("large", List(mkVar("x")))),
+        Atom(FOL("diverse", List(mkVar("x")))),
       ),
     )
 
@@ -328,8 +328,8 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = aboutTwoThirds,
       variable = "x",
-      range = Atom(FOL("country", List(Var("x")))),
-      scope = Exists("y", Forall("z", Atom(FOL("relation", List(Var("x"), Var("y"), Var("z")))))),
+      range = Atom(FOL("country", List(mkVar("x")))),
+      scope = mkExists("y", mkForall("z", Atom(FOL("relation", List(mkVar("x"), mkVar("y"), mkVar("z")))))),
     )
 
     val vars = q.scopeVars
@@ -344,7 +344,7 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = aboutHalf,
       variable = "x",
-      range = Atom(FOL("country", List(Var("x")))),
+      range = Atom(FOL("country", List(mkVar("x")))),
       scope = False,
     )
     assertEquals(q.scopeVars, Set.empty)
@@ -354,7 +354,7 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = aboutHalf,
       variable = "x",
-      range = Atom(FOL("country", List(Var("x")))),
+      range = Atom(FOL("country", List(mkVar("x")))),
       scope = True,
     )
     assertEquals(q.scopeVars, Set.empty)
@@ -364,10 +364,24 @@ class ParsedQuerySpec extends FunSuite:
     val q = ParsedQuery(
       quantifier = aboutHalf,
       variable = "x",
-      range = Atom(FOL("relation", List(Var("x"), Const("USA")))),
+      range = Atom(FOL("relation", List(mkVar("x"), mkConst("USA")))),
       scope = True,
     )
     assertEquals(q.rangeVars, Set("x"))
   }
+
+  // ==================== Names in a query ====================
+
+  test("tree case constructors do not compile outside the package logic"):
+    assert(compileErrors("""_root_.logic.Term.Var("x")""").nonEmpty)
+    assert(compileErrors("""new _root_.logic.FOL("p", Nil)""").nonEmpty)
+    assert(compileErrors("""_root_.logic.Term.mkVar("x") match { case v: _root_.logic.Term.Var => v.copy(name = "y") }""").nonEmpty)
+    assert(compileErrors("""_root_.logic.Formula.Forall("x", _root_.logic.Formula.True)""").nonEmpty)
+    assert(compileErrors("""_root_.logic.Formula.mkForall("x", _root_.logic.Formula.True)""").isEmpty)
+
+  test("a query with a variable or answer variable no query text can produce throws"):
+    val range = Atom(FOL("country", List(mkVar("x"))))
+    intercept[IllegalArgumentException](ParsedQuery(mkAbout(1, 2), "risk-id", range, True, Nil))
+    intercept[IllegalArgumentException](ParsedQuery(mkAbout(1, 2), "x", range, True, List("a b")))
 
 end ParsedQuerySpec

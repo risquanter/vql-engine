@@ -74,10 +74,10 @@ object FormulaParser:
         papply((p: Formula[A]) => Not(p))(parseAtomicFormula(ifn, afn)(vs)(rest))
 
       case Token.Word("forall") :: Token.Word(x) :: rest =>
-        parseQuant(ifn, afn)(x :: vs)((x: String, p: Formula[A]) => Forall(x, p))(x)(rest)
+        parseQuant(ifn, afn)(x :: vs)((x: String, p: Formula[A]) => mkForall(x, p))(x)(rest)
 
       case Token.Word("exists") :: Token.Word(x) :: rest =>
-        parseQuant(ifn, afn)(x :: vs)((x: String, p: Formula[A]) => Exists(x, p))(x)(rest)
+        parseQuant(ifn, afn)(x :: vs)((x: String, p: Formula[A]) => mkExists(x, p))(x)(rest)
 
       case _ =>
         // Default: parse as atom

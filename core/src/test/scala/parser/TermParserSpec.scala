@@ -9,17 +9,17 @@ class TermParserSpec extends FunSuite:
 
   test("parse variable") {
     val result = parseFromString("x")
-    assertEquals(result, Var("x"))
+    assertEquals(result, mkVar("x"))
   }
 
   test("parse constant (numeric)") {
     val result = parseFromString("42")
-    assertEquals(result, Const("42"))
+    assertEquals(result, mkConst("42"))
   }
 
   test("parse constant (nil)") {
     val result = parseFromString("nil")
-    assertEquals(result, Const("nil"))
+    assertEquals(result, mkConst("nil"))
   }
 
   test("parse constant (decimal, pre-merged token)") {
@@ -28,151 +28,151 @@ class TermParserSpec extends FunSuite:
     // StringUtil.isDecimalLiteral so QueryBinder gets Term.Const("0.05") not Var("0.05").
     import lexer.Token.*
     val (result, rest) = parse(List(Word("0.05")))
-    assertEquals(result, Const("0.05"))
+    assertEquals(result, mkConst("0.05"))
     assertEquals(rest, Nil)
   }
 
   test("parse function with no args") {
     val result = parseFromString("f()")
-    assertEquals(result, Fn("f", List()))
+    assertEquals(result, mkFn("f", List()))
   }
 
   test("parse function with one arg") {
     val result = parseFromString("f(x)")
-    assertEquals(result, Fn("f", List(Var("x"))))
+    assertEquals(result, mkFn("f", List(mkVar("x"))))
   }
 
   test("parse function with multiple args") {
     val result = parseFromString("f(x, y, z)")
-    assertEquals(result, Fn("f", List(Var("x"), Var("y"), Var("z"))))
+    assertEquals(result, mkFn("f", List(mkVar("x"), mkVar("y"), mkVar("z"))))
   }
 
   test("parse parenthesized term") {
     val result = parseFromString("(x)")
-    assertEquals(result, Var("x"))
+    assertEquals(result, mkVar("x"))
   }
 
   test("parse unary minus") {
     val result = parseFromString("- x")
-    assertEquals(result, Fn("-", List(Var("x"))))
+    assertEquals(result, mkFn("-", List(mkVar("x"))))
   }
 
   test("parse unary minus with constant") {
     val result = parseFromString("- 5")
-    assertEquals(result, Fn("-", List(Const("5"))))
+    assertEquals(result, mkFn("-", List(mkConst("5"))))
   }
 
   test("parse addition (infix)") {
     val result = parseFromString("x + y")
-    assertEquals(result, Fn("+", List(Var("x"), Var("y"))))
+    assertEquals(result, mkFn("+", List(mkVar("x"), mkVar("y"))))
   }
 
   test("parse subtraction (infix)") {
     val result = parseFromString("x - y")
-    assertEquals(result, Fn("-", List(Var("x"), Var("y"))))
+    assertEquals(result, mkFn("-", List(mkVar("x"), mkVar("y"))))
   }
 
   test("parse multiplication (infix)") {
     val result = parseFromString("x * y")
-    assertEquals(result, Fn("*", List(Var("x"), Var("y"))))
+    assertEquals(result, mkFn("*", List(mkVar("x"), mkVar("y"))))
   }
 
   test("parse division (infix)") {
     val result = parseFromString("x / y")
-    assertEquals(result, Fn("/", List(Var("x"), Var("y"))))
+    assertEquals(result, mkFn("/", List(mkVar("x"), mkVar("y"))))
   }
 
   test("parse exponentiation (infix)") {
     val result = parseFromString("x ^ y")
-    assertEquals(result, Fn("^", List(Var("x"), Var("y"))))
+    assertEquals(result, mkFn("^", List(mkVar("x"), mkVar("y"))))
   }
 
   test("parse cons (infix)") {
     val result = parseFromString("x :: y")
-    assertEquals(result, Fn("::", List(Var("x"), Var("y"))))
+    assertEquals(result, mkFn("::", List(mkVar("x"), mkVar("y"))))
   }
 
   test("parse addition right-associative (x + y + z)") {
     // + is right-associative: x + y + z = x + (y + z)
     val result = parseFromString("x + y + z")
-    assertEquals(result, Fn("+", List(Var("x"), Fn("+", List(Var("y"), Var("z"))))))
+    assertEquals(result, mkFn("+", List(mkVar("x"), mkFn("+", List(mkVar("y"), mkVar("z"))))))
   }
 
   test("parse subtraction left-associative (x - y - z)") {
     // - is left-associative: x - y - z = (x - y) - z
     val result = parseFromString("x - y - z")
-    assertEquals(result, Fn("-", List(Fn("-", List(Var("x"), Var("y"))), Var("z"))))
+    assertEquals(result, mkFn("-", List(mkFn("-", List(mkVar("x"), mkVar("y"))), mkVar("z"))))
   }
 
   test("parse multiplication right-associative (x * y * z)") {
     // * is right-associative: x * y * z = x * (y * z)
     val result = parseFromString("x * y * z")
-    assertEquals(result, Fn("*", List(Var("x"), Fn("*", List(Var("y"), Var("z"))))))
+    assertEquals(result, mkFn("*", List(mkVar("x"), mkFn("*", List(mkVar("y"), mkVar("z"))))))
   }
 
   test("parse division left-associative (x / y / z)") {
     // / is left-associative: x / y / z = (x / y) / z
     val result = parseFromString("x / y / z")
-    assertEquals(result, Fn("/", List(Fn("/", List(Var("x"), Var("y"))), Var("z"))))
+    assertEquals(result, mkFn("/", List(mkFn("/", List(mkVar("x"), mkVar("y"))), mkVar("z"))))
   }
 
   test("parse exponentiation left-associative (x ^ y ^ z)") {
     // ^ is left-associative in OCaml: x ^ y ^ z = (x ^ y) ^ z
     val result = parseFromString("x ^ y ^ z")
-    assertEquals(result, Fn("^", List(Fn("^", List(Var("x"), Var("y"))), Var("z"))))
+    assertEquals(result, mkFn("^", List(mkFn("^", List(mkVar("x"), mkVar("y"))), mkVar("z"))))
   }
 
   test("parse cons right-associative (x :: y :: z)") {
     // :: is right-associative: x :: y :: z = x :: (y :: z)
     val result = parseFromString("x :: y :: z")
-    assertEquals(result, Fn("::", List(Var("x"), Fn("::", List(Var("y"), Var("z"))))))
+    assertEquals(result, mkFn("::", List(mkVar("x"), mkFn("::", List(mkVar("y"), mkVar("z"))))))
   }
 
   test("parse precedence: ^ binds tighter than /") {
     // x / y ^ z should parse as: x / (y ^ z)
     val result = parseFromString("x / y ^ z")
-    assertEquals(result, Fn("/", List(Var("x"), Fn("^", List(Var("y"), Var("z"))))))
+    assertEquals(result, mkFn("/", List(mkVar("x"), mkFn("^", List(mkVar("y"), mkVar("z"))))))
   }
 
   test("parse precedence: / binds tighter than *") {
     // x * y / z should parse as: x * (y / z)
     val result = parseFromString("x * y / z")
-    assertEquals(result, Fn("*", List(Var("x"), Fn("/", List(Var("y"), Var("z"))))))
+    assertEquals(result, mkFn("*", List(mkVar("x"), mkFn("/", List(mkVar("y"), mkVar("z"))))))
   }
 
   test("parse precedence: * binds tighter than -") {
     // x - y * z should parse as: x - (y * z)
     val result = parseFromString("x - y * z")
-    assertEquals(result, Fn("-", List(Var("x"), Fn("*", List(Var("y"), Var("z"))))))
+    assertEquals(result, mkFn("-", List(mkVar("x"), mkFn("*", List(mkVar("y"), mkVar("z"))))))
   }
 
   test("parse precedence: - binds tighter than +") {
     // x + y - z should parse as: x + (y - z)
     val result = parseFromString("x + y - z")
-    assertEquals(result, Fn("+", List(Var("x"), Fn("-", List(Var("y"), Var("z"))))))
+    assertEquals(result, mkFn("+", List(mkVar("x"), mkFn("-", List(mkVar("y"), mkVar("z"))))))
   }
 
   test("parse precedence: + binds tighter than ::") {
     // x :: y + z should parse as: x :: (y + z)
     val result = parseFromString("x :: y + z")
-    assertEquals(result, Fn("::", List(Var("x"), Fn("+", List(Var("y"), Var("z"))))))
+    assertEquals(result, mkFn("::", List(mkVar("x"), mkFn("+", List(mkVar("y"), mkVar("z"))))))
   }
 
   test("parse parentheses override precedence") {
     // (x + y) * z - parentheses force + to be evaluated first
     val result = parseFromString("( x + y ) * z")
-    assertEquals(result, Fn("*", List(Fn("+", List(Var("x"), Var("y"))), Var("z"))))
+    assertEquals(result, mkFn("*", List(mkFn("+", List(mkVar("x"), mkVar("y"))), mkVar("z"))))
   }
 
   test("parse nested function calls") {
     val result = parseFromString("f(g(x), h(y))")
     assertEquals(
       result,
-      Fn(
+      mkFn(
         "f",
         List(
-          Fn("g", List(Var("x"))),
-          Fn("h", List(Var("y"))),
+          mkFn("g", List(mkVar("x"))),
+          mkFn("h", List(mkVar("y"))),
         ),
       ),
     )
@@ -183,11 +183,11 @@ class TermParserSpec extends FunSuite:
     val result = parseFromString("f( x + y , g(z) )")
     assertEquals(
       result,
-      Fn(
+      mkFn(
         "f",
         List(
-          Fn("+", List(Var("x"), Var("y"))),
-          Fn("g", List(Var("z"))),
+          mkFn("+", List(mkVar("x"), mkVar("y"))),
+          mkFn("g", List(mkVar("z"))),
         ),
       ),
     )
@@ -198,18 +198,18 @@ class TermParserSpec extends FunSuite:
     val result = parseFromString("1 - cos( power( x + y , 2 ) )")
     assertEquals(
       result,
-      Fn(
+      mkFn(
         "-",
         List(
-          Const("1"),
-          Fn(
+          mkConst("1"),
+          mkFn(
             "cos",
             List(
-              Fn(
+              mkFn(
                 "power",
                 List(
-                  Fn("+", List(Var("x"), Var("y"))),
-                  Const("2"),
+                  mkFn("+", List(mkVar("x"), mkVar("y"))),
+                  mkConst("2"),
                 ),
               )
             ),
@@ -246,11 +246,11 @@ class TermParserSpec extends FunSuite:
     // Answer: Fn("+", List(Fn("*", List(Fn("2"), Var("x"))), Fn("3")))
     assertEquals(
       result,
-      Fn(
+      mkFn(
         "+",
         List(
-          Fn("*", List(Const("2"), Var("x"))),
-          Const("3"),
+          mkFn("*", List(mkConst("2"), mkVar("x"))),
+          mkConst("3"),
         ),
       ),
     )
@@ -261,15 +261,15 @@ class TermParserSpec extends FunSuite:
     // :: is right-associative: 1 :: (2 :: nil)
     assertEquals(
       result,
-      Fn(
+      mkFn(
         "::",
         List(
-          Const("1"),
-          Fn(
+          mkConst("1"),
+          mkFn(
             "::",
             List(
-              Const("2"),
-              Const("nil"),
+              mkConst("2"),
+              mkConst("nil"),
             ),
           ),
         ),
@@ -303,7 +303,7 @@ class TermParserSpec extends FunSuite:
 
   test("parse multiple unary minus") {
     val result = parseFromString("- - x")
-    assertEquals(result, Fn("-", List(Fn("-", List(Var("x"))))))
+    assertEquals(result, mkFn("-", List(mkFn("-", List(mkVar("x"))))))
   }
 
   test("parse mixed operators with all precedence levels") {
@@ -313,27 +313,27 @@ class TermParserSpec extends FunSuite:
     val result = parseFromString("x :: y + z - w * u / v ^ 2")
     assertEquals(
       result,
-      Fn(
+      mkFn(
         "::",
         List(
-          Var("x"),
-          Fn(
+          mkVar("x"),
+          mkFn(
             "+",
             List(
-              Var("y"),
-              Fn(
+              mkVar("y"),
+              mkFn(
                 "-",
                 List(
-                  Var("z"),
-                  Fn(
+                  mkVar("z"),
+                  mkFn(
                     "*",
                     List(
-                      Var("w"),
-                      Fn(
+                      mkVar("w"),
+                      mkFn(
                         "/",
                         List(
-                          Var("u"),
-                          Fn("^", List(Var("v"), Const("2"))),
+                          mkVar("u"),
+                          mkFn("^", List(mkVar("v"), mkConst("2"))),
                         ),
                       ),
                     ),
@@ -348,14 +348,13 @@ class TermParserSpec extends FunSuite:
   }
 
   // -----------------------------------------------------------------------
-  // F2 tests (PLAN-QUERY-NODE-NAME-LITERALS §5.2)
   // Token.StringLit → Term.Const, plus regression coverage for adjacent paths.
   // -----------------------------------------------------------------------
 
   test("T1: StringLit token → Term.Const carrying inner content (multi-word)") {
     import lexer.Token.*
     val (result, rest) = parse(List(StringLit("IT Risk")))
-    assertEquals(result, Const("IT Risk"))
+    assertEquals(result, mkConst("IT Risk"))
     assertEquals(rest, Nil)
   }
 
@@ -364,38 +363,38 @@ class TermParserSpec extends FunSuite:
     // Quoted "42" must take the StringLit arm — same Const value as the
     // numeric path, but the path itself is the F2 contribution.
     val (result, rest) = parse(List(StringLit("42")))
-    assertEquals(result, Const("42"))
+    assertEquals(result, mkConst("42"))
     assertEquals(rest, Nil)
   }
 
   test("T3: bare alphanumeric Word → Term.Var (unchanged behaviour)") {
     val result = parseFromString("Cyber")
-    assertEquals(result, Var("Cyber"))
+    assertEquals(result, mkVar("Cyber"))
   }
 
   test("T4: bare numeric Word → Term.Const (numeric path, unchanged)") {
     val result = parseFromString("42")
-    assertEquals(result, Const("42"))
+    assertEquals(result, mkConst("42"))
   }
 
   test("F2 end-to-end via lex+parse: \"IT Risk\" round-trips to Term.Const") {
     val result = parseFromString("\"IT Risk\"")
-    assertEquals(result, Const("IT Risk"))
+    assertEquals(result, mkConst("IT Risk"))
   }
 
   test("F2: StringLit inside a function call — f(\"IT Risk\")") {
     val result = parseFromString("f(\"IT Risk\")")
-    assertEquals(result, Fn("f", List(Const("IT Risk"))))
+    assertEquals(result, mkFn("f", List(mkConst("IT Risk"))))
   }
 
   test("F2: mixed bare + quoted args — f(x, \"IT Risk\")") {
     val result = parseFromString("f(x, \"IT Risk\")")
-    assertEquals(result, Fn("f", List(Var("x"), Const("IT Risk"))))
+    assertEquals(result, mkFn("f", List(mkVar("x"), mkConst("IT Risk"))))
   }
 
   // -----------------------------------------------------------------------
-  // Regression: parseAtomicTerm Nil arm must raise ParseFailure (not the
-  // implicit MatchError it produced before the F1 rewrite). Without this,
+  // Regression: parseAtomicTerm Nil arm must raise ParseFailure, not a
+  // MatchError. Without this,
   // formula-level callers cannot backtrack from `term-expected` failures to
   // sibling alternatives such as the bracketed-formula branch reached by
   // inputs like `~(~p)`. See FOLAtomParserSpec "regression: ~(~p) ...".

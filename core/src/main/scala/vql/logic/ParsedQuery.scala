@@ -1,5 +1,6 @@
 package vql.logic
 
+import lexer.VariableText
 import logic.{FOL, FOLUtil, Formula, Term}
 import vql.error.QueryError
 import vql.quantifier.Quantifier
@@ -33,6 +34,8 @@ import vql.quantifier.Quantifier
  *   Scope predicate φ(x,y) as FOL formula
  * @param answerVars
  *   Free variables y (answer variables)
+ * @throws IllegalArgumentException
+ *   if `variable` or an answer variable is a name no query text can produce
  */
 case class ParsedQuery(
   quantifier: Quantifier,
@@ -40,6 +43,11 @@ case class ParsedQuery(
   range: Formula[FOL],
   scope: Formula[FOL],
   answerVars: List[String] = Nil):
+
+  require(
+    (variable :: answerVars).forall(VariableText.admits),
+    "A query's variable names must be words or decimals",
+  )
 
   /**
    * Free variables of the range formula R(x,y').
@@ -164,12 +172,12 @@ object ParsedQuery:
     ParsedQuery(
       quantifier = Quantifier.mkAtLeast(3, 4),
       variable = "x",
-      range = Atom(FOL("country", List(Var("x")))),
-      scope = Exists(
+      range = Atom(FOL("country", List(mkVar("x")))),
+      scope = mkExists(
         "y",
         And(
-          Atom(FOL("hasGDP_agr", List(Var("x"), Var("y")))),
-          Atom(FOL("<=", List(Var("y"), Const("20")))),
+          Atom(FOL("hasGDP_agr", List(mkVar("x"), mkVar("y")))),
+          Atom(FOL("<=", List(mkVar("y"), mkConst("20")))),
         ),
       ),
       answerVars = Nil, // Boolean query
@@ -190,7 +198,7 @@ object ParsedQuery:
     ParsedQuery(
       quantifier = Quantifier.mkAbout(1, 2),
       variable = "x",
-      range = Atom(FOL("capital", List(Var("x")))),
+      range = Atom(FOL("capital", List(mkVar("x")))),
       scope = True, // Placeholder - would be complex formula
       answerVars = List("y"),
     )
@@ -201,8 +209,8 @@ object ParsedQuery:
     ParsedQuery(
       quantifier = Quantifier.aboutHalf,
       variable = "x",
-      range = Atom(FOL("country", List(Var("x")))),
-      scope = Atom(FOL("large", List(Var("x")))),
+      range = Atom(FOL("country", List(mkVar("x")))),
+      scope = Atom(FOL("large", List(mkVar("x")))),
       answerVars = Nil,
     )
 

@@ -1,5 +1,6 @@
 package vql.typed
 
+import lexer.VariableText
 import logic.{FOL, Formula, Term}
 import vql.logic.ParsedQuery
 
@@ -35,13 +36,15 @@ object QueryBinder:
    * variables are exactly `variable`, and that variable's inferred sort is a domain type. Failure
    * modes, in order: the variable is absent from the formula ([[TypeCheckError.UnconstrainedVar]]);
    * some other free variable appears ([[TypeCheckError.UnexpectedFreeVar]]); the inferred sort is a
-   * value type ([[TypeCheckError.TypeNotQuantifiable]]).
+   * value type ([[TypeCheckError.TypeNotQuantifiable]]). Throws `IllegalArgumentException` when
+   * `variable` is a name no query text can produce.
    */
   def bindSatisfyingFormula(
     formula: Formula[FOL],
     variable: String,
     catalog: TypeCatalog,
   ): Either[List[TypeCheckError], (BoundFormula, BoundVar)] =
+    require(VariableText.admits(variable), "A variable name must be a word or a decimal")
     for
       result <- bindFormula(formula, Map.empty, catalog)
       (bound, env) = result

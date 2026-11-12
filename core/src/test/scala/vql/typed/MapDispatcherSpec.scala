@@ -57,18 +57,18 @@ class MapDispatcherSpec extends FunSuite:
     val d = MapDispatcher(predicates = Map(symLeaf -> (_ => Right(true))))
     assertEquals(d.functionSymbols, Set.empty[SymbolName])
 
-  // ─── Phase 4: primitive Any returns + value.extract[A] (PLAN §6) ──────────
+  // ─── primitive Any returns + value.extract[A] ────────────────────────────
 
-  test("Phase 4: function lambda returns primitive Any, evalFunction surfaces it unchanged"):
+  test("function lambda returns primitive Any, evalFunction surfaces it unchanged"):
     val d = MapDispatcher(
       predicates = Map(symLeaf -> (_ => Right(true))),
-      // Native primitive return: NOT wrapped in FloatLiteral. The dispatcher
-      // boundary is `Either[String, Any]` after Phase 4.
+      // Native primitive return. The dispatcher boundary is
+      // `Either[String, Any]`.
       functions = Map(symLec -> (_ => Right(0.07))),
     )
     assertEquals(d.evalFunction(symLec, Nil), Right(0.07))
 
-  test("Phase 4: dispatcher lambda consumes args via value.extract[A]"):
+  test("dispatcher lambda consumes args via value.extract[A]"):
     // gt_loss(a, b): both args are Loss-sorted Long carriers. The lambda
     // recovers Long via Extract[Long] (ADR-015 §2) — no asInstanceOf.
     val d = MapDispatcher(
@@ -90,7 +90,7 @@ class MapDispatcherSpec extends FunSuite:
       Right(false),
     )
 
-  test("Phase 4: value.extract[Long] returns Left for wrong-carrier Value"):
+  test("value.extract[Long] returns Left for wrong-carrier Value"):
     // A dispatcher lambda that miscalls the typeclass on a wrong-carrier
     // Value receives a descriptive Left rather than a runtime cast crash.
     val d = MapDispatcher(
@@ -368,13 +368,13 @@ class MapDispatcherSpec extends FunSuite:
   private val lecQuery = ParsedQuery(
     quantifier = Quantifier.About(1, 2, 0.01),
     variable = "x",
-    range = Formula.Atom(FOL(symLeaf.value, List(Term.Var("x")))),
+    range = Formula.Atom(FOL(symLeaf.value, List(Term.mkVar("x")))),
     scope = Formula.Atom(
       FOL(
         symGtProb.value,
         List(
-          Term.Fn(symLec.value, List(Term.Var("x"), Term.Const("10000000"))),
-          Term.Const("0.05"),
+          Term.mkFn(symLec.value, List(Term.mkVar("x"), Term.mkConst("10000000"))),
+          Term.mkConst("0.05"),
         ),
       )
     ),

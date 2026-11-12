@@ -22,37 +22,37 @@ class FOLAtomParserSpec extends FunSuite:
 
   test("parse predicate with one arg") {
     val result = parseFromString("P(x)")
-    assertEquals(result, Atom(FOL("P", List(Var("x")))))
+    assertEquals(result, Atom(FOL("P", List(mkVar("x")))))
   }
 
   test("parse predicate with multiple args") {
     val result = parseFromString("P(x, y, z)")
-    assertEquals(result, Atom(FOL("P", List(Var("x"), Var("y"), Var("z")))))
+    assertEquals(result, Atom(FOL("P", List(mkVar("x"), mkVar("y"), mkVar("z")))))
   }
 
   test("parse equality (infix)") {
     val result = parseFromString("x = y")
-    assertEquals(result, Atom(FOL("=", List(Var("x"), Var("y")))))
+    assertEquals(result, Atom(FOL("=", List(mkVar("x"), mkVar("y")))))
   }
 
   test("parse less than (infix)") {
     val result = parseFromString("x < y")
-    assertEquals(result, Atom(FOL("<", List(Var("x"), Var("y")))))
+    assertEquals(result, Atom(FOL("<", List(mkVar("x"), mkVar("y")))))
   }
 
   test("parse less than or equal (infix)") {
     val result = parseFromString("x <= y")
-    assertEquals(result, Atom(FOL("<=", List(Var("x"), Var("y")))))
+    assertEquals(result, Atom(FOL("<=", List(mkVar("x"), mkVar("y")))))
   }
 
   test("parse greater than (infix)") {
     val result = parseFromString("x > y")
-    assertEquals(result, Atom(FOL(">", List(Var("x"), Var("y")))))
+    assertEquals(result, Atom(FOL(">", List(mkVar("x"), mkVar("y")))))
   }
 
   test("parse greater than or equal (infix)") {
     val result = parseFromString("x >= y")
-    assertEquals(result, Atom(FOL(">=", List(Var("x"), Var("y")))))
+    assertEquals(result, Atom(FOL(">=", List(mkVar("x"), mkVar("y")))))
   }
 
   test("parse infix with complex terms: (x + y) < z") {
@@ -63,8 +63,8 @@ class FOLAtomParserSpec extends FunSuite:
         FOL(
           "<",
           List(
-            Fn("+", List(Var("x"), Var("y"))),
-            Var("z"),
+            mkFn("+", List(mkVar("x"), mkVar("y"))),
+            mkVar("z"),
           ),
         )
       ),
@@ -79,8 +79,8 @@ class FOLAtomParserSpec extends FunSuite:
         FOL(
           "P",
           List(
-            Fn("f", List(Var("x"))),
-            Fn("g", List(Var("y"), Var("z"))),
+            mkFn("f", List(mkVar("x"))),
+            mkFn("g", List(mkVar("y"), mkVar("z"))),
           ),
         )
       ),
@@ -91,7 +91,7 @@ class FOLAtomParserSpec extends FunSuite:
 
   test("parse negation of predicate") {
     val result = parseFromString("~ P(x)")
-    assertEquals(result, Not(Atom(FOL("P", List(Var("x"))))))
+    assertEquals(result, Not(Atom(FOL("P", List(mkVar("x"))))))
   }
 
   test("parse conjunction of predicates") {
@@ -99,8 +99,8 @@ class FOLAtomParserSpec extends FunSuite:
     assertEquals(
       result,
       And(
-        Atom(FOL("P", List(Var("x")))),
-        Atom(FOL("Q", List(Var("y")))),
+        Atom(FOL("P", List(mkVar("x")))),
+        Atom(FOL("Q", List(mkVar("y")))),
       ),
     )
   }
@@ -110,8 +110,8 @@ class FOLAtomParserSpec extends FunSuite:
     assertEquals(
       result,
       Or(
-        Atom(FOL("P", List(Var("x")))),
-        Atom(FOL("Q", List(Var("y")))),
+        Atom(FOL("P", List(mkVar("x")))),
+        Atom(FOL("Q", List(mkVar("y")))),
       ),
     )
   }
@@ -121,27 +121,27 @@ class FOLAtomParserSpec extends FunSuite:
     assertEquals(
       result,
       Imp(
-        Atom(FOL("P", List(Var("x")))),
-        Atom(FOL("Q", List(Var("x")))),
+        Atom(FOL("P", List(mkVar("x")))),
+        Atom(FOL("Q", List(mkVar("x")))),
       ),
     )
   }
 
   test("parse universal quantification") {
     val result = parseFromString("forall x . P(x)")
-    assertEquals(result, Forall("x", Atom(FOL("P", List(Var("x"))))))
+    assertEquals(result, mkForall("x", Atom(FOL("P", List(mkVar("x"))))))
   }
 
   test("parse existential quantification") {
     val result = parseFromString("exists x . P(x)")
-    assertEquals(result, Exists("x", Atom(FOL("P", List(Var("x"))))))
+    assertEquals(result, mkExists("x", Atom(FOL("P", List(mkVar("x"))))))
   }
 
   test("parse forall with infix relation") {
     val result = parseFromString("forall x . x < 2")
     assertEquals(
       result,
-      Forall("x", Atom(FOL("<", List(Var("x"), Const("2"))))),
+      mkForall("x", Atom(FOL("<", List(mkVar("x"), mkConst("2"))))),
     )
   }
 
@@ -149,7 +149,7 @@ class FOLAtomParserSpec extends FunSuite:
     val result = parseFromString("forall x . exists y . x < y")
     assertEquals(
       result,
-      Forall("x", Exists("y", Atom(FOL("<", List(Var("x"), Var("y")))))),
+      mkForall("x", mkExists("y", Atom(FOL("<", List(mkVar("x"), mkVar("y")))))),
     )
   }
 
@@ -157,15 +157,15 @@ class FOLAtomParserSpec extends FunSuite:
     val result = parseFromString("forall x y . exists z . x < z /\\ y < z")
     assertEquals(
       result,
-      Forall(
+      mkForall(
         "x",
-        Forall(
+        mkForall(
           "y",
-          Exists(
+          mkExists(
             "z",
             And(
-              Atom(FOL("<", List(Var("x"), Var("z")))),
-              Atom(FOL("<", List(Var("y"), Var("z")))),
+              Atom(FOL("<", List(mkVar("x"), mkVar("z")))),
+              Atom(FOL("<", List(mkVar("y"), mkVar("z")))),
             ),
           ),
         ),
@@ -178,15 +178,15 @@ class FOLAtomParserSpec extends FunSuite:
     val result = parseFromString("forall x . P(x) ==> exists y . Q(x, y) /\\ R(y)")
     assertEquals(
       result,
-      Forall(
+      mkForall(
         "x",
         Imp(
-          Atom(FOL("P", List(Var("x")))),
-          Exists(
+          Atom(FOL("P", List(mkVar("x")))),
+          mkExists(
             "y",
             And(
-              Atom(FOL("Q", List(Var("x"), Var("y")))),
-              Atom(FOL("R", List(Var("y")))),
+              Atom(FOL("Q", List(mkVar("x"), mkVar("y")))),
+              Atom(FOL("R", List(mkVar("y")))),
             ),
           ),
         ),
@@ -202,14 +202,14 @@ class FOLAtomParserSpec extends FunSuite:
         FOL(
           "=",
           List(
-            Fn(
+            mkFn(
               "+",
               List(
-                Fn("*", List(Const("2"), Var("x"))),
-                Const("1"),
+                mkFn("*", List(mkConst("2"), mkVar("x"))),
+                mkConst("1"),
               ),
             ),
-            Var("y"),
+            mkVar("y"),
           ),
         )
       ),
@@ -218,7 +218,7 @@ class FOLAtomParserSpec extends FunSuite:
 
   test("parse parenthesized infix relation") {
     val result = parseFromString("( x < y )")
-    assertEquals(result, Atom(FOL("<", List(Var("x"), Var("y")))))
+    assertEquals(result, Atom(FOL("<", List(mkVar("x"), mkVar("y")))))
   }
 
   test("parse precedence: conjunction binds tighter than implication") {
@@ -228,10 +228,10 @@ class FOLAtomParserSpec extends FunSuite:
       result,
       Imp(
         And(
-          Atom(FOL("P", List(Var("x")))),
-          Atom(FOL("Q", List(Var("x")))),
+          Atom(FOL("P", List(mkVar("x")))),
+          Atom(FOL("Q", List(mkVar("x")))),
         ),
-        Atom(FOL("R", List(Var("x")))),
+        Atom(FOL("R", List(mkVar("x")))),
       ),
     )
   }
@@ -243,17 +243,17 @@ class FOLAtomParserSpec extends FunSuite:
 
   test("parse mixed true/false with predicates") {
     val result = parseFromString("P(x) \\/ false")
-    assertEquals(result, Or(Atom(FOL("P", List(Var("x")))), False))
+    assertEquals(result, Or(Atom(FOL("P", List(mkVar("x")))), False))
   }
 
   test("parse negation of quantified formula") {
     val result = parseFromString("~ forall x . P(x)")
-    assertEquals(result, Not(Forall("x", Atom(FOL("P", List(Var("x")))))))
+    assertEquals(result, Not(mkForall("x", Atom(FOL("P", List(mkVar("x")))))))
   }
 
   test("parse double negation") {
     val result = parseFromString("~ ~ P(x)")
-    assertEquals(result, Not(Not(Atom(FOL("P", List(Var("x")))))))
+    assertEquals(result, Not(Not(Atom(FOL("P", List(mkVar("x")))))))
   }
 
   // Regression: `~(~p)` (no space, parenthesised inner negation). Before the
@@ -275,8 +275,8 @@ class FOLAtomParserSpec extends FunSuite:
         FOL(
           "=",
           List(
-            Fn("f", List(Var("x"))),
-            Fn("g", List(Var("y"))),
+            mkFn("f", List(mkVar("x"))),
+            mkFn("g", List(mkVar("y"))),
           ),
         )
       ),
@@ -291,8 +291,8 @@ class FOLAtomParserSpec extends FunSuite:
         FOL(
           "<",
           List(
-            Fn("+", List(Var("x"), Var("y"))),
-            Var("z"),
+            mkFn("+", List(mkVar("x"), mkVar("y"))),
+            mkVar("z"),
           ),
         )
       ),
@@ -304,8 +304,8 @@ class FOLAtomParserSpec extends FunSuite:
     assertEquals(
       result,
       Iff(
-        Atom(FOL("P", List(Var("x")))),
-        Atom(FOL("Q", List(Var("x")))),
+        Atom(FOL("P", List(mkVar("x")))),
+        Atom(FOL("Q", List(mkVar("x")))),
       ),
     )
   }
@@ -315,15 +315,15 @@ class FOLAtomParserSpec extends FunSuite:
     val result = parseFromString("exists x . forall y . exists z . P(x, y) ==> Q(y, z)")
     assertEquals(
       result,
-      Exists(
+      mkExists(
         "x",
-        Forall(
+        mkForall(
           "y",
-          Exists(
+          mkExists(
             "z",
             Imp(
-              Atom(FOL("P", List(Var("x"), Var("y")))),
-              Atom(FOL("Q", List(Var("y"), Var("z")))),
+              Atom(FOL("P", List(mkVar("x"), mkVar("y")))),
+              Atom(FOL("Q", List(mkVar("y"), mkVar("z")))),
             ),
           ),
         ),
@@ -339,14 +339,14 @@ class FOLAtomParserSpec extends FunSuite:
         FOL(
           "<",
           List(
-            Fn(
+            mkFn(
               "+",
               List(
-                Fn("*", List(Const("2"), Var("x"))),
-                Const("3"),
+                mkFn("*", List(mkConst("2"), mkVar("x"))),
+                mkConst("3"),
               ),
             ),
-            Fn("-", List(Var("y"), Const("1"))),
+            mkFn("-", List(mkVar("y"), mkConst("1"))),
           ),
         )
       ),

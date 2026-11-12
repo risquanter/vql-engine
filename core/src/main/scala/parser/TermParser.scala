@@ -57,10 +57,11 @@ object TermParser:
    *
    * Scala extensions:
    *  - [[lexer.Token.StringLit]] (quoted literal, e.g. `"IT Risk"`) → always
-   *    a [[Term.Const]] carrying the inner content; resolves D2 from
-   *    PLAN-QUERY-NODE-NAME-LITERALS.md (the "bare alphanumeric is always a
-   *    Var" defect) for the multi-word path. The numeric / `nil` / decimal
-   *    legacy path through [[isConstName]] is preserved unchanged.
+   *    a [[Term.Const]] carrying the inner content, so a multi-word name is
+   *    a constant and never a variable. The numeric / `nil` / decimal path
+   *    through [[isConstName]] is unchanged.
+   *  - Every term is built through [[Term.mkVar]], [[Term.mkFn]] and
+   *    [[Term.mkConst]], where the OCaml source applies the constructors.
    */
   def parseAtomicTerm(vs: List[String])(inp: List[Token]): ParseResult[Term] =
     inp match
@@ -77,20 +78,20 @@ object TermParser:
 
       case Token.OpSym("-") :: rest =>
         // Unary minus
-        papply((t: Term) => Fn("-", List(t)))(parseAtomicTerm(vs)(rest))
+        papply((t: Term) => Term.mkFn("-", List(t)))(parseAtomicTerm(vs)(rest))
 
       case Token.StringLit(content) :: rest =>
-        // Quoted literal (D1/D2 fix path) — always a constant whose value is
+        // Quoted literal — always a constant whose value is
         // the inner content. The lexer has already stripped surrounding quotes.
-        (Term.Const(content), rest)
+        (Term.mkConst(content), rest)
 
       case Token.Word(f) :: Token.LParen :: Token.RParen :: rest =>
         // Function with no arguments: f()
-        (Fn(f, List()), rest)
+        (Term.mkFn(f, List()), rest)
 
       case Token.Word(f) :: Token.LParen :: rest =>
         // Function with arguments: f(arg1, arg2, ...)
-        papply((args: List[Term]) => Fn(f, args))(
+        papply((args: List[Term]) => Term.mkFn(f, args))(
           parseBracketed(
             parseList(Token.Comma)(parseTerm(vs)),
             Token.RParen,
@@ -105,8 +106,8 @@ object TermParser:
         // for zero-arity constants because its `term` type has no Const variant.
         // This Scala port adds Term.Const precisely so QueryBinder can distinguish
         // inline literals from zero-arity function applications at the bind phase.
-        if isConstName(a) && !vs.contains(a) then (Term.Const(a), rest)
-        else (Var(a), rest)
+        if isConstName(a) && !vs.contains(a) then (Term.mkConst(a), rest)
+        else (Term.mkVar(a), rest)
 
       case _ :: _ =>
         // Token cannot start a term — backtrackable failure (see Nil arm note).
@@ -124,12 +125,12 @@ object TermParser:
    * 6. ^   (exponentiation)            - LEFT associative
    */
   def parseTerm(vs: List[String])(inp: List[Token]): ParseResult[Term] =
-    parseRightInfix(Token.OpSym("::"), (e1: Term, e2: Term) => Fn("::", List(e1, e2)))(
-      parseRightInfix(Token.OpSym("+"), (e1: Term, e2: Term) => Fn("+", List(e1, e2)))(
-        parseLeftInfix(Token.OpSym("-"), (e1: Term, e2: Term) => Fn("-", List(e1, e2)))(
-          parseRightInfix(Token.OpSym("*"), (e1: Term, e2: Term) => Fn("*", List(e1, e2)))(
-            parseLeftInfix(Token.OpSym("/"), (e1: Term, e2: Term) => Fn("/", List(e1, e2)))(
-              parseLeftInfix(Token.OpSym("^"), (e1: Term, e2: Term) => Fn("^", List(e1, e2)))(
+    parseRightInfix(Token.OpSym("::"), (e1: Term, e2: Term) => Term.mkFn("::", List(e1, e2)))(
+      parseRightInfix(Token.OpSym("+"), (e1: Term, e2: Term) => Term.mkFn("+", List(e1, e2)))(
+        parseLeftInfix(Token.OpSym("-"), (e1: Term, e2: Term) => Term.mkFn("-", List(e1, e2)))(
+          parseRightInfix(Token.OpSym("*"), (e1: Term, e2: Term) => Term.mkFn("*", List(e1, e2)))(
+            parseLeftInfix(Token.OpSym("/"), (e1: Term, e2: Term) => Term.mkFn("/", List(e1, e2)))(
+              parseLeftInfix(Token.OpSym("^"), (e1: Term, e2: Term) => Term.mkFn("^", List(e1, e2)))(
                 parseAtomicTerm(vs)
               )
             )

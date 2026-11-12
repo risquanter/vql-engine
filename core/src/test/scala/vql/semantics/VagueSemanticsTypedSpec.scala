@@ -44,8 +44,8 @@ class VagueSemanticsTypedSpec extends FunSuite:
   private val query = ParsedQuery(
     quantifier = Quantifier.About(1, 2, 0.01),
     variable = "x",
-    range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
-    scope = Formula.Atom(FOL("coastal", List(Term.Var("x")))),
+    range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
+    scope = Formula.Atom(FOL("coastal", List(Term.mkVar("x")))),
     answerVars = Nil,
   )
 
@@ -157,8 +157,8 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val badQuery = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = "x",
-      range = Formula.Atom(FOL("nonexistent_predicate", List(Term.Var("x")))),
-      scope = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      range = Formula.Atom(FOL("nonexistent_predicate", List(Term.mkVar("x")))),
+      scope = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
       answerVars = Nil,
     )
     val result   = VagueSemantics.bindTyped(badQuery, catalog)
@@ -173,8 +173,8 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val badQuery   = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = "x",
-      range = Formula.Atom(FOL("nonexistent_predicate", List(Term.Var("x")))),
-      scope = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      range = Formula.Atom(FOL("nonexistent_predicate", List(Term.mkVar("x")))),
+      scope = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
       answerVars = Nil,
     )
     val dispatcher = new RuntimeDispatcher:
@@ -238,7 +238,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = "x",
-      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
       scope = scope,
       answerVars = Nil,
     )
@@ -255,7 +255,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
   test(
     "AC-1/AC-7: a sole unparseable constant surfaces its sort name through evaluateTyped, with one rendered source"
   ):
-    val e = bindErrorFor(Formula.Atom(FOL("big", List(Term.Var("x"), Term.Const("abc")))))
+    val e = bindErrorFor(Formula.Atom(FOL("big", List(Term.mkVar("x"), Term.mkConst("abc")))))
     e.details match
       case List(d: BindErrorDetail.UnparseableConstant) =>
         assertEquals(d.sortName, "Loss")
@@ -265,7 +265,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       case other => fail(s"expected one UnparseableConstant detail, got $other")
 
   test("AC-3: a homogeneous non-node unparseable carries both sort name and rendered message"):
-    val e = bindErrorFor(Formula.Atom(FOL("likely", List(Term.Var("x"), Term.Const("2.0")))))
+    val e = bindErrorFor(Formula.Atom(FOL("likely", List(Term.mkVar("x"), Term.mkConst("2.0")))))
     e.details match
       case List(d: BindErrorDetail.UnparseableConstant) =>
         assertEquals(d.sortName, "Probability")
@@ -273,7 +273,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       case other => fail(s"expected one UnparseableConstant detail, got $other")
 
   test("AC-5: messages match the plain rendered strings a text-only consumer reads"):
-    val e = bindErrorFor(Formula.Atom(FOL("big", List(Term.Var("x"), Term.Const("abc")))))
+    val e = bindErrorFor(Formula.Atom(FOL("big", List(Term.mkVar("x"), Term.mkConst("abc")))))
     assertEquals(e.messages, List("cannot parse 'abc' as Loss"))
 
   test("AC-6: BindErrorDetail is built from primitives only — no typed value crosses the boundary"):
@@ -286,10 +286,10 @@ class VagueSemanticsTypedSpec extends FunSuite:
 
   // Scope fragments over the sortCatalog fixture (range is leaf(x), so x: Asset).
   private def bigConst(c: String): Formula[FOL] =
-    Formula.Atom(FOL("big", List(Term.Var("x"), Term.Const(c))))
+    Formula.Atom(FOL("big", List(Term.mkVar("x"), Term.mkConst(c))))
 
   private val leafArity2: Formula[FOL] =
-    Formula.Atom(FOL("leaf", List(Term.Var("x"), Term.Var("x"))))
+    Formula.Atom(FOL("leaf", List(Term.mkVar("x"), Term.mkVar("x"))))
 
   private def bindErrorForQuery(q: ParsedQuery, fm: FolModel): QueryError.BindError =
     VagueSemantics.evaluateTyped(q, fm, samplingParams = SamplingParams.exact) match
@@ -373,8 +373,8 @@ class VagueSemanticsTypedSpec extends FunSuite:
       )
         .fold(e => fail(s"FolModel construction failed: $e"), identity)
 
-    def lossAtom(v: String) = Formula.Atom(FOL("lossp", List(Term.Var(v))))
-    def probAtom(v: String) = Formula.Atom(FOL("probp", List(Term.Var(v))))
+    def lossAtom(v: String) = Formula.Atom(FOL("lossp", List(Term.mkVar(v))))
+    def probAtom(v: String) = Formula.Atom(FOL("probp", List(Term.mkVar(v))))
     val scope               = Formula.And(
       Formula.And(lossAtom("u"), lossAtom("v")),
       Formula.And(probAtom("u"), probAtom("v")),
@@ -382,7 +382,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val q                   = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = "x",
-      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
       scope = scope,
       answerVars = Nil,
     )
@@ -431,7 +431,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val queryOverLoss = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = "l",
-      range = Formula.Atom(FOL("hasloss", List(Term.Var("l")))),
+      range = Formula.Atom(FOL("hasloss", List(Term.mkVar("l")))),
       scope = Formula.True,
       answerVars = Nil,
     )
@@ -448,8 +448,8 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val queryWithInnerForall = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = "x",
-      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
-      scope = Formula.Forall("l", Formula.Atom(FOL("hasloss", List(Term.Var("l"))))),
+      range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
+      scope = Formula.mkForall("l", Formula.Atom(FOL("hasloss", List(Term.mkVar("l"))))),
       answerVars = Nil,
     )
     val model  = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
@@ -464,8 +464,8 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val queryWithInnerExists = ParsedQuery(
       quantifier = Quantifier.About(1, 2, 0.01),
       variable = "x",
-      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
-      scope = Formula.Exists("l", Formula.Atom(FOL("hasloss", List(Term.Var("l"))))),
+      range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
+      scope = Formula.mkExists("l", Formula.Atom(FOL("hasloss", List(Term.mkVar("l"))))),
       answerVars = Nil,
     )
     val model  = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)

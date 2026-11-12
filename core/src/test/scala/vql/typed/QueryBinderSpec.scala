@@ -34,9 +34,9 @@ class QueryBinderSpec extends FunSuite:
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(2, 3),
       variable = "x",
-      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
       scope = Formula.Atom(
-        FOL("gt_loss", List(Term.Fn("p95", List(Term.Var("x"))), Term.Const("5000000")))
+        FOL("gt_loss", List(Term.mkFn("p95", List(Term.mkVar("x"))), Term.mkConst("5000000")))
       ),
       answerVars = Nil,
     )
@@ -48,11 +48,11 @@ class QueryBinderSpec extends FunSuite:
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
-      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
       scope = Formula.Atom(
         FOL(
           "gt_prob",
-          List(Term.Fn("lec", List(Term.Var("x"), Term.Const("10000000"))), Term.Const("0.05")),
+          List(Term.mkFn("lec", List(Term.mkVar("x"), Term.mkConst("10000000"))), Term.mkConst("0.05")),
         )
       ),
       answerVars = Nil,
@@ -65,9 +65,9 @@ class QueryBinderSpec extends FunSuite:
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
-      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
       scope =
-        Formula.Atom(FOL("gt_loss", List(Term.Fn("p95", List(Term.Var("x"))), Term.Const("0.05")))),
+        Formula.Atom(FOL("gt_loss", List(Term.mkFn("p95", List(Term.mkVar("x"))), Term.mkConst("0.05")))),
       answerVars = Nil,
     )
 
@@ -78,7 +78,7 @@ class QueryBinderSpec extends FunSuite:
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
-      range = Formula.Atom(FOL("unknown_range", List(Term.Var("x")))),
+      range = Formula.Atom(FOL("unknown_range", List(Term.mkVar("x")))),
       scope = Formula.True,
       answerVars = Nil,
     )
@@ -105,7 +105,7 @@ class QueryBinderSpec extends FunSuite:
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "l",
-      range = Formula.Atom(FOL("gt_loss", List(Term.Var("l"), Term.Var("l")))),
+      range = Formula.Atom(FOL("gt_loss", List(Term.mkVar("l"), Term.mkVar("l")))),
       scope = Formula.True,
       answerVars = Nil,
     )
@@ -119,8 +119,8 @@ class QueryBinderSpec extends FunSuite:
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
-      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
-      scope = Formula.Forall("l", Formula.Atom(FOL("gt_loss", List(Term.Var("l"), Term.Var("l"))))),
+      range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
+      scope = Formula.mkForall("l", Formula.Atom(FOL("gt_loss", List(Term.mkVar("l"), Term.mkVar("l"))))),
       answerVars = Nil,
     )
     QueryBinder.bind(query, catalogWithValueType) match
@@ -133,8 +133,8 @@ class QueryBinderSpec extends FunSuite:
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
-      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
-      scope = Formula.Exists("l", Formula.Atom(FOL("gt_loss", List(Term.Var("l"), Term.Var("l"))))),
+      range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
+      scope = Formula.mkExists("l", Formula.Atom(FOL("gt_loss", List(Term.mkVar("l"), Term.mkVar("l"))))),
       answerVars = Nil,
     )
     QueryBinder.bind(query, catalogWithValueType) match
@@ -147,7 +147,7 @@ class QueryBinderSpec extends FunSuite:
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
-      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
       scope = Formula.True,
       answerVars = Nil,
     )
@@ -163,8 +163,8 @@ class QueryBinderSpec extends FunSuite:
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
       range = Formula.And(
-        Formula.Atom(FOL("leaf", List(Term.Var("x")))),
-        Formula.Atom(FOL("gt_loss", List(Term.Var("x"), Term.Var("x")))),
+        Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
+        Formula.Atom(FOL("gt_loss", List(Term.mkVar("x"), Term.mkVar("x")))),
       ),
       scope = Formula.True,
       answerVars = Nil,
@@ -182,8 +182,8 @@ class QueryBinderSpec extends FunSuite:
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
       range = Formula.And(
-        Formula.Atom(FOL("leaf", List(Term.Var("x")))),
-        Formula.Exists("l", Formula.Atom(FOL("gt_loss", List(Term.Var("l"), Term.Var("l"))))),
+        Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
+        Formula.mkExists("l", Formula.Atom(FOL("gt_loss", List(Term.mkVar("l"), Term.mkVar("l"))))),
       ),
       scope = Formula.True,
       answerVars = Nil,
@@ -198,8 +198,8 @@ class QueryBinderSpec extends FunSuite:
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
       range = Formula.Or(
-        Formula.Atom(FOL("leaf", List(Term.Var("x")))),
-        Formula.Not(Formula.Atom(FOL("leaf", List(Term.Var("x"))))),
+        Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
+        Formula.Not(Formula.Atom(FOL("leaf", List(Term.mkVar("x"))))),
       ),
       scope = Formula.True,
       answerVars = Nil,
@@ -256,9 +256,9 @@ class QueryBinderSpec extends FunSuite:
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
-      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
       scope = Formula.Atom(
-        FOL("gt_loss", List(Term.Fn("p95", List(Term.Var("x"))), Term.Const("5000000")))
+        FOL("gt_loss", List(Term.mkFn("p95", List(Term.mkVar("x"))), Term.mkConst("5000000")))
       ),
       answerVars = Nil,
     )
@@ -279,11 +279,11 @@ class QueryBinderSpec extends FunSuite:
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
-      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
       scope = Formula.Atom(
         FOL(
           "gt_prob",
-          List(Term.Fn("lec", List(Term.Var("x"), Term.Const("10000000"))), Term.Const("0.05")),
+          List(Term.mkFn("lec", List(Term.mkVar("x"), Term.mkConst("10000000"))), Term.mkConst("0.05")),
         )
       ),
       answerVars = Nil,
@@ -307,10 +307,10 @@ class QueryBinderSpec extends FunSuite:
     val query = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
-      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
       // "0.05" cannot be parsed as Long for the loss sort.
       scope =
-        Formula.Atom(FOL("gt_loss", List(Term.Fn("p95", List(Term.Var("x"))), Term.Const("0.05")))),
+        Formula.Atom(FOL("gt_loss", List(Term.mkFn("p95", List(Term.mkVar("x"))), Term.mkConst("0.05")))),
       answerVars = Nil,
     )
     QueryBinder.bind(query, catalogPrim) match
@@ -336,9 +336,9 @@ class QueryBinderSpec extends FunSuite:
     val query       = ParsedQuery(
       quantifier = Quantifier.mkAtLeast(1, 2),
       variable = "x",
-      range = Formula.Atom(FOL("leaf", List(Term.Var("x")))),
+      range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
       scope = Formula.Atom(
-        FOL("gt_loss", List(Term.Fn("p95", List(Term.Var("x"))), Term.Const("5000000")))
+        FOL("gt_loss", List(Term.mkFn("p95", List(Term.mkVar("x"))), Term.mkConst("5000000")))
       ),
       answerVars = Nil,
     )
@@ -356,5 +356,10 @@ class QueryBinderSpec extends FunSuite:
           s"must not produce UnparseableConstant when no validator registered: $errs",
         )
       case Right(_)   => fail("expected Left for sort with no validator")
+
+  test("a BoundVar or satisfying-set variable no query text can produce throws"):
+    intercept[IllegalArgumentException](BoundVar("risk-id", asset))
+    val f = Formula.Atom(FOL("leaf", List(Term.mkVar("x"))))
+    intercept[IllegalArgumentException](QueryBinder.bindSatisfyingFormula(f, "risk-id", catalog))
 
 end QueryBinderSpec

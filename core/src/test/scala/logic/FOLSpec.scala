@@ -70,4 +70,15 @@ class FOLSpec extends FunSuite:
       case _ => fail("Should match nested quantifiers with conjunction")
   }
 
+  // ── the checked apply ─────────────────────────────────────────────
+
+  test("FOL(…) builds an atom for a word, a decimal and a relation"):
+    assertEquals(FOL("p", List(Var("x"))).predicate, "p")
+    assertEquals(FOL("0.5", Nil).predicate, "0.5")
+    for op <- List("=", "<", "<=", ">", ">=") do assertEquals(FOL(op, Nil).predicate, op)
+
+  test("FOL(…) refuses a predicate name no query text can produce"):
+    for name <- List("", "risk-id", "a b", "+", "(") do
+      intercept[IllegalArgumentException](FOL(name, Nil))
+
 end FOLSpec
