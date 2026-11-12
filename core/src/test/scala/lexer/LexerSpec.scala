@@ -238,12 +238,16 @@ class LexerSpec extends FunSuite:
     assertEquals(lex(explode("\"\"")), List(StringLit("")))
   }
 
-  test("L3 — unterminated string literal raises LexerError") {
-    intercept[LexerError](lex(explode("\"abc")))
+  test("L3 — unterminated string literal raises LexerError at the end of the input") {
+    val e = intercept[LexerError](lex(explode("\"abc")))
+    assertEquals(e.failure, LexFailure.UnterminatedLiteral)
+    assertEquals(e.remaining, 0)
   }
 
-  test("L4 — newline inside string literal raises LexerError") {
-    intercept[LexerError](lex(explode("\"a\nb\"")))
+  test("L4 — newline inside string literal raises LexerError at the newline") {
+    val e = intercept[LexerError](lex(explode("\"a\nb\"")))
+    assertEquals(e.failure, LexFailure.NewlineInLiteral)
+    assertEquals(e.remaining, 3)
   }
 
   test("L5 — each punctuation char emits its dedicated Token case") {
@@ -260,11 +264,16 @@ class LexerSpec extends FunSuite:
     )
   }
 
-  test("L6b — quoted literal preserves all internal characters verbatim") {
-    assertEquals(
-      lex(explode("\"a, b. (c) [d] {e} ==> f\"")),
-      List(StringLit("a, b. (c) [d] {e} ==> f")),
-    )
+  test("L6b — quoted literal keeps every character of the literal alphabet verbatim") {
+    val alphabet = "abcdefghijklmnopqrstuvwxyz" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "0123456789" + " /_.+-"
+    assertEquals(lex(explode("\"" + alphabet + "\"")), List(StringLit(alphabet)))
   }
+
+  for refused <- List('<', '>', '&', '\'', ',', '(', '\r', '\t') do
+    test(f"L7 — quoted literal refuses U+${refused.toInt}%04X at its position") {
+      val e = intercept[LexerError](lex(explode("\"a" + refused + "b\"")))
+      assertEquals(e.failure, LexFailure.RefusedLiteralCharacter)
+      assertEquals(e.remaining, 3)
+    }
 
 end LexerSpec

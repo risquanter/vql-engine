@@ -1,10 +1,8 @@
 package parser
 
-import scala.util.control.NonFatal
-
-import lexer.{Lexer, LexerError, Token}
+import lexer.{Lexer, LexerError, Token, TokenKind}
 import logic.{FOL, Formula}
-import parser.Combinators.tokensLabel
+import parser.Combinators.{ParseFailure, SyntaxError}
 import util.StringUtil.explode
 
 /**
@@ -14,10 +12,10 @@ import util.StringUtil.explode
  * parser.
  *
  * The string-input entries return `Either[ParseError, Formula[FOL]]`: a single `try/catch` at each
- * entry converts the foundation's internal backtracking exceptions (ADR-007 C2/C12) into a typed
- * value, so no exception escapes the public API. The failure is classified into a [[ParseError]]
- * variant — `Lex`, `Trailing`, or `Syntax`. `parseTokens` keeps the combinator tuple shape (C1) for
- * callers that lex themselves.
+ * entry converts the foundation's own exceptions (ADR-007 C2/C12) into a typed value, so none of
+ * them escapes the public API. The failure is classified into a [[ParseError]] variant — `Lex`,
+ * `Trailing`, or `Syntax`. `parseTokens` keeps the combinator tuple shape (C1) for callers that lex
+ * themselves.
  *
  * OCaml equivalent: let parse = make_parser (parse_formula (parse_infix_atom,parse_atom) []) let
  * default_parser = parse
@@ -38,8 +36,10 @@ object FOLParser:
   /**
    * Parse with a custom lexer.
    *
-   * `Left(ParseError.Lex)` on a lexer error, `Left(ParseError.Trailing)` when a formula parses but
-   * tokens remain, `Left(ParseError.Syntax)` on any other parse failure.
+   * `Left(ParseError.Lex)` on a lexer error, with the offset of the refused character.
+   * `Left(ParseError.Trailing)` when a formula parses but tokens remain. `Left(ParseError.Syntax)`
+   * when a parser throws its own failure. Any other exception, including one the custom `lexer`
+   * throws, propagates.
    */
   def parseWithLexer(
     s: String,
@@ -48,13 +48,13 @@ object FOLParser:
     try
       val tokens         = lexer(explode(s))
       val (result, rest) = parseTokens(tokens)
-      if rest.isEmpty then Right(result)
-      else Left(ParseError.Trailing(tokensLabel(rest)))
+      rest match
+        case Nil           => Right(result)
+        case first :: more =>
+          Left(ParseError.Trailing(TokenKind.of(first), more.map(TokenKind.of), SourcePosition.Unknown))
     catch
-      case e: LexerError => Left(ParseError.Lex(detailOf(e)))
-      case NonFatal(e)   => Left(ParseError.Syntax(detailOf(e)))
-
-  private def detailOf(e: Throwable): String =
-    Option(e.getMessage).getOrElse(e.getClass.getSimpleName)
+      case e: LexerError   => Left(ParseError.Lex(e.failure, SourcePosition.At(s.length - e.remaining)))
+      case e: ParseFailure => Left(ParseError.Syntax(e.failure, SourcePosition.Unknown))
+      case e: SyntaxError  => Left(ParseError.Syntax(e.failure, SourcePosition.Unknown))
 
 end FOLParser

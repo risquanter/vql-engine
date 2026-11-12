@@ -1,5 +1,6 @@
 package parser
 
+import lexer.{GrammarSymbol, LexFailure, TokenKind, WordText}
 import logic.{FOL, Formula, Term}
 import logic.Formula.*
 import logic.Term.*
@@ -139,21 +140,56 @@ class FOLParserSpec extends FunSuite:
   // ── Either error contract: no exception escapes the string entries ──
 
   test("parse returns Left (Trailing) on unparsed trailing input") {
-    FOLParser.parse("P(x) )") match
-      case Left(ParseError.Trailing(rem)) => assert(rem.nonEmpty)
-      case other                          => fail(s"expected Left(Trailing), got $other")
+    assertEquals(
+      FOLParser.parse("P(x) )"),
+      Left(ParseError.Trailing(TokenKind.Symbol(GrammarSymbol.RParen), Nil, SourcePosition.Unknown)),
+    )
   }
 
   test("parse returns Left (Syntax) on empty input") {
-    FOLParser.parse("") match
-      case Left(ParseError.Syntax(_)) => ()
-      case other                      => fail(s"expected Left(Syntax), got $other")
+    assertEquals(
+      FOLParser.parse(""),
+      Left(ParseError.Syntax(SyntaxFailure.FormulaExpected, SourcePosition.Unknown)),
+    )
   }
 
-  test("parse returns Left (Lex) on lexer error") {
-    FOLParser.parse("\"unterminated") match
-      case Left(ParseError.Lex(_)) => ()
-      case other                   => fail(s"expected Left(Lex), got $other")
+  test("parse returns Left (Lex) on lexer error, at the end of the input") {
+    assertEquals(
+      FOLParser.parse("\"unterminated"),
+      Left(ParseError.Lex(LexFailure.UnterminatedLiteral, SourcePosition.At(13))),
+    )
+  }
+
+  test("parse returns Left (Lex) at the offset of a refused literal character") {
+    assertEquals(
+      FOLParser.parse("P(\"a<b\")"),
+      Left(ParseError.Lex(LexFailure.RefusedLiteralCharacter, SourcePosition.At(4))),
+    )
+  }
+
+  test("parse returns Left (Lex) at the offset of a newline inside a literal") {
+    assertEquals(
+      FOLParser.parse("P(\"a\nb\")"),
+      Left(ParseError.Lex(LexFailure.NewlineInLiteral, SourcePosition.At(4))),
+    )
+  }
+
+  test("parse returns Left (Syntax) carrying the token a term was expected at") {
+    assertEquals(
+      FOLParser.parse("P(x,)"),
+      Left(
+        ParseError.Syntax(
+          SyntaxFailure.TermExpected(lexer.Found.Token(TokenKind.Symbol(GrammarSymbol.RParen))),
+          SourcePosition.Unknown,
+        )
+      ),
+    )
+  }
+
+  test("parseWithLexer propagates an exception the custom lexer throws") {
+    intercept[IllegalStateException] {
+      FOLParser.parseWithLexer("P(x)", _ => throw new IllegalStateException("lexer defect"))
+    }
   }
 
   test("parse returns Left on incomplete quantifier") {
@@ -170,9 +206,10 @@ class FOLParserSpec extends FunSuite:
   }
 
   test("parseWithLexer returns Left (Trailing) with remaining on trailing input") {
-    FOLParser.parseWithLexer("P(x) extra", lexer.Lexer.lex) match
-      case Left(ParseError.Trailing(rem)) => assert(rem.nonEmpty)
-      case other                          => fail(s"expected Left(Trailing), got $other")
+    assertEquals(
+      FOLParser.parseWithLexer("P(x) extra", lexer.Lexer.lex),
+      Left(ParseError.Trailing(TokenKind.Word(WordText("extra")), Nil, SourcePosition.Unknown)),
+    )
   }
 
   test("parseWithLexer returns Left on malformed input") {

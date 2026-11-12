@@ -30,7 +30,7 @@ class FormulaParserSpec extends FunSuite:
 
   /** No infix atoms for simple propositional logic */
   def parseNoInfix(vs: List[String], inp: List[Token]): ParseResult[String] =
-    throw new ParseFailure("No infix atoms in propositional logic")
+    throw new ParseFailure(SyntaxFailure.NotAnInfixAtom)
 
   /** Helper to parse from string */
   def parseFromString(s: String): Formula[String] =

@@ -403,9 +403,10 @@ class TermParserSpec extends FunSuite:
   test(
     "regression: parseAtomicTerm on empty input raises ParseFailure (catchable for backtracking)"
   ) {
-    intercept[parser.Combinators.ParseFailure] {
+    val e = intercept[parser.Combinators.ParseFailure] {
       parse(Nil)
     }
+    assertEquals(e.failure, SyntaxFailure.TermExpected(lexer.Found.EndOfInput))
   }
 
 end TermParserSpec

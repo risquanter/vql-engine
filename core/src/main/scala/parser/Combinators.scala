@@ -1,6 +1,6 @@
 package parser
 
-import lexer.Token
+import lexer.{Found, Token, TokenKind}
 
 /**
  * Parser combinator infrastructure following OCaml style from formulas.ml
@@ -22,7 +22,14 @@ object Combinators:
    * broad `case _: Exception` clause — always name this type explicitly so real programming errors
    * (NPE, StackOverflow, etc.) are not silently swallowed as parse failures. See ADR-007 C2.
    */
-  class ParseFailure(msg: String) extends Exception(msg)
+  class ParseFailure(val failure: SyntaxFailure) extends Exception(failure.message)
+
+  /**
+   * Signals a parse failure no parser backtracks over: the ported `failwith` sites that OCaml's
+   * `try … with Failure _` never reaches. Its message is the OCaml text, word for word (ADR-007
+   * C12).
+   */
+  class SyntaxError(val failure: SyntaxFailure) extends Exception(failure.message)
 
   /**
    * Parse result type: (parsed_value, remaining_tokens)
@@ -123,9 +130,7 @@ object Combinators:
     val (ast, rest) = subparser(inp)
     if nextin(rest, cbra) then (ast, rest.tail)
     else
-      throw new ParseFailure(
-        s"Closing bracket '${tokenLabel(cbra)}' expected, but got: ${rest.headOption.map(tokenLabel).getOrElse("end of input")}"
-      )
+      throw new ParseFailure(SyntaxFailure.ClosingBracketExpected(TokenKind.of(cbra), Found.of(rest)))
 
   /** Helper to check if token list is empty */
   def isEmpty(inp: List[Token]): Boolean = inp.isEmpty

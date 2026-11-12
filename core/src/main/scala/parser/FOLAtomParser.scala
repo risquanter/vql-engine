@@ -1,6 +1,6 @@
 package parser
 
-import lexer.Token
+import lexer.{Found, Token}
 import logic.{FOL, Formula, Term}
 import logic.Formula.*
 import parser.Combinators.*
@@ -39,7 +39,7 @@ object FOLAtomParser:
       case Token.OpSym(op) :: tl if relOps.contains(op) =>
         papply((tm2: Term) => FOL(op, List(tm, tm2)))(parseTerm(vs)(tl))
       case _                                            =>
-        throw ParseFailure("Not an infix atom")
+        throw ParseFailure(SyntaxFailure.NotAnInfixAtom)
 
   /**
    * Parse general atom (predicate)
@@ -61,7 +61,7 @@ object FOLAtomParser:
       case _: ParseFailure =>
         inp match
           case Nil =>
-            throw new Exception("parse_atom: expected atom")
+            throw new SyntaxError(SyntaxFailure.AtomExpected(Found.of(inp)))
 
           case Token.Word(p) :: Token.LParen :: Token.RParen :: rest =>
             // Predicate with no arguments: P()
@@ -82,7 +82,7 @@ object FOLAtomParser:
             (FOL(p, List()), rest)
 
           case _ =>
-            throw new Exception("parse_atom")
+            throw new SyntaxError(SyntaxFailure.AtomExpected(Found.of(inp)))
 
   /**
    * Complete FOL formula parser

@@ -1,6 +1,6 @@
 package parser
 
-import lexer.Token
+import lexer.{Found, Token}
 import logic.Term
 import logic.Term.*
 import parser.Combinators.*
@@ -69,7 +69,7 @@ object TermParser:
         // parseAtomicFormula) can backtrack to the bracketed-formula branch
         // for inputs like `~(~p)` where the leading `(` is not the start of a
         // term-level atom. ADR-007 C2: preserve OCaml error semantics.
-        throw new ParseFailure("term expected")
+        throw new ParseFailure(SyntaxFailure.TermExpected(Found.of(inp)))
 
       case Token.LParen :: rest =>
         // Parenthesized term
@@ -108,9 +108,9 @@ object TermParser:
         if isConstName(a) && !vs.contains(a) then (Term.Const(a), rest)
         else (Var(a), rest)
 
-      case other :: _ =>
+      case _ :: _ =>
         // Token cannot start a term — backtrackable failure (see Nil arm note).
-        throw new ParseFailure(s"term expected, got: ${tokenLabel(other)}")
+        throw new ParseFailure(SyntaxFailure.TermExpected(Found.of(inp)))
 
   /**
    * Parse term with all infix operators.

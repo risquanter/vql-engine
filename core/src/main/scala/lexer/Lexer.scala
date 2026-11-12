@@ -3,15 +3,15 @@ package lexer
 import util.StringUtil.*
 
 /**
- * Signals an unrecoverable lexer error.
+ * Signals an unrecoverable lexer error in a `"…"`-delimited string literal.
  *
- * Used for malformed `"…"`-delimited string literals (unterminated; embedded newline). Mirrors the
- * exception-based error idiom established by the OCaml-ported parser combinators (ADR-002, ADR-007
- * C2, ADR-012 §"Relationship to ADR-007"). Distinct from `Combinators.ParseFailure` so the public
- * `parse` boundary in `VagueQueryParser` can map it to a structured `QueryError.ParseError` without
- * conflating with parser-level backtracking.
+ * `remaining` counts the characters from the refused one to the end of the input, and is 0 when
+ * the input ended inside the literal. A boundary turns it into an offset as `s.length - remaining`.
+ * Mirrors the exception-based error idiom of the OCaml-ported parser combinators (ADR-002, ADR-007
+ * C2, ADR-012 §"Relationship to ADR-007"). Distinct from `Combinators.ParseFailure` so a boundary
+ * maps it without conflating it with parser-level backtracking.
  */
-class LexerError(msg: String) extends Exception(msg)
+class LexerError(val failure: LexFailure, val remaining: Int) extends Exception(failure.message)
 
 /**
  * Lexical analysis following OCaml style from intro.ml
@@ -69,22 +69,32 @@ object Lexer:
     case '.' => Token.Dot
 
   /**
+   * The characters a quoted literal admits: letters, digits and `_` as in a bare word without the
+   * apostrophe, the space, `/` and `-` of consumer node names, and the `.`, `+` and `-` of a
+   * number.
+   */
+  private[lexer] val literalChars: Set[Char] =
+    ("abcdefghijklmnopqrstuvwxyz" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "0123456789" + " /_.+-").toSet
+
+  /**
    * Consume a `"…"`-delimited string literal up to (but not including) the closing quote. No
-   * backslash escaping (per plan D-4); embedded newlines raise [[LexerError]]; missing closing
-   * quote raises [[LexerError]].
+   * backslash escaping. A missing closing quote, an embedded newline and a character outside
+   * [[literalChars]] each raise [[LexerError]].
    *
    * Caller has already consumed the opening `"`. Returns `(content, rest)` where `rest` begins
    * immediately after the closing `"`.
    */
   private def lexStringLit(inp: List[Char]): (String, List[Char]) =
     inp match
-      case Nil         =>
-        throw new LexerError("Unterminated string literal: missing closing '\"'")
-      case '\n' :: _   =>
-        throw new LexerError("Unterminated string literal: newline before closing '\"'")
-      case '"' :: rest =>
+      case Nil                                 =>
+        throw new LexerError(LexFailure.UnterminatedLiteral, 0)
+      case '\n' :: _                           =>
+        throw new LexerError(LexFailure.NewlineInLiteral, inp.length)
+      case '"' :: rest                         =>
         ("", rest)
-      case c :: cs     =>
+      case c :: _ if !literalChars.contains(c) =>
+        throw new LexerError(LexFailure.RefusedLiteralCharacter, inp.length)
+      case c :: cs                             =>
         val (tail, rest) = lexStringLit(cs)
         (c.toString + tail, rest)
 
@@ -105,8 +115,9 @@ object Lexer:
    *  - punctuation chars in [[punctChars]] short-circuit to dedicated [[Token]]
    *    cases before the symbolic check (resolves the `.`/`,` overlap noted in
    *    `StringUtil.symbolic`);
-   *  - `"` opens a [[Token.StringLit]] branch consuming verbatim until the
-   *    matching `"` (no escapes; newline ⇒ [[LexerError]]).
+   *  - `"` opens a [[Token.StringLit]] branch consuming until the matching `"`
+   *    (no escapes; a newline or a character outside the literal alphabet ⇒
+   *    [[LexerError]]).
    */
   def lex(inp: List[Char]): List[Token] =
     // Skip whitespace: snd(lexwhile space inp)
@@ -116,7 +127,7 @@ object Lexer:
       case Nil => Nil
 
       case '"' :: cs =>
-        // String-literal branch (NEW per D1 fix; no OCaml counterpart).
+        // String-literal branch (no OCaml counterpart).
         val (content, rest) = lexStringLit(cs)
         Token.StringLit(content) :: lex(rest)
 

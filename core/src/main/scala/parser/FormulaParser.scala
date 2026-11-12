@@ -1,6 +1,6 @@
 package parser
 
-import lexer.Token
+import lexer.{Found, Token}
 import logic.Formula
 import logic.Formula.*
 import parser.Combinators.*
@@ -54,7 +54,7 @@ object FormulaParser:
   ): ParseResult[Formula[A]] =
     inp match
       case Nil =>
-        throw new Exception("formula expected")
+        throw new SyntaxError(SyntaxFailure.FormulaExpected)
 
       case Token.Word("false") :: rest =>
         (False, rest)
@@ -112,7 +112,7 @@ object FormulaParser:
   ): ParseResult[Formula[A]] =
     inp match
       case Nil =>
-        throw new Exception("Body of quantified term expected")
+        throw new SyntaxError(SyntaxFailure.QuantifierBodyExpected(Found.of(inp)))
 
       case Token.Dot :: rest =>
         // Dot marks end of variables, parse body
@@ -124,10 +124,8 @@ object FormulaParser:
           parseQuant(ifn, afn)(y :: vs)(qcon)(y)(rest)
         )
 
-      case other :: _ =>
-        throw new Exception(
-          s"Body of quantified term expected, got: ${tokenLabel(other)}"
-        )
+      case _ :: _ =>
+        throw new SyntaxError(SyntaxFailure.QuantifierBodyExpected(Found.of(inp)))
 
   /**
    * Parse complete formula with all logical operators.
