@@ -97,8 +97,8 @@ fails one is a draft, however it is titled and however it was approved in chat.
    family lives in with one existing member quoted, and either the existing type it
    reuses or the statement that none denotes the same concept. Every `String` or
    other raw primitive in a signature carries either the opaque type that replaces it
-   (`TypeId`, `SymbolName`, or a new one) or the reason none applies. A primitive
-   crossing into `vql.error` is the sanctioned case under ADR-019, and says so.
+   (`TypeId`, `SymbolName`, or a new one) or the reason none applies. A sort or a
+   symbol name in `vql.error` is a `TypeId` or a `SymbolName` from `vql.id` (ADR-023).
 2. **File inventory.** Every file to create or modify, by full repository-relative
    path, as bullet lines in the plan's own `## File inventory` section. A file the
    work turns out to need and the inventory does not name is stopped at: say which
@@ -222,8 +222,8 @@ attribution.
   bound once into a `BoundQuery`, and the catalog and model are valid by construction.
 - **No cast at a value boundary** (ADR-015). A dispatcher reads `args(i).extract[A]`.
 - **Sort identity is an opaque type**, `TypeId` or `SymbolName`, never a bare string
-  key (ADR-001). It crosses into `vql.error` only as `TypeId.value` (ADR-019).
+  key (ADR-001). Both are declared in `vql.id`, below `vql.error` and `vql.typed` (ADR-023).
 - **The foundation never imports `vql.*`, and `vql.error` never imports `vql.typed`**
-  (ADR-004, ADR-019).
+  (ADR-004, ADR-023).
 - **A pure-data sum is an `enum`; a hierarchy with per-variant behaviour is a
   `sealed trait`** (ADR-006).

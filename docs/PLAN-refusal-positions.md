@@ -7,7 +7,7 @@ context found so far. It is not an implementation plan and authorizes no code.
 `docs/dev/plans/PLAN-UES-UNIFIED-ERROR-SHAPE.md`, decision `UES-D-20`.
 **Independence:** this analysis is the engine's own. Register does not wait on
 it and its design does not depend on the outcome.
-**Companion stub:** [PLAN-typed-refusals.md](PLAN-typed-refusals.md), which
+**Companion stub:** [DONE_PLAN-typed-refusals.md](DONE_PLAN-typed-refusals.md), which
 introduces the position field this analysis would fill.
 
 ---
@@ -131,4 +131,4 @@ has no position field.
 A document with the recommendation per kind of refusal, the ADR verdicts it
 rests on, and the decisions the user has to rule. If it recommends work, that
 work becomes an implementation plan of its own or a section of
-`PLAN-typed-refusals.md`, as the user decides.
+`DONE_PLAN-typed-refusals.md`, as the user decides.
