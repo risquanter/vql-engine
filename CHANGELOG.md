@@ -3,6 +3,59 @@
 This project follows early-semver (pre-1.0): breaking changes bump the minor
 version.
 
+## 0.18.0
+
+### Changed (breaking)
+
+- **Every refusal is a typed value.** A refusal is a `Left` caused by what the
+  caller typed. Each is now a case of a closed `enum` holding the values its
+  sentence is built from, and `message` derives the sentence. See ADR-022.
+  - `QueryError.ParseError(refusal: ParseRefusal, position: SourcePosition)`.
+    `ParseError.input` and its `context` map are removed.
+  - `QueryError.ValidationError(problem: ValidationProblem, position: SourcePosition)`.
+    Its `context` map is removed.
+  - `QueryError.EvaluationError(failure: EvaluationFailure)`. `cause` and
+    `context` are removed.
+  - `parser.ParseError` is `Syntax(failure, position)`,
+    `Trailing(first, rest, position)` or `Lex(failure, position)`.
+  - A token in a refusal is a `lexer.TokenKind`. It carries text only for a
+    word, a decimal or a quoted literal, each an opaque type.
+- **Each error is declared once.** `TypeCheckError` and `RuntimeModelError`
+  are declared in `vql.error`, and `vql.typed` no longer holds them.
+  `BindErrorDetail` is removed. `BindError.details` is a `List[TypeCheckError]`,
+  and a detail's `rendered` is now `TypeCheckError.message`.
+  `ModelValidationError.details` is a `List[RuntimeModelError]`. See ADR-023.
+- **`TypeId` and `SymbolName` are declared in `vql.id`.** The paths
+  `vql.typed.TypeId` and `vql.typed.SymbolName` still resolve. Every sort in an
+  error is a `TypeId`.
+- **Every name in a bind error carries a type.** `VariableText`, `SymbolText`
+  or `LiteralText`. `TypeMismatch.context: String` is now
+  `site: MismatchSite`, and `ArityMismatch` gains `kind: SymbolKind` after
+  `symbol`. A predicate or function name can be an operator's text, such as
+  `<` or `+`.
+- **A tree is built through checked functions.** The case constructors of
+  `Term`, `FOL`, `Formula.Forall` and `Formula.Exists` are closed. Build with
+  `Term.mkVar`, `Term.mkFn`, `Term.mkConst`, `FOL(…)`, `Formula.mkForall` and
+  `Formula.mkExists`. Each throws `IllegalArgumentException` for a name no query
+  text can produce. Pattern matching is unchanged.
+- **A quoted literal admits `[A-Za-z0-9 /_.+-]` only.** Any other character is
+  a lexer refusal with its offset.
+- **A quantifier outside its bounds is refused.** A fraction outside [0, 1], a
+  denominator of zero and a tolerance outside [0, 1] are parse refusals. The
+  `Quantifier` case constructors are closed. Build with `Quantifier.mkAbout`,
+  `mkAtLeast` and `mkAtMost`.
+- **The parse boundaries convert only the parsers' own failures.**
+  `VagueQueryParser.parse` and `FOLParser.parseWithLexer` no longer turn an
+  arbitrary exception into a parse error.
+- Every sentence is unchanged, except these. A formula failure inside a vague
+  query loses the prefix `Unexpected error during parsing: `. An unknown
+  operator prints as `unknown operator`, and a stray character as
+  `unexpected character`. `ParseError.formatted` has no `Input:` line and no
+  context lines, and `ValidationError.formatted` has no context lines. The
+  refused-literal-character sentence and the two quantifier sentences are new.
+- A refusal for tokens left after a query reports `SourcePosition.Unknown`.
+  Only a lexer refusal reports an offset.
+
 ## 0.17.0
 
 ### Changed (breaking)

@@ -15,7 +15,7 @@ It has four layers, and they answer four different questions:
 3. **Where records meet** — the pairs whose combination neither record states alone.
 4. **Where a record meets the consumer's** — the vql-engine records that a decision record in register depends on, so a change here can make a register record wrong.
 
-**Which records are in force.** A record in `docs/` whose status is `Accepted` is in force and is validated against. A record whose status is `Proposed` is routed here so its content is found, and is validated against only once it is accepted (`docs/WORKING-INSTRUCTIONS.md`, "Proposed ADRs (validate once accepted)"). ADR-016 is the one such record. The records under `docs/archive/` covered the retired untyped backend and are not in force.
+**Which records are in force.** A record in `docs/` whose status is `Accepted` is in force and is validated against. A record whose status is `Proposed` is routed here so its content is found, and is validated against only once it is accepted (`docs/WORKING-INSTRUCTIONS.md`, "Proposed ADRs (validate once accepted)"). ADR-016, ADR-022 and ADR-023 are such records. A record whose status is `Superseded` is not in force; the record that supersedes it is routed in its place. The records under `docs/archive/` covered the retired untyped backend and are not in force.
 
 **The verdict covers every record.** Layer 1 decides which records are read in full for a change. It does not narrow the planning-phase review: that review records a verdict for every record in force, relevant or not, with a one-line basis (`docs/WORKING-INSTRUCTIONS.md`, "Record an explicit per-ADR verdict for every active ADR"). Layer 1 is what makes the "relevant" column right.
 
@@ -38,15 +38,15 @@ Import placement and named imports (ADR-006 §4–§5) and the import direction 
 
 The files are listed in ADR-007's scope tables: `parser/`, `lexer/`, `logic/`, `util/StringUtil`, `printer/FOLPrinter`, `semantics/FOLSemantics`.
 
-**Always:** ADR-007 · ADR-002 · ADR-012 · ADR-004
-Characteristics C1–C13 and the review criterion that benchmarks every change against them (ADR-007), the throw-inside, `Either`-at-the-edge parser discipline (ADR-002), the one place the error-channel policy defers to the port (ADR-012, "Relationship to ADR-007"), and the rule that the foundation imports nothing from `vql.*` (ADR-004).
+**Always:** ADR-007 · ADR-002 · ADR-012 · ADR-004 · ADR-022
+Characteristics C1–C13 and the review criterion that benchmarks every change against them (ADR-007), the throw-inside, `Either`-at-the-edge parser discipline (ADR-002), the one place the error-channel policy defers to the port (ADR-012, "Relationship to ADR-007"), the rule that the foundation imports nothing from `vql.*` (ADR-004), and the typed values the throws carry, the token kinds and the literal alphabet (ADR-022).
 
 **Also:** ADR-006 if a primitive carrier is refined into an ADT (C13 requires ADR-006's encoding).
 
 ### Changing the vague query grammar or `VagueQueryParser`
 
-**Always:** ADR-002 · ADR-007 · ADR-012 · ADR-017
-The single `Either` boundary at `VagueQueryParser.parse` (ADR-002 §2), the frozen combinators it is layered on (ADR-007), the two `Either` boundaries of the library (ADR-012), and the range production and `ParsedQuery.mk`'s surface validation (ADR-017 §4).
+**Always:** ADR-002 · ADR-007 · ADR-012 · ADR-017 · ADR-022
+The single `Either` boundary at `VagueQueryParser.parse` (ADR-002 §2), the frozen combinators it is layered on (ADR-007), the two `Either` boundaries of the library (ADR-012), the range production and `ParsedQuery.mk`'s surface validation (ADR-017 §4), and one `ParseRefusal` case per sentence template with the failures the boundary may convert (ADR-022).
 
 **Also:** ADR-018 if the parse tree's shape changes, since fragment membership walks it · ADR-001 if `ParsedQuery` changes, since the binder consumes it.
 
@@ -55,14 +55,14 @@ The single `Either` boundary at `VagueQueryParser.parse` (ADR-002 §2), the froz
 **Always:** ADR-006 · ADR-012 · ADR-004
 Whether the sum is an `enum` or a `sealed trait`, and how a shared accessor is declared (ADR-006), whether a construction failure is a `require` or an `Either` (ADR-012), and which layer the type may live in given what it imports (ADR-004).
 
-**Also:** ADR-001 if it is a typed-IL node or a catalog type · ADR-015 and ADR-016 if it carries a `Value` or a literal payload · ADR-019 and ADR-021 if it is an error type in `vql.error` or crosses the error/typed boundary · ADR-014 if it partitions types.
+**Also:** ADR-001 if it is a typed-IL node or a catalog type · ADR-015 and ADR-016 if it carries a `Value` or a literal payload · ADR-023 if it is an error type in `vql.error` or names a sort or a symbol · ADR-014 if it partitions types.
 
 ### Changing the typed pipeline: catalog, binder or `BoundQuery`
 
 **Always:** ADR-001 · ADR-014 · ADR-015 · ADR-017 · ADR-020 · ADR-012
 The catalog as a contract valid by construction and `bind` as the single compilation step (ADR-001), the bind-time quantifiability check that must not be dropped (ADR-014), the literal branch through `literalValidators` and the `ConstRef`/`LiteralRef` split (ADR-015 §4), the range as a formula and its free-variable rules (ADR-017), where the binder accumulates errors and where it must not (ADR-020), and the error channel (ADR-012).
 
-**Also:** ADR-016 if the literal payload's typing changes · ADR-019 and ADR-021 if a `TypeCheckError` variant is added, removed or reshaped, because the facade fold is exhaustive over them.
+**Also:** ADR-016 if the literal payload's typing changes · ADR-023 if a `TypeCheckError` variant is added, removed or reshaped, because `BindError.details` carries it to the consumer unchanged.
 
 ### Changing evaluation, the runtime model or the dispatcher
 
@@ -78,8 +78,8 @@ The HDR generator as the only randomness and the single code path for exact and 
 
 ### Adding or changing a failure, `QueryError` or bind-error detail
 
-**Always:** ADR-012 · ADR-002 · ADR-019 · ADR-020 · ADR-021 · ADR-004 · ADR-006
-Which failures are `require` and which are `Either` (ADR-012), where a parser throw is converted (ADR-002), the primitive-only detail type and the fold in the facade (ADR-019), the accumulation sites (ADR-020), one detail case per `TypeCheckError` variant with no catch-all (ADR-021), the import direction `vql.error` may not break (ADR-004), and the abstract shared accessor (ADR-006 §3).
+**Always:** ADR-012 · ADR-002 · ADR-022 · ADR-020 · ADR-023 · ADR-004 · ADR-006
+Which failures are `require` and which are `Either` (ADR-012), where a parser throw is converted (ADR-002), one case per sentence template holding typed fields and a position (ADR-022), the accumulation sites (ADR-020), each error declared once in `vql.error` above `vql.id` (ADR-023), the import direction `vql.error` may not break (ADR-004), and the derived `message` accessor (ADR-006 §3).
 
 **Also:** Layer 4 — register classifies these failures, so a reshaped field is a consumer break.
 
@@ -88,7 +88,7 @@ Which failures are `require` and which are `Either` (ADR-012), where a parser th
 **Always:** ADR-001 · ADR-012 · ADR-004
 `VagueSemantics` as the canonical entry and `FolModel` as the pre-validated input (ADR-001 §5), the `Either`-only public surface (ADR-012), and the layer the entry sits in (ADR-004).
 
-**Also:** ADR-017 for `satisfyingSet` · ADR-018 for `FragmentCheck` · ADR-019 and ADR-021 for the bind-error contract · Layer 4 for every change, because register is the consumer.
+**Also:** ADR-017 for `satisfyingSet` · ADR-018 for `FragmentCheck` · ADR-022 and ADR-023 for the refusal and bind-error contract · Layer 4 for every change, because register is the consumer.
 
 ### Changing fragment membership
 
@@ -123,9 +123,11 @@ ADR-003 rules out `scala.util.Random`, `java.util.Random` and `commons-math3`. N
 | ADR-016 | `ADR-016-carrier-witness-on-symmetric-value-typeclasses.md` | Proposed | The `Carrier[A]` storage witness for literal payloads, the `ConstRef`/`LiteralRef` split, adoption as a per-phase decision |
 | ADR-017 | `ADR-017.md` | Accepted | Formula ranges: extraction over the active domain, closed-world negation, the denominator, range validation, the satisfying-set entry |
 | ADR-018 | `ADR-018.md` | Accepted | Structural fragment membership over the parse tree: `Fragment`, `FragmentViolation`, `FragmentCheck.check` |
-| ADR-019 | `ADR-019.md` | Accepted | Bind-error detail across the error/typed boundary: primitive fields, one renderer, the fold in the facade. Its one-case shape is superseded by ADR-021 |
+| ADR-019 | `ADR-019.md` | Superseded by ADR-023 | Bind-error detail across the error/typed boundary: primitive fields, one renderer, the fold in the facade |
 | ADR-020 | `ADR-020.md` | Accepted | Binder error accumulation: only across same-input siblings, the strict accumulating product, conflict accumulation in `mergeEnvs` |
-| ADR-021 | `ADR-021.md` | Accepted | One `BindErrorDetail` case per `TypeCheckError` variant and an exhaustive facade fold |
+| ADR-021 | `ADR-021.md` | Superseded by ADR-023 | One `BindErrorDetail` case per `TypeCheckError` variant and an exhaustive facade fold |
+| ADR-022 | `ADR-022.md` | Proposed | Typed refusals: one case per sentence template, token kinds and bounded text types, the literal alphabet, `SourcePosition`, boundaries that convert only the parsers' own failures |
+| ADR-023 | `ADR-023.md` | Proposed | Errors declared once in `vql.error`, `TypeId` and `SymbolName` in `vql.id`, the import directions between `vql.id`, `vql.error` and `vql.typed` |
 | — | `ADR-00X.md` | Active | The authoring template for a record. Not a decision record |
 
 ---
@@ -138,16 +140,15 @@ Read it as an index of collisions, not as a substitute for either record. Where 
 
 | Records | The trap |
 |---|---|
-| ADR-002 × ADR-007 × ADR-012 | ADR-012's `Either` rule reads as binding everywhere, and the ported foundation throws by design. Both hold, because they govern disjoint files. The library has exactly two `Either` boundaries, `FOLParser.parse` and `VagueQueryParser.parse`, and vague code calls only the `Either`-returning foundation entry. Wrapping a foundation throw inside vague code is the "re-wrapping exceptions mid-flight" smell. *Stated in ADR-012, "Relationship to ADR-007", and ADR-002's cross-ADR section.* |
+| ADR-002 × ADR-007 × ADR-012 | ADR-012's `Either` rule reads as binding everywhere, and the ported foundation throws by design. Both hold, because they govern disjoint files. The library has exactly two `Either` boundaries, `FOLParser.parse` and `VagueQueryParser.parse`. `VagueQueryParser.parseTokens` calls `FormulaParser.parse` directly, and `VagueQueryParser.parse` is the one place vague code catches a foundation throw. Wrapping a foundation throw anywhere else in vague code is the "re-wrapping exceptions mid-flight" smell. *Stated in ADR-012, "Relationship to ADR-007", and ADR-002's cross-ADR section.* |
 | ADR-007 × ADR-006 | ADR-006 §4–§5 forbid opening a foreign wildcard import and require named top-level imports. The ported files keep their wildcard style under ADR-007. Tidying imports in a ported file under ADR-006, or under a general cleanup rule, breaks a preserved characteristic. C13 does admit an `enum` refinement of a primitive carrier inside the port, encoded per ADR-006. *Stated in ADR-006's cross-ADR section and ADR-007 C13.* |
 | ADR-007 C11 × the comment-style rule | The global comment-style rule says a comment describes current behaviour in a sentence or two. The ported files carry verbatim OCaml source in their scaladoc, and C11 makes it the traceability link to the textbook. Rewriting or trimming it to fit the comment style deletes the link. `docs/WORKING-INSTRUCTIONS.md` says "never delete or paraphrase them". |
 | ADR-001 × ADR-014 | ADR-001 §4 describes the startup check and reads as covering quantifiability. It covers half. The bind-time `TypeNotQuantifiable` check in `QueryBinder` is the other half, and dropping it lets a value-type quantification reach the evaluator as `DomainNotFoundError`. *Stated in ADR-014's cross-ADR section.* |
 | ADR-014 × ADR-017 | `satisfyingSet` enumerates a variable's domain outside `QueryBinder.bind`, so the bind-time check does not run for it. ADR-017 §6 replicates `TypeNotQuantifiable` there. Removing that replica as duplicate code reopens the gap. *Stated in ADR-017 §6 and its cross-ADR section.* |
 | ADR-003 × ADR-017 | ADR-003 says exact is the degenerate case of sampled, which invites sampling everything for speed. Range extraction must stay exhaustive, because closed-world negation is a complement over the active domain and is wrong over a sample. Sampling is confined to scope evaluation. *Stated in ADR-017 §2.* |
 | ADR-015 × ADR-016 | ADR-015 governs the boundary and leaves `LiteralRef.value: Any`. ADR-016 is Proposed, and §5 makes `Carrier[A]` adoption a per-phase decision. Reporting the `Any` payload as a violation applies a record not yet in force. The `ConstRef`/`LiteralRef` split ADR-016 §3 describes is implemented, and ADR-015 §4 states it. *Stated in ADR-016's cross-ADR section and ADR-015's acceptance note.* |
-| ADR-004 × ADR-019 × ADR-021 | A consumer needs the sort of a bind error, and the sort is a `TypeId` in `vql.typed`. Moving `TypeCheckError` or `TypeId` into `vql.error` inverts the layering. The sort crosses as `TypeId.value`, a `String`, and the fold runs in the facade, which already imports both layers. *Stated as alternative E3 in ADR-019 and ADR-021.* |
-| ADR-019 × ADR-021 | ADR-019 §1 shows a `BindErrorDetail` with an `Other` catch-all. ADR-021 removed it and made the fold exhaustive. Implementing from ADR-019's sketch reintroduces a wildcard that silently drops a new variant's fields. *A superseded-shape marker sits at ADR-019 §1.* |
-| ADR-006 §3 × ADR-019 × ADR-021 | `rendered` reads as a derived accessor, which ADR-006 §3 says to declare as a concrete `def` matching on the cases. It is stored, so it is an abstract member the case parameters implement. A concrete `def rendered` clashes with the parameter and does not compile. *Stated in ADR-019 §1 and ADR-021's cross-ADR section.* |
+| ADR-004 × ADR-023 | ADR-004 forbids `vql.error` importing `vql.typed`, which reads as forbidding a `TypeId` in an error. `TypeId` and `SymbolName` are declared in `vql.id`, which imports nothing, so `vql.error` holds them without importing `vql.typed`. Adding a `vql.typed` import to `vql.error` to reach another type inverts the layering. *Stated in ADR-004 §2 and ADR-023 §4.* |
+| ADR-007 C12 × ADR-022 | C12's letter says `failwith` becomes `throw new Exception(…)`. The ported parsers throw `ParseFailure`, `SyntaxError` and `LexerError`, subclasses that carry a typed value whose `message` is the OCaml text. Reverting them to a plain `Exception` loses the typed refusal, and catching `Exception` at a boundary reports a defect as the caller's mistake. *Stated in ADR-007's review criterion and ADR-022 §5.* |
 | ADR-020 × ADR-014 × ADR-017 | ADR-020 makes the binder accumulate, which invites extending accumulation to every check. `TypeNotQuantifiable` and the satisfying-formula chain (`UnconstrainedVar` → `UnexpectedFreeVar` → `TypeNotQuantifiable`) run at sequential, environment-threaded points and stay short-circuiting. Accumulating there manufactures cascade errors. *Stated in ADR-020's cross-ADR section.* |
 | ADR-017 × ADR-002 | ADR-017 §4 has `ParsedQuery.mk` enforce the range rules by throwing, which reads as breaking ADR-012's `Either` rule for vague code. The throw sits behind `VagueQueryParser.parse`'s single `Either` boundary, under ADR-002. *Stated in ADR-017 §4.* |
 | ADR-012 × ADR-018 | `FragmentCheck.check` returns an `Either`, which reads as an operational-failure channel under ADR-012. It is a membership result with a reason. `Screening(k)` carries no `require` on `k` because `check` is total for a negative `k`. *Stated in ADR-018's cross-ADR section.* |
@@ -163,8 +164,9 @@ register (sibling checkout `/home/danago/projects/register/`, records in `docs/d
 | vql-engine | register | The dependency |
 |---|---|---|
 | ADR-015 §1, §4 | ADR-029 §3, row "FOL `VagueQueryParser.parse`" | register's injection defence states that "node references resolve at bind time through per-sort literal validators … whitelist-constrained, never interpolated". That holds while the binder routes constant-position tokens through `literalValidators` and never through text substitution. A change to the binder's literal branch reaches register's injection boundary. |
-| ADR-019 §4, ADR-021 §1 | ADR-028 appendix §5, "Error Responses" | register's refusal table states that `UnknownReferences` means "Every bind error is a quoted node reference no literal validator accepts". register decides that by reading `BindErrorDetail.UnparseableConstant.sortName` against its own sort names. Renaming that field, changing what crosses in it, or splitting `UnparseableConstant` changes which refusal register reports, with no compile error if the field survives under another meaning. |
+| ADR-023 §2 | ADR-028 appendix §5, "Error Responses" | register's refusal table states that `UnknownReferences` means "Every bind error is a quoted node reference no literal validator accepts". register decides that by reading `TypeCheckError.UnparseableConstant.sort` against its own sort names. Renaming that field, changing what it holds, or splitting `UnparseableConstant` changes which refusal register reports, with no compile error if the field survives under another meaning. |
 | ADR-001, ADR-015 | ADR-028 §1–§2, §4 | ADR-028 describes register's integration as a `TypeCatalog` and a `MapDispatcher` evaluated through `VagueSemantics.evaluateTyped`, with every argument read by `extract[A]`, and states that the library is parsed on both platforms (`QueryRequest.resolve` in the cross-compiled `common` module). A change to those entry points, or dropping the Scala.js build, makes those sections wrong. |
+| ADR-022 §2, §3 | ADR-035, the section on what of the caller's query text a refusal may carry, which step 5.7 of register's `docs/dev/plans/PLAN-UES-UNIFIED-ERROR-SHAPE.md` adds | register states which engine refusal fields it may pass to a client or a log, and what each holds. That rests on the token kinds, on the text types and their content, and on the literal alphabet `[A-Za-z0-9 /_.+-]`. Widening a text type, admitting a character to the alphabet, or adding a field that holds caller text makes that section wrong. |
 
 ---
 

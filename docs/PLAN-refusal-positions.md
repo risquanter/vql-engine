@@ -2,7 +2,7 @@
 
 **Status:** STUB, written 2026-11-11. It asks for an analysis and records the
 context found so far. It is not an implementation plan and authorizes no code.
-**Version this was read at:** 0.17.0.
+**Version this was read at:** 0.17.0. §3 is brought to 0.18.0.
 **Origin:** register, the downstream consumer, in the repository `register`:
 `docs/dev/plans/PLAN-UES-UNIFIED-ERROR-SHAPE.md`, decision `UES-D-20`.
 **Independence:** this analysis is the engine's own. Register does not wait on
@@ -35,7 +35,7 @@ computes no position itself. So every position the engine learns to report
 reaches the user with no further change in register, and every one it cannot
 report stays a visible `Unknown`.
 
-## 3. Where the engine stands at 0.17.0
+## 3. Where the engine stands at 0.18.0
 
 **Tokens carry no offset.** `lexer/Token.scala`:
 
@@ -50,24 +50,29 @@ enum Token:
 `Lexer.lex` walks a `List[Char]` and knows each character's place only
 implicitly, as the length of what is left.
 
-**One of fourteen parse-error sites reports a position.**
-`VagueQueryParser.parse` builds `QueryError.ParseError` at fourteen sites. The
-one that fills `position` is the trailing-tokens check:
+**The position type exists.** `parser/SourcePosition.scala`:
 
 ```scala
-Some(s.length - tokensLabel(remaining).length),
+enum SourcePosition:
+  case At(offset: Int) // a UTF-16 code-unit offset into the input
+  case Unknown
 ```
 
-That is an estimate. `tokensLabel` re-renders the leftover tokens, and the
-rendering does not reproduce the original spacing or the quotes of a literal,
-so the difference is the true offset only when the leftover text happens to
-render to its own length. The other thirteen sites pass `None`.
+`QueryError.ParseError`, `QueryError.ValidationError` and every
+`parser.ParseError` case carry one.
+
+**Only lexer refusals report a position.** `LexerError` carries `remaining`,
+the length of the input left at the refused character, and both boundaries
+report `SourcePosition.At(s.length - e.remaining)`. Every other parse refusal,
+including tokens left after a query, reports `SourcePosition.Unknown`. No site
+reports an estimate.
 
 **Bind errors have none.** A `TypeCheckError` is raised over `Formula[FOL]`,
-`Term` and `FOL`, which hold names and no source location.
+`Term` and `FOL`, which hold names and no source location. `TypeCheckError`
+has no position field.
 
-**The foundation parser has none.** `parser.ParseError` carries strings, and
-the ported parsers throw messages.
+**The two variable rules have none.** `ParsedQuery.mk` throws
+`ValidationError(problem, SourcePosition.Unknown)`.
 
 ## 4. What the analysis covers
 
@@ -85,17 +90,21 @@ the ported parsers throw messages.
    field, and whether that stays within C13 (b)'s case-by-case traceability is
    part of the verdict. `mergeDecimalTokens` in `VagueQueryParser` joins tokens
    and has to keep an offset.
-3. **Parse refusals.** With token offsets, the thirteen sites that pass `None`
-   can report the first unconsumed token, and the estimate at the fourteenth
-   becomes exact. The ported parsers throw from deep inside backtracking, so
+3. **Parse refusals.** With token offsets, every parse site that reports
+   `Unknown` can report the first unconsumed token, including the
+   trailing-tokens site. The ported parsers throw from deep inside backtracking, so
    which failure is the one reported, and therefore which offset, needs
    stating: the furthest position reached is the usual choice and is not what
    exception backtracking yields by default.
 4. **Bind refusals.** A bind error names a predicate, a function, a constant or
    a variable. Reporting its place needs the parsed formula to remember where
    each part came from. ADR-007 C8 says of `Term`, `FOL` and `Formula[+A]`:
-   "The structure is preserved verbatim." So a location field on those types
-   breaks C8. The alternatives to weigh are a side table from each node to its
+   "The cases, their fields and their field types map one to one to the OCaml
+   definitions." So a location field on those types breaks C8. The case
+   constructors that hold a name are closed, and a tree is built through
+   `Term.mkVar`, `Term.mkFn`, `Term.mkConst`, `FOL(…)`, `Formula.mkForall` and
+   `Formula.mkExists`. A side table could be filled in those functions, but they
+   receive no offset from the parser today. The alternatives to weigh are a side table from each node to its
    offset built during parsing, a search of the token list for the name at
    report time, which is ambiguous when a name occurs twice, and leaving bind
    refusals at "no position".

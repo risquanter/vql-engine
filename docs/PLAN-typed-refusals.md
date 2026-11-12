@@ -1,6 +1,6 @@
 # Implementation Plan: Typed Refusals
 
-**Status:** APPROVED 2026-11-12, in implementation. Written 2026-11-11 and
+**Status:** APPROVED 2026-11-12. All six phases implemented 2026-11-12; the suite is green on both platforms. Written 2026-11-11 and
 revised 2026-11-12. Decisions `TR-D-1`
 to `TR-D-7` were ruled on 2026-11-11, and `TR-D-8` and `TR-D-9` on 2026-11-12.
 None is open.

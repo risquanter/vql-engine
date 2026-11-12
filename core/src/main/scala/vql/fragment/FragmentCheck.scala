@@ -8,7 +8,8 @@ import logic.{FOL, Formula, Term}
  * Structural membership test over a parsed `Formula[FOL]` — the inert tree `FOLParser.parse`
  * returns. It forks no parser (ADR-007), needs no `TypeCatalog`, and embeds no sort logic. Callers
  * with query text parse via `FOLParser.parse` and map the foundation `ParseError` at their own
- * boundary, the same input discipline as `VagueSemantics.satisfyingSet` (ADR-017 §6).
+ * boundary, the same input discipline as `VagueSemantics.satisfyingSet` (ADR-017 §6). Its cases
+ * `Syntax`, `Trailing` and `Lex` each carry a typed value and a `SourcePosition` (ADR-022).
  */
 object FragmentCheck:
 

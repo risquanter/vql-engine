@@ -231,13 +231,12 @@ TimeoutError, ConfigError`.
 - Breaking change to a published type → changelog note + minor version bump
   (early-semver pre-1.0). Do it in its own release, ideally bundled with the
   register upgrade that already adapts to the 0.11.0 error changes.
-- The related smell for `BindError` is **resolved**: it now carries
-  `List[BindErrorDetail]` (structured, primitives-only) with a derived
-  `messages: List[String]`, per [ADR-019](ADR-019.md) and
-  PLAN-bind-error-sort-fidelity. The `vql.error → vql.typed` direction was
-  settled there — the error layer stays independent; the sort crosses as
-  `TypeId.value`. `ModelValidationError` still carries `List[String]` and is out
-  of scope.
+- The related smell for `BindError` is **resolved**: it carries
+  `List[TypeCheckError]` with a derived `messages: List[String]`, per
+  [ADR-023](ADR-023.md). `TypeCheckError` is declared in `vql.error`, and its
+  sorts are `TypeId` values from `vql.id`, so the error layer still imports
+  nothing from `vql.typed`. `ModelValidationError` carries
+  `List[RuntimeModelError]` with a derived `errors: List[String]`.
 - Cross-layer / cross-phase error-hierarchy consolidation is a non-goal: it
   would break ADR-004 (foundation must not import vague; this is why
   `parser.ParseError` is foundation-local) and the `vql.error → vql.typed`

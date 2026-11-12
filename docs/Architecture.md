@@ -10,8 +10,9 @@ of the codebase and the integration flow between layers.
 ```
 core/src/main/scala/
 ├── logic/           Formula, Term, FOL, Model, Valuation
-├── parser/          Combinators, FormulaParser, FOLAtomParser, TermParser, FOLParser
-├── lexer/           Lexer (List[Char] → List[Token]), Token
+├── parser/          Combinators, FormulaParser, FOLAtomParser, TermParser, FOLParser,
+│                    ParseError, SyntaxFailure, SourcePosition
+├── lexer/           Lexer (List[Char] → List[Token]), Token, TokenKind, TokenText, LexFailure
 ├── semantics/       FOLSemantics
 ├── printer/         FOLPrinter, PrinterUtil
 ├── util/            StringUtil
@@ -21,13 +22,15 @@ core/src/main/scala/
     ├── logic/       ParsedQuery
     ├── typed/       TypeCatalog, QueryBinder, BoundQuery, TypedSemantics,
     │                RuntimeModel, RuntimeDispatcher, FolModel, Value,
-    │                TypeDefs, TypeCheckError, Extract, LiteralParser
+    │                TypeDefs, Extract, LiteralParser
     ├── semantics/   VagueSemantics (typed facade)
     ├── sampling/    HDRSampler, ProportionEstimator, SampleSizeCalculator, NormalApprox, SamplingParams
     ├── quantifier/  VagueQuantifier, Quantifier
     ├── fragment/    Fragment, FragmentViolation, FragmentCheck
     ├── result/      VagueQueryResult, EvaluationOutput
-    └── error/       QueryError, QueryException
+    ├── error/       QueryError, QueryException, ParseRefusal, TypeCheckError,
+    │                RuntimeModelError
+    └── id/          TypeId, SymbolName (imports nothing; vql.error and vql.typed both import it)
 ```
 
 ---
@@ -83,7 +86,7 @@ A parsed query flows through the typed pipeline in three stages:
 
 | Stage | Step |
 |---|---|
-| Parse | `VagueQueryParser.parse(s)` → `ParsedQuery` |
+| Parse | `VagueQueryParser.parse(s)` → `ParsedQuery`. A tree is built through the checked building functions (`Term.mkVar`, `FOL(…)`, `Formula.mkForall`, …), so every name in it is one query text can produce |
 | Bind | `VagueSemantics.bindTyped(query, catalog)` → `BoundQuery` (via `QueryBinder.bind`) |
 | Evaluate | `VagueSemantics.evaluateTyped(query, folModel, …)` → `EvaluationOutput[Value]` |
 
@@ -123,11 +126,14 @@ a parsed `Formula[FOL]` lies in a declared `Fragment` (`Targeting` or
 `Screening(k)`), returning the first `FragmentViolation` otherwise. It runs on
 the parse tree before any typed bind, needs no `TypeCatalog` or model, and forks
 no parser. Callers with text parse via `FOLParser.parse` and map the foundation
-`ParseError` at their own boundary. See [ADR-018](ADR-018.md).
+`ParseError` at their own boundary: `Syntax`, `Trailing` and `Lex` each carry a
+typed value and a `SourcePosition`. See [ADR-018](ADR-018.md).
 
 **Error handling:**
-Public methods return `Either[QueryError, A]`. See [ADR-002](ADR-002.md)
-and [ADR-012](ADR-012.md).
+Public methods return `Either[QueryError, A]`. Every refusal is a case of a
+closed `enum` with a derived `message` (ADR-022), and each error is declared
+once in `vql.error` (ADR-023). See [ADR-002](ADR-002.md) and
+[ADR-012](ADR-012.md).
 
 ---
 
@@ -147,9 +153,11 @@ and [ADR-012](ADR-012.md).
 | [ADR-016](ADR-016-carrier-witness-on-symmetric-value-typeclasses.md) | Carrier Witness on Symmetric Value Typeclasses (Proposed) |
 | [ADR-017](ADR-017.md) | Formula Ranges and the Satisfying-Set Boundary |
 | [ADR-018](ADR-018.md) | Structural Fragment Membership over the Parse Tree |
-| [ADR-019](ADR-019.md) | Structured Bind-Error Detail across the Error/Typed Boundary |
+| [ADR-019](ADR-019.md) | Structured Bind-Error Detail across the Error/Typed Boundary (Superseded by ADR-023) |
 | [ADR-020](ADR-020.md) | Binder Error Accumulation across Independent Subtrees |
-| [ADR-021](ADR-021.md) | Structured Bind-Error Detail for Every `TypeCheckError` Variant |
+| [ADR-021](ADR-021.md) | Structured Bind-Error Detail for Every `TypeCheckError` Variant (Superseded by ADR-023) |
+| [ADR-022](ADR-022.md) | Typed Refusals (Proposed) |
+| [ADR-023](ADR-023.md) | Errors Declared Once above a Shared Identifier Package (Proposed) |
 
 ---
 
