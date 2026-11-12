@@ -525,3 +525,28 @@ literal kinds and the per-predicate approach stops scaling.
 node-reference predicates (`eq` / `named` / `has_id`) over dedicated literal
 sorts, disambiguating by predicate slot at bind time — not domain-returning
 functions (T-004), not a grammar change (this item).
+
+## T-013 — Layer 4 rows that name register's refusal records
+
+**Status:** OPEN.
+
+register now consumes 0.18.0's typed refusals. Two rows of Layer 4 in
+`.claude/skills/vql-adr-constraints/SKILL.md` describe register as it was
+before that:
+
+- **The ADR-023 §2 row** says register's refusal table names `UnknownReferences`
+  and decides it by reading `TypeCheckError.UnparseableConstant.sort` against its
+  own sort names. register's ADR-028 appendix §5 table now has three cases:
+  `Unparseable`, `Unbound` and `AnswerVariablesNotSupported`. The dependency is
+  the same field, read another way. `BindProblem.namesAbsentNode` reads
+  `UnparseableConstant`'s sort through `QuerySort.fromSymbol`, and the code is
+  `UNKNOWN_REFERENCE` when every bind problem names a node the tree does not
+  hold. Every other `Unbound` is `BIND_FAILED`.
+- **The ADR-022 §2, §3 row** names "the section … which step 5.7 of register's
+  `PLAN-UES-UNIFIED-ERROR-SHAPE.md` adds". That section exists now as register's
+  ADR-035 §5, "What of the Caller's Query Text a Refusal May Carry". Its
+  reconciliation with register's ADR-029 is written under a heading in each
+  record.
+
+**Scope:** rewrite both rows to name what register holds now. No engine code
+changes.
