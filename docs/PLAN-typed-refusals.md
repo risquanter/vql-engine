@@ -998,10 +998,13 @@ enum SymbolText:
     case Operator(symbol) => symbol.text
 
 object SymbolText:
-  /** Whether `name` is a word, a decimal or a `GrammarSymbol`'s text. */
-  def admits(name: String): Boolean
+  /** Whether `name` is a word, a decimal, or one of `=`, `<`, `<=`, `>`, `>=`. */
+  def admitsPredicate(name: String): Boolean
 
-  /** Throws `IllegalArgumentException` unless `admits(name)`. */
+  /** Whether `name` is a word, a decimal, or one of `+`, `-`, `*`, `/`, `^`, `::`. */
+  def admitsFunction(name: String): Boolean
+
+  /** Throws `IllegalArgumentException` unless `admitsPredicate(name)` or `admitsFunction(name)`. */
   def of(name: String): SymbolText
 ```
 
@@ -1015,12 +1018,22 @@ object SymbolText:
 `VariableText.admits(name)` holds when `StringUtil.isDecimalLiteral(name)`, or
 when `name` is non-empty and every character satisfies
 `StringUtil.alphanumeric`. `VariableText.of` yields `Decimal` in the first
-case and `Word(WordText(name))` in the second. `SymbolText.admits(name)` holds
-when `GrammarSymbol.fromText(name)` is defined or `VariableText.admits(name)`.
-`SymbolText.of` yields `Operator` in the first case, and otherwise decides as
-`VariableText.of` does. A constant's name is a `LiteralText`.
+case and `Word(WordText(name))` in the second. `SymbolText.admitsPredicate`
+holds when `VariableText.admits(name)` or `name` is the text of one of the five
+relations `FOLAtomParser.parseInfixAtom` names an atom by.
+`SymbolText.admitsFunction` holds when `VariableText.admits(name)` or `name`
+is the text of one of the six operators `TermParser` names a function
+application by. `SymbolText.of` yields `Operator` for any of those eleven, and
+otherwise decides as `VariableText.of` does. A constant's name is a
+`LiteralText`.
 
-The three `admits` predicates are what the building functions of §5.13 check.
+**Ruled 2026-11-12, after Phase 2: Option B.** The plan first had one
+`SymbolText.admits`, true for a word, a decimal or any `GrammarSymbol`'s text.
+It admitted punctuation as a name and did not tell a predicate from a
+function, so `FOL("+", …)` and `Term.mkFn("(", Nil)` would have passed
+requirement 12's check. The user ruled one check per position.
+
+The four `admits` predicates are what the building functions of §5.13 check.
 The two `of` functions and `LiteralText.apply` are what a refusal is built
 with.
 
@@ -1533,7 +1546,7 @@ today. `vql.id` imports nothing. `vql.error` imports `lexer`, `parser` and
 and `TypedSemantics` do today, and `vql.id`. No foundation package imports
 `vql.*`, and `vql.error` imports nothing from `vql.typed`.
 
-**Algebraic structure.** `TokenKind.of`, `Found.of`, each `admits`, each `of`
+**Algebraic structure.** `TokenKind.of`, `Found.of`, each `admits*`, each `of`
 and each `message` are transformations of one value. Nothing is aggregated or
 sequenced.
 
@@ -1713,8 +1726,8 @@ unchanged, and so is every pattern match.
 |---|---|---|
 | a variable | a `Token.Word`: a word, or a merged decimal such as the bound variable in `forall 0.5 . p(0.5)` | `VariableText.admits` |
 | a constant | an all-digit word, `nil`, a merged decimal, or a quoted literal's content | `LiteralText.admits` |
-| a predicate | a `Token.Word`, or one of `=`, `<`, `<=`, `>`, `>=` | `SymbolText.admits` |
-| a function | a `Token.Word`, or one of `+`, `-`, `*`, `/`, `^`, `::` | `SymbolText.admits` |
+| a predicate | a `Token.Word`, or one of `=`, `<`, `<=`, `>`, `>=` | `SymbolText.admitsPredicate` |
+| a function | a `Token.Word`, or one of `+`, `-`, `*`, `/`, `^`, `::` | `SymbolText.admitsFunction` |
 
 Every constant fits `LiteralText`, because digits, `nil` and a decimal use only
 characters of the literal alphabet.
@@ -1736,7 +1749,7 @@ object Term:
 
   /** A function application. Throws `IllegalArgumentException` for a name no query text can produce. */
   def mkFn(name: String, args: List[Term]): Term =
-    require(SymbolText.admits(name), "A function name must be a word, a decimal or an operator")
+    require(SymbolText.admitsFunction(name), "A function name must be a word, a decimal or a term operator")
     Fn(name, args)
 
   /** A constant. Throws `IllegalArgumentException` for text outside the literal alphabet. */
@@ -1750,7 +1763,7 @@ case class FOL private[logic] (predicate: String, terms: List[Term])
 object FOL:
   /** An atom. Throws `IllegalArgumentException` for a predicate name no query text can produce. */
   def apply(predicate: String, terms: List[Term]): FOL =
-    require(SymbolText.admits(predicate), "A predicate name must be a word, a decimal or an operator")
+    require(SymbolText.admitsPredicate(predicate), "A predicate name must be a word, a decimal or a relation")
     new FOL(predicate, terms)
 
   /** Convenience constructor */
@@ -2162,7 +2175,7 @@ Not edited: `core/src/main/scala/util/StringUtil.scala`,
 |---|---|
 | `TypeCatalogSpec` | a `vql.typed.TypeId` is a `vql.id.TypeId` |
 | `TokenKindSpec` | each text type refuses text outside its content; `TokenKind.of` for each `Token` case, a merged decimal, an unknown operator run, a stray character; `GrammarSymbol.fromText(s.text) == Some(s)` for every case; `label` equals `tokenLabel` for words, decimals, literals and symbols |
-| `TokenKindSpec` | `VariableText.of` and `SymbolText.of` for a word, a decimal and each operator; each `admits` is false, and each `of` throws `IllegalArgumentException`, for `""`, `"risk-id"` and `"a b"`; `LiteralText` throws for `"a<b"` |
+| `TokenKindSpec` | `VariableText.of` and `SymbolText.of` for a word, a decimal and each name operator; `admitsPredicate` holds for the five relations only and `admitsFunction` for the six term operators only; no punctuation or connective is a symbol name; each `admits*` is false, and each `of` throws `IllegalArgumentException`, for `""`, `"risk-id"` and `"a b"`; `LiteralText` throws for `"a<b"` |
 | `SyntaxFailureSpec` | every `message` of §5.4's table, as a literal string |
 | `LexerSpec` | L3 and L4 assert `failure` and `remaining`; L6b is rewritten to pin that every character of the alphabet is kept; each of `<`, `>`, `&`, `'`, `,`, `(`, `\r`, `\t` is refused with the right `remaining` |
 | `FOLParserSpec` | each `ParseError` case with its typed value; `Lex` carries `At` with the exact offset; an exception thrown by a custom lexer propagates |
