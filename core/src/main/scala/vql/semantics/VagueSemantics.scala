@@ -53,9 +53,9 @@ object VagueSemantics:
         val others   = errors.filterNot {
           case _: TypeCheckError.UnknownConstantOrLiteral => true; case _ => false
         }
-        if others.isEmpty && unknowns.nonEmpty then
-          QueryError.UnknownConstantOrLiteralError(unknowns.head)
-        else QueryError.BindError(details = errors)
+        (others, unknowns) match
+          case (Nil, first :: _) => QueryError.UnknownConstantOrLiteralError(first)
+          case _                 => QueryError.BindError(details = errors)
       }
 
   /**

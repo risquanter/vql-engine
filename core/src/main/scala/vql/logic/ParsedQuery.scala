@@ -2,7 +2,9 @@ package vql.logic
 
 import lexer.VariableText
 import logic.{FOL, FOLUtil, Formula, Term}
-import vql.error.QueryError
+import parser.SourcePosition
+import vql.error.{QueryError, QueryException}
+import vql.error.QueryError.ValidationProblem
 import vql.quantifier.Quantifier
 
 /**
@@ -114,31 +116,23 @@ object ParsedQuery:
   ): ParsedQuery =
     val query = ParsedQuery(q, x, r, phi, y)
 
+    val rangeVariables = query.rangeVars.map(VariableText.of)
+
     // Validation: x must occur free in the range formula
     if !query.rangeVars.contains(x) then
-      throw vql.error.QueryException(
+      throw QueryException(
         QueryError.ValidationError(
-          s"Quantified variable '$x' must occur free in the range formula",
-          "quantified_variable",
-          Map(
-            "variable"   -> x,
-            "range_vars" -> query.rangeVars.mkString(", "),
-          ),
+          ValidationProblem.QuantifiedVariableNotInRange(VariableText.of(x), rangeVariables),
+          SourcePosition.Unknown,
         )
       )
 
     // Paper constraint: y' ⊆ y (free range vars minus x ⊆ answer vars)
-    val rangeVarsMinusX = query.rangeVars - x
-    if !rangeVarsMinusX.subsetOf(y.toSet) then
-      throw vql.error.QueryException(
+    if !(query.rangeVars - x).subsetOf(y.toSet) then
+      throw QueryException(
         QueryError.ValidationError(
-          s"Range variables ${rangeVarsMinusX.mkString(",")} must be subset of answer variables ${y.mkString(",")}",
-          "answer_variables",
-          Map(
-            "range_vars"   -> rangeVarsMinusX.mkString(", "),
-            "answer_vars"  -> y.mkString(", "),
-            "missing_vars" -> (rangeVarsMinusX -- y.toSet).mkString(", "),
-          ),
+          ValidationProblem.RangeVariablesNotAnswered(rangeVariables - VariableText.of(x), y.map(VariableText.of)),
+          SourcePosition.Unknown,
         )
       )
 

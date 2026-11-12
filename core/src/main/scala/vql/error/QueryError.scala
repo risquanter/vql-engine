@@ -1,6 +1,8 @@
 package vql.error
 
-import vql.id.TypeId
+import lexer.{LiteralText, VariableText}
+import parser.SourcePosition
+import vql.id.{SymbolName, TypeId}
 
 /**
  * Structured error types for vague quantifier evaluation.
@@ -56,50 +58,80 @@ object QueryError:
 
   // ==================== Parsing Errors ====================
 
-  /** Error during query parsing */
-  case class ParseError(
-    message: String,
-    input: String,
-    position: Option[Int] = None,
-    override val context: Map[String, String] = Map.empty)
-    extends QueryError:
+  /** `VagueQueryParser.parse` refused the query's text. */
+  case class ParseError(refusal: ParseRefusal, position: SourcePosition) extends QueryError:
+    def message: String = refusal.message
 
-    override def formatted: String =
-      val pos     = position.map(p => s" at position $p").getOrElse("")
-      val snippet = if input.length > 50 then input.take(50) + "..." else input
-      s"Parse error$pos: $message\nInput: $snippet" +
-        (if context.isEmpty then ""
-         else "\n" + context.map { case (k, v) => s"  $k: $v" }.mkString("\n"))
+    override def formatted: String = position match
+      case SourcePosition.At(offset) => s"Parse error at position $offset: $message"
+      case SourcePosition.Unknown    => s"Parse error: $message"
 
   // ==================== Validation Errors ====================
 
-  /** Validation error (well-formed but invalid query) */
-  case class ValidationError(
-    message: String,
-    field: String,
-    override val context: Map[String, String] = Map.empty)
-    extends QueryError:
+  /** A well-formed query, or the answer tuple it is evaluated with, breaks a rule of ADR-017 §4. */
+  enum ValidationProblem:
+    case QuantifiedVariableNotInRange(variable: VariableText, rangeVariables: Set[VariableText])
 
-    override def formatted: String =
-      s"Validation error in '$field': $message" +
-        (if context.isEmpty then ""
-         else "\n" + context.map { case (k, v) => s"  $k: $v" }.mkString("\n"))
+    /** `rangeVariables` are the range's free variables other than the quantified one. */
+    case RangeVariablesNotAnswered(rangeVariables: Set[VariableText], answerVariables: List[VariableText])
+    case MissingAnswerValue(variable: VariableText)
+    case AnswerSortMismatch(variable: VariableText, expected: TypeId, actual: TypeId)
+
+    /** The part of the query or its input the problem lies in. */
+    def field: String = this match
+      case QuantifiedVariableNotInRange(_, _) => "quantified_variable"
+      case RangeVariablesNotAnswered(_, _)    => "answer_variables"
+      case MissingAnswerValue(_)              => "answer_tuple"
+      case AnswerSortMismatch(_, _, _)        => "answer_tuple"
+
+    def message: String = this match
+      case QuantifiedVariableNotInRange(variable, _)                =>
+        s"Quantified variable '${variable.value}' must occur free in the range formula"
+      case RangeVariablesNotAnswered(rangeVariables, answerVariables) =>
+        s"Range variables ${rangeVariables.map(_.value).mkString(",")} must be subset of answer variables ${answerVariables.map(_.value).mkString(",")}"
+      case MissingAnswerValue(variable)                             =>
+        s"Missing answer tuple value for '${variable.value}'"
+      case AnswerSortMismatch(variable, expected, actual)           =>
+        s"Type mismatch for answer variable '${variable.value}': expected ${expected.value}, actual ${actual.value}"
+
+  end ValidationProblem
+
+  /** Validation error (well-formed but invalid query, or an answer tuple that does not fit it) */
+  case class ValidationError(problem: ValidationProblem, position: SourcePosition) extends QueryError:
+    def message: String = problem.message
+
+    override def formatted: String = s"Validation error in '${problem.field}': $message"
 
   // ==================== Evaluation Errors ====================
 
-  /** Error during query evaluation */
-  case class EvaluationError(
-    message: String,
-    phase: String,
-    cause: Option[Throwable] = None,
-    override val context: Map[String, String] = Map.empty)
-    extends QueryError:
+  /** Why evaluation of a bound query stopped. */
+  enum EvaluationFailure:
+    /** The dispatcher refused a predicate; `dispatcherMessage` is its own text. */
+    case PredicateRefused(name: SymbolName, dispatcherMessage: String)
 
-    override def formatted: String =
-      val causeMsg = cause.map(c => s"\nCause: ${c.getMessage}").getOrElse("")
-      s"Evaluation error in $phase: $message$causeMsg" +
-        (if context.isEmpty then ""
-         else "\n" + context.map { case (k, v) => s"  $k: $v" }.mkString("\n"))
+    /** The dispatcher refused a function; `dispatcherMessage` is its own text. */
+    case FunctionRefused(name: SymbolName, dispatcherMessage: String)
+    case VariableSortMismatch(variable: VariableText, expected: TypeId, actual: TypeId)
+
+    /** The step of evaluation that stopped. */
+    def phase: String = this match
+      case PredicateRefused(name, _)     => s"predicate:${name.value}"
+      case FunctionRefused(name, _)      => s"function:${name.value}"
+      case VariableSortMismatch(_, _, _) => "typed_term"
+
+    def message: String = this match
+      case PredicateRefused(_, dispatcherMessage)           => dispatcherMessage
+      case FunctionRefused(_, dispatcherMessage)            => dispatcherMessage
+      case VariableSortMismatch(variable, expected, actual) =>
+        s"Variable '${variable.value}' has type ${actual.value}, expected ${expected.value}"
+
+  end EvaluationFailure
+
+  /** Error during query evaluation */
+  case class EvaluationError(failure: EvaluationFailure) extends QueryError:
+    def message: String = failure.message
+
+    override def formatted: String = s"Evaluation error in ${failure.phase}: $message"
 
   // ==================== FOL Semantics Errors ====================
 
@@ -132,9 +164,9 @@ object QueryError:
    * Distinguished from [[BindError]] (which covers arity/type mismatches) so callers can surface
    * targeted "did you mean …" guidance.
    */
-  case class UnknownConstantOrLiteralError(name: String) extends QueryError:
-    def message          = s"Unknown constant or literal: '$name'"
-    override val context = Map("constant" -> name)
+  case class UnknownConstantOrLiteralError(name: LiteralText) extends QueryError:
+    def message          = s"Unknown constant or literal: '${name.value}'"
+    override val context = Map("constant" -> name.value)
 
   /**
    * Raised when a query fails the typed bind phase (type-check errors). Indicates a user query
@@ -162,15 +194,18 @@ object QueryError:
     def message          = s"Runtime model validation failed: ${errors.mkString("; ")}"
     override val context = Map("errors" -> errors.mkString("; "))
 
-  /** Unbound variable in valuation */
+  /**
+   * Unbound variable in valuation. `boundVariables` holds the names bound at that point, which
+   * include the keys of the caller's answer tuple, so they are any text the caller chose.
+   */
   case class UnboundVariableError(
-    variableName: String,
+    variableName: VariableText,
     boundVariables: Set[String])
     extends QueryError:
-    def message = s"Unbound variable: '$variableName'"
+    def message = s"Unbound variable: '${variableName.value}'"
 
     override val context = Map(
-      "variable"        -> variableName,
+      "variable"        -> variableName.value,
       "bound_variables" -> boundVariables.mkString(", "),
     )
 

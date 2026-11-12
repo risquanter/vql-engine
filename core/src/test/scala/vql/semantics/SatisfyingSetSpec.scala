@@ -1,5 +1,6 @@
 package vql.semantics
 
+import lexer.VariableText
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
 import vql.error.{QueryError, TypeCheckError}
@@ -106,13 +107,13 @@ class SatisfyingSetSpec extends FunSuite:
     // r(x, y): y is a second free variable, not the satisfying-set variable.
     val f = atom("r", Term.mkVar("x"), Term.mkVar("y"))
     QueryBinder.bindSatisfyingFormula(f, "x", catalog) match
-      case Left(errs) => assert(errs.contains(TypeCheckError.UnexpectedFreeVar("y")), s"got $errs")
+      case Left(errs) => assert(errs.contains(TypeCheckError.UnexpectedFreeVar(VariableText.of("y"))), s"got $errs")
       case Right(_)   => fail("expected Left for extra free variable")
 
   test("rejects a formula that does not contain the variable (UnconstrainedVar)"):
     val f = atom("p", Term.mkVar("x"))
     QueryBinder.bindSatisfyingFormula(f, "z", catalog) match
-      case Left(errs) => assert(errs.contains(TypeCheckError.UnconstrainedVar("z")), s"got $errs")
+      case Left(errs) => assert(errs.contains(TypeCheckError.UnconstrainedVar(VariableText.of("z"))), s"got $errs")
       case Right(_)   => fail("expected Left when the variable is absent")
 
   test("rejects a variable whose inferred sort is a value type (TypeNotQuantifiable, ADR-014)"):

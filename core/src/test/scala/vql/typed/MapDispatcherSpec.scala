@@ -4,6 +4,7 @@ import TypeDecl.*
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
 import vql.error.{QueryError, RuntimeModelError}
+import vql.error.QueryError.EvaluationFailure
 import vql.logic.ParsedQuery
 import vql.quantifier.Quantifier
 import vql.sampling.SamplingParams
@@ -366,7 +367,7 @@ class MapDispatcherSpec extends FunSuite:
   // Query: Q[<=]^{1/4} x (leaf(x), gt_prob(lec(x, 10000000), 0.05))
   // Expected: only A satisfies gt_prob(lec(A, 10000000), 0.05) since lec(A)=0.07 > 0.05
   private val lecQuery = ParsedQuery(
-    quantifier = Quantifier.About(1, 2, 0.01),
+    quantifier = Quantifier.mkAbout(1, 2, 0.01),
     variable = "x",
     range = Formula.Atom(FOL(symLeaf.value, List(Term.mkVar("x")))),
     scope = Formula.Atom(
@@ -430,8 +431,29 @@ class MapDispatcherSpec extends FunSuite:
     result match
       case Left(e: QueryError.EvaluationError) =>
         assert(e.message.contains("deliberate predicate failure"))
+        assertEquals(e.failure, EvaluationFailure.PredicateRefused(symGtProb, "deliberate predicate failure"))
+        assertEquals(e.failure.phase, s"predicate:${symGtProb.value}")
       case Left(other)                         => fail(s"Expected EvaluationError, got $other")
       case Right(_)                            => fail("Expected Left for failing dispatcher")
+
+  test("evaluateTyped with MapDispatcher: a function's Left propagates as FunctionRefused"):
+    val failingDispatcher = MapDispatcher(
+      predicates = Map(
+        symLeaf   -> (_ => Right(true)),
+        symGtProb -> (_ => Right(true)),
+      ),
+      functions = Map(
+        symLec -> (_ => Left("deliberate function failure")),
+        symP95 -> (_ => Right(5000000L)),
+      ),
+    )
+    val fm     = FolModel(catalog, RuntimeModel(domains = Map(tAsset -> Set(domainA, domainB)), dispatcher = failingDispatcher))
+      .fold(e => fail(s"FolModel construction failed: $e"), identity)
+    VagueSemantics.evaluateTyped(query = lecQuery, folModel = fm, samplingParams = SamplingParams.exact) match
+      case Left(e: QueryError.EvaluationError) =>
+        assertEquals(e.failure, EvaluationFailure.FunctionRefused(symLec, "deliberate function failure"))
+        assertEquals(e.formatted, s"Evaluation error in function:${symLec.value}: deliberate function failure")
+      case other                               => fail(s"Expected EvaluationError, got $other")
 
   test("evaluateTyped with MapDispatcher: validateAgainst catches missing symbol in catalog"):
     // A dispatcher that is missing symGtProb from its predicates map

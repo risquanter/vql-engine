@@ -1,8 +1,8 @@
 package vql.typed
 
-import lexer.VariableText
+import lexer.{LiteralText, SymbolText, VariableText}
 import logic.{FOL, Formula, Term}
-import vql.error.TypeCheckError
+import vql.error.{MismatchSite, SymbolKind, TypeCheckError}
 import vql.logic.ParsedQuery
 
 object QueryBinder:
@@ -15,7 +15,7 @@ object QueryBinder:
       (boundRange, envAfterRange) = rangeResult
       quantifiedVarSort <- envAfterRange
         .get(query.variable)
-        .toRight(List(TypeCheckError.UnconstrainedVar(query.variable)))
+        .toRight(List(TypeCheckError.UnconstrainedVar(VariableText.of(query.variable))))
       _                 <-
         if catalog.domainTypes.contains(quantifiedVarSort) then Right(())
         else Left(List(TypeCheckError.TypeNotQuantifiable(quantifiedVarSort)))
@@ -49,10 +49,10 @@ object QueryBinder:
     for
       result <- bindFormula(formula, Map.empty, catalog)
       (bound, env) = result
-      sort <- env.get(variable).toRight(List(TypeCheckError.UnconstrainedVar(variable)))
+      sort <- env.get(variable).toRight(List(TypeCheckError.UnconstrainedVar(VariableText.of(variable))))
       _    <- (env.keySet - variable).toList match
         case Nil    => Right(())
-        case extras => Left(extras.map(TypeCheckError.UnexpectedFreeVar.apply))
+        case extras => Left(extras.map(extra => TypeCheckError.UnexpectedFreeVar(VariableText.of(extra))))
       _    <-
         if catalog.domainTypes.contains(sort) then Right(())
         else Left(List(TypeCheckError.TypeNotQuantifiable(sort)))
@@ -64,7 +64,7 @@ object QueryBinder:
     names.foldLeft[Either[List[TypeCheckError], List[BoundVar]]](Right(Nil)) { (acc, name) =>
       for
         xs <- acc
-        s  <- env.get(name).toRight(List(TypeCheckError.UnboundAnswerVar(name)))
+        s  <- env.get(name).toRight(List(TypeCheckError.UnboundAnswerVar(VariableText.of(name))))
       yield xs :+ BoundVar(name, s)
     }
 
@@ -128,7 +128,7 @@ object QueryBinder:
     bindFormula(body, scopedEnv, catalog).flatMap {
       case (boundBody, envAfterBody) =>
         envAfterBody.get(name) match
-          case None       => Left(List(TypeCheckError.UnconstrainedVar(name)))
+          case None       => Left(List(TypeCheckError.UnconstrainedVar(VariableText.of(name))))
           case Some(sort) =>
             if !catalog.domainTypes.contains(sort) then
               Left(List(TypeCheckError.TypeNotQuantifiable(sort)))
@@ -145,11 +145,18 @@ object QueryBinder:
   ], (BoundAtom, Env)] =
     val symbol = SymbolName(atom.predicate)
     catalog.predicates.get(symbol) match
-      case None      => Left(List(TypeCheckError.UnknownPredicate(atom.predicate)))
+      case None      => Left(List(TypeCheckError.UnknownPredicate(SymbolText.of(atom.predicate))))
       case Some(sig) =>
         if sig.params.length != atom.terms.length then
           Left(
-            List(TypeCheckError.ArityMismatch(atom.predicate, sig.params.length, atom.terms.length))
+            List(
+              TypeCheckError.ArityMismatch(
+                SymbolText.of(atom.predicate),
+                SymbolKind.Predicate,
+                sig.params.length,
+                atom.terms.length,
+              )
+            )
           )
         else
           bindTermsExpected(atom.terms, sig.params, env, catalog).map {
@@ -189,7 +196,7 @@ object QueryBinder:
           case Some(actual) if actual == expected =>
             Right((BoundTerm.VarRef(BoundVar(name, actual)), env))
           case Some(actual)                       =>
-            Left(List(TypeCheckError.TypeMismatch(expected, actual, s"variable '$name'")))
+            Left(List(TypeCheckError.TypeMismatch(expected, actual, MismatchSite.Variable(VariableText.of(name)))))
 
       case Term.Const(name) =>
         catalog.constants.get(name) match
@@ -197,7 +204,7 @@ object QueryBinder:
             // Named constant: resolved by the model at eval time.
             Right((BoundTerm.ConstRef(name, expected), env))
           case Some(actual)                       =>
-            Left(List(TypeCheckError.TypeMismatch(expected, actual, s"constant '$name'")))
+            Left(List(TypeCheckError.TypeMismatch(expected, actual, MismatchSite.Constant(LiteralText(name)))))
           case None                               =>
             catalog.literalValidators.get(expected) match
               case Some(v) =>
@@ -205,17 +212,22 @@ object QueryBinder:
                   case Some(raw) =>
                     Right((BoundTerm.LiteralRef(name, expected, raw), env))
                   case None      =>
-                    Left(List(TypeCheckError.UnparseableConstant(name, expected, name)))
+                    Left(List(TypeCheckError.UnparseableConstant(LiteralText(name), expected, LiteralText(name))))
               case None    =>
-                Left(List(TypeCheckError.UnknownConstantOrLiteral(name)))
+                Left(List(TypeCheckError.UnknownConstantOrLiteral(LiteralText(name))))
 
       case Term.Fn(name, args) =>
         val symbol = SymbolName(name)
         catalog.functions.get(symbol) match
-          case None      => Left(List(TypeCheckError.UnknownFunction(name)))
+          case None      => Left(List(TypeCheckError.UnknownFunction(SymbolText.of(name))))
           case Some(sig) =>
             if sig.params.length != args.length then
-              Left(List(TypeCheckError.ArityMismatch(name, sig.params.length, args.length)))
+              Left(
+                List(
+                  TypeCheckError
+                    .ArityMismatch(SymbolText.of(name), SymbolKind.Function, sig.params.length, args.length)
+                )
+              )
             else
               for
                 boundArgs <- bindTermsExpected(args, sig.params, env, catalog)
@@ -225,7 +237,7 @@ object QueryBinder:
                     Left(
                       List(
                         TypeCheckError
-                          .TypeMismatch(expected, sig.returns, s"function '$name' return")
+                          .TypeMismatch(expected, sig.returns, MismatchSite.FunctionReturn(SymbolText.of(name)))
                       )
                     )
               yield (BoundTerm.FnApp(symbol, boundArgs._1, sig.returns), boundArgs._2)
@@ -240,7 +252,7 @@ object QueryBinder:
     val keys      = (left.keySet union right.keySet).toList.sorted
     val conflicts = keys.collect {
       case k if left.get(k).exists(a => right.get(k).exists(_ != a)) =>
-        TypeCheckError.ConflictingTypes(k, left(k), right(k))
+        TypeCheckError.ConflictingTypes(VariableText.of(k), left(k), right(k))
     }
     conflicts match
       case Nil => Right(keys.map(k => k -> left.getOrElse(k, right(k))).toMap)

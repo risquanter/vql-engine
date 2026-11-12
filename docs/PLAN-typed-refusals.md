@@ -1228,7 +1228,7 @@ still all caught.
 package vql.error
 
 import lexer.{Found, GrammarSymbol, LexFailure, TokenKind, WordText}
-import parser.{SourcePosition, SyntaxFailure}
+import parser.SyntaxFailure
 
 /** What the parser was about to read when it needed a symbol. */
 enum ParseContext(val label: String):
@@ -1979,8 +1979,9 @@ arm reads `getMessage` and its last arm catches `Exception`.
 7. Tests: `VagueQueryParserSpec`, `ParsedQuerySpec`, `QuantifierSpec`,
    `QueryBinderSpec`, `MapDispatcherSpec`, `SatisfyingSetSpec` and
    `VagueSemanticsTypedSpec`. The tests that build a `Quantifier` case
-   directly, in `QuantifierSpec` and at line 45 of `VagueSemanticsTypedSpec`,
-   build it through `mk*`. Their assertions are unchanged.
+   directly build it through `mk*`: `QuantifierSpec`, thirteen sites in
+   `VagueSemanticsTypedSpec`, three in `CompoundRangeSpec` and one in
+   `MapDispatcherSpec`. Their assertions are unchanged.
 
 **Phase 6 — documents and release preparation.**
 1. `docs/ADR-022.md` (new): typed refusals. It records the closed sets, the
@@ -2214,6 +2215,10 @@ is parsed, `evaluateTyped` refuses it, and the test asserts the site.
   compared as a `TypeId`.
 - A test that builds an expected tree with a case constructor builds it with
   the building function. The expected tree is the same value.
+- `VagueQueryParserSpec` asserts that the refusal of `Q[==]^{1/2}` contains
+  `==`. An unknown operator run prints as `unknown operator` (§5.10), so the
+  test asserts the typed value `UnknownQuantifierOperator(UnknownOperator)`
+  and the whole sentence instead.
 - No other assertion is removed or weakened.
 
 ### Code this plan removes

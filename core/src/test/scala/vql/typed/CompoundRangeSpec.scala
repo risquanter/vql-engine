@@ -59,7 +59,7 @@ class CompoundRangeSpec extends FunSuite:
   /** A query whose scope is `True`, so `satisfyingElements == rangeElements`. */
   private def rangeQuery(range: BoundFormula): BoundQuery =
     BoundQuery(
-      quantifier = Quantifier.About(1, 2, 0.01),
+      quantifier = Quantifier.mkAbout(1, 2, 0.01),
       variable = x,
       range = range,
       scope = BoundFormula.True,
@@ -104,7 +104,7 @@ class CompoundRangeSpec extends FunSuite:
   ):
     // range p(x) = {i1,i2}; scope q(x) satisfied on {i2}
     val boundQuery = BoundQuery(
-      quantifier = Quantifier.About(1, 2, 0.01),
+      quantifier = Quantifier.mkAbout(1, 2, 0.01),
       variable = x,
       range = px, // the prior single-atom shape, now wrapped as BoundFormula.Atom
       scope = qx,
@@ -120,7 +120,7 @@ class CompoundRangeSpec extends FunSuite:
     // so 1 of 2), which the BoundFormula.Atom delegation must keep identical.
     val expected = EvaluationOutput(
       result = VagueQueryResult.fromEstimate(
-        VagueQuantifier.fromQuantifier(Quantifier.About(1, 2, 0.01)),
+        VagueQuantifier.fromQuantifier(Quantifier.mkAbout(1, 2, 0.01)),
         ProportionEstimator
           .estimateFromCount(successes = 1, sampleSize = 2, params = SamplingParams.exact),
         domainSize = 2,

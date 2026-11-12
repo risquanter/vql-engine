@@ -1,6 +1,9 @@
 package vql.parser
 
-import logic.{FOL, Formula, Term}
+import lexer.{Found, GrammarSymbol, LexFailure, SymbolText, TokenKind, VariableText, WordText}
+import logic.{FOL, FOLUtil, Formula, Term}
+import parser.{SourcePosition, SyntaxFailure}
+import vql.error.{ParseContext, ParseRefusal, QueryError, QuantifierPart, TypeCheckError}
 import vql.logic.ParsedQuery
 import vql.quantifier.Quantifier
 
@@ -400,8 +403,14 @@ class VagueQueryParserSpec extends munit.FunSuite:
 
     result match
       case Left(error) =>
-        assert(error.message.contains("Invalid quantifier operator"))
-        assert(error.message.contains("=="))
+        assertEquals(
+          error,
+          QueryError.ParseError(
+            ParseRefusal.UnknownQuantifierOperator(TokenKind.UnknownOperator),
+            SourcePosition.Unknown,
+          ),
+        )
+        assertEquals(error.message, "Invalid quantifier operator: unknown operator (expected ~, >=, or <=)")
       case Right(_)    =>
         fail("Expected parse error")
   }
@@ -449,6 +458,196 @@ class VagueQueryParserSpec extends munit.FunSuite:
     assertEquals(rangeAtom(q).terms.length, 2)
     assertEquals(rangeAtom(q).terms.head, Term.mkVar("x"))
     assertEquals(rangeAtom(q).terms(1), Term.mkConst("Vienna"))
+  }
+
+  // ==================== Typed refusals ====================
+
+  private def refusalOf(input: String): (ParseRefusal, SourcePosition) =
+    parse(input) match
+      case Left(QueryError.ParseError(refusal, position)) => (refusal, position)
+      case other                                          => fail(s"expected a ParseError, got $other")
+
+  private def word(text: String): TokenKind     = TokenKind.Word(WordText(text))
+  private def symbol(s: GrammarSymbol): TokenKind = TokenKind.Symbol(s)
+
+  /** Asserts the refusal, that its position is `Unknown`, and its sentence. */
+  private def assertRefused(input: String, refusal: ParseRefusal, sentence: String): Unit =
+    assertEquals(refusalOf(input), (refusal, SourcePosition.Unknown))
+    assertEquals(refusal.message, sentence)
+
+  test("QuantifierExpected carries at most the first seven tokens") {
+    assertRefused(
+      "x (country(x), large(x))",
+      ParseRefusal.QuantifierExpected(
+        List(
+          word("x"),
+          symbol(GrammarSymbol.LParen),
+          word("country"),
+          symbol(GrammarSymbol.LParen),
+          word("x"),
+          symbol(GrammarSymbol.RParen),
+          symbol(GrammarSymbol.Comma),
+        )
+      ),
+      "Expected quantifier Q[op]^{k/n}, got: x ( country ( x ) ,",
+    )
+  }
+
+  test("UnknownQuantifierOperator carries a grammar symbol it does not accept") {
+    assertRefused(
+      "Q[*]^{1/2} x (country(x), large(x))",
+      ParseRefusal.UnknownQuantifierOperator(symbol(GrammarSymbol.Times)),
+      "Invalid quantifier operator: * (expected ~, >=, or <=)",
+    )
+  }
+
+  test("IntegerExpected names the part and what was found") {
+    assertRefused(
+      "Q[~]^{a/2} x (country(x), large(x))",
+      ParseRefusal.IntegerExpected(QuantifierPart.Numerator, Found.Token(word("a"))),
+      "Expected integer for numerator k, got: a",
+    )
+    assertRefused(
+      "Q[~]^{1/",
+      ParseRefusal.IntegerExpected(QuantifierPart.Denominator, Found.EndOfInput),
+      "Expected integer for denominator n, got end of input",
+    )
+  }
+
+  test("IntegerOutOfRange carries the digits") {
+    assertRefused(
+      "Q[~]^{99999999999/2} x (country(x), large(x))",
+      ParseRefusal.IntegerOutOfRange(QuantifierPart.Numerator, WordText("99999999999")),
+      "Integer out of range for numerator k: 99999999999",
+    )
+  }
+
+  test("a fraction or tolerance outside [0, 1] is refused with its typed case") {
+    assertRefused(
+      "Q[>=]^{5/3} x (country(x), large(x))",
+      ParseRefusal.FractionOutOfRange(5, 3),
+      "Fraction 5/3 must lie in [0, 1] with a positive denominator",
+    )
+    assertRefused(
+      "Q[>=]^{1/0} x (country(x), large(x))",
+      ParseRefusal.FractionOutOfRange(1, 0),
+      "Fraction 1/0 must lie in [0, 1] with a positive denominator",
+    )
+    assertRefused(
+      "Q[~]^{1/2}[2.5] x (country(x), large(x))",
+      ParseRefusal.ToleranceOutOfRange(2.5),
+      "Tolerance 2.5 must lie in [0, 1]",
+    )
+  }
+
+  test("a fraction and a tolerance on the bounds parse") {
+    assertEquals(parseOk("Q[>=]^{0/4} x (country(x), large(x))").quantifier, Quantifier.mkAtLeast(0, 4))
+    assertEquals(parseOk("Q[~]^{1/1}[1] x (country(x), large(x))").quantifier, Quantifier.mkAbout(1, 1, 1.0))
+  }
+
+  test("a quantifier case constructor does not compile outside its package") {
+    assert(compileErrors("vql.quantifier.Quantifier.About(1, 2, 0.1)").nonEmpty)
+    assert(compileErrors("vql.quantifier.Quantifier.mkAbout(1, 2, 0.1)").isEmpty)
+  }
+
+  test("VariableExpected and AnswerVariableExpected carry what was found") {
+    assertRefused(
+      "Q[~]^{1/2} (country(x), large(x))",
+      ParseRefusal.VariableExpected(Found.Token(symbol(GrammarSymbol.LParen))),
+      "Expected variable identifier, got: (",
+    )
+    assertRefused(
+      "Q[~]^{1/2}",
+      ParseRefusal.VariableExpected(Found.EndOfInput),
+      "Expected variable identifier, got end of input",
+    )
+    assertRefused(
+      "Q[~]^{1/2} x (capital(x, y), large(x))(1)",
+      ParseRefusal.AnswerVariableExpected(Found.Token(word("1"))),
+      "Expected variable in list, got: 1",
+    )
+    assertRefused(
+      "Q[~]^{1/2} x (capital(x, y), large(x))(y,",
+      ParseRefusal.AnswerVariableExpected(Found.EndOfInput),
+      "Expected variable in list, got end of input",
+    )
+  }
+
+  test("SymbolExpected names the symbol, the context and what was found") {
+    assertRefused(
+      "Q[~]^{1/2} x country(x)",
+      ParseRefusal.SymbolExpected(GrammarSymbol.LParen, ParseContext.RangeFormula, Found.Token(word("country"))),
+      "Expected '(' before range formula, got 'country'",
+    )
+    assertRefused(
+      "Q[~]^{1/2} x",
+      ParseRefusal.SymbolExpected(GrammarSymbol.LParen, ParseContext.RangeFormula, Found.EndOfInput),
+      "Expected '(' before range formula, got end of input",
+    )
+  }
+
+  test("TrailingTokens holds every remaining token") {
+    assertRefused(
+      "Q[~]^{1/2} x (country(x), large(x)) extra tokens",
+      ParseRefusal.TrailingTokens(word("extra"), List(word("tokens"))),
+      "Unexpected tokens after query: extra tokens",
+    )
+  }
+
+  test("a formula failure is Formula(failure), with the foundation's sentence and no prefix") {
+    assertRefused("Q[~]^{1/2} x (", ParseRefusal.Formula(SyntaxFailure.FormulaExpected), "formula expected")
+  }
+
+  test("a refused literal character is Lexical with the exact offset") {
+    val input = "Q[~]^{1/2} x (p(x, \"a<b\"), q(x))"
+    assertEquals(
+      refusalOf(input),
+      (ParseRefusal.Lexical(LexFailure.RefusedLiteralCharacter), SourcePosition.At(input.indexOf('<'))),
+    )
+    assertEquals(
+      ParseRefusal.Lexical(LexFailure.RefusedLiteralCharacter).message,
+      "Lexer error: String literal holds a character outside its alphabet",
+    )
+  }
+
+  test("a word with an apostrophe, a decimal-named variable and each operator parse, and their refusals build") {
+    val q = parseOk(
+      "Q[~]^{1/2} x (country(x), exists y' . (exists 1.5 . r(x, y', 1.5)) /\\ " +
+        "(x + 1) * 2 - 3 / 4 ^ 5 >= 0 /\\ x = x /\\ x < 1 /\\ x <= 1 /\\ x > 0 /\\ x :: x = x)"
+    )
+    def predicates(f: Formula[FOL]): Set[String] = f match
+      case Formula.Atom(a)         => Set(a.predicate)
+      case Formula.Not(p)          => predicates(p)
+      case Formula.And(p, r)       => predicates(p) ++ predicates(r)
+      case Formula.Or(p, r)        => predicates(p) ++ predicates(r)
+      case Formula.Imp(p, r)       => predicates(p) ++ predicates(r)
+      case Formula.Iff(p, r)       => predicates(p) ++ predicates(r)
+      case Formula.Forall(_, p)    => predicates(p)
+      case Formula.Exists(_, p)    => predicates(p)
+      case Formula.True | Formula.False => Set.empty
+    def functions(f: Formula[FOL]): Set[String] =
+      def ofTerm(t: Term): Set[String] = t match
+        case Term.Fn(name, args) => args.toSet.flatMap(ofTerm) + name
+        case _                   => Set.empty
+      f match
+        case Formula.Atom(a)      => a.terms.toSet.flatMap(ofTerm)
+        case Formula.Not(p)       => functions(p)
+        case Formula.And(p, r)    => functions(p) ++ functions(r)
+        case Formula.Or(p, r)     => functions(p) ++ functions(r)
+        case Formula.Imp(p, r)    => functions(p) ++ functions(r)
+        case Formula.Iff(p, r)    => functions(p) ++ functions(r)
+        case Formula.Forall(_, p) => functions(p)
+        case Formula.Exists(_, p) => functions(p)
+        case Formula.True | Formula.False => Set.empty
+    assertEquals(predicates(q.scope), Set("r", ">=", "=", "<", "<=", ">"))
+    assertEquals(functions(q.scope), Set("+", "*", "-", "/", "^", "::"))
+    assertEquals(FOLUtil.varFOL(q.scope).toSet, Set("x", "y'", "1.5"))
+    (predicates(q.scope) ++ functions(q.scope)).foreach(name =>
+      assertEquals(TypeCheckError.UnknownPredicate(SymbolText.of(name)).message, s"unknown predicate: $name")
+    )
+    Set("y'", "1.5").foreach(name =>
+      assertEquals(TypeCheckError.UnboundAnswerVar(VariableText.of(name)).message, s"unbound answer variable: $name")
+    )
   }
 
 end VagueQueryParserSpec

@@ -1,9 +1,12 @@
 package vql.semantics
 
+import lexer.{LiteralText, SymbolText, VariableText}
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
-import vql.error.{QueryError, TypeCheckError}
+import vql.error.{MismatchSite, QueryError, SymbolKind, TypeCheckError}
+import parser.SourcePosition
 import vql.logic.ParsedQuery
+import vql.parser.VagueQueryParser
 import vql.quantifier.Quantifier
 import vql.sampling.SamplingParams
 import vql.typed.{
@@ -14,6 +17,7 @@ import vql.typed.{
   BoundTerm,
   BoundVar,
   FolModel,
+  FunctionSig,
   PredicateSig,
   QueryBinder,
   RuntimeDispatcher,
@@ -43,7 +47,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
   private val vB = Value(asset, "B")
 
   private val query = ParsedQuery(
-    quantifier = Quantifier.About(1, 2, 0.01),
+    quantifier = Quantifier.mkAbout(1, 2, 0.01),
     variable = "x",
     range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
     scope = Formula.Atom(FOL("coastal", List(Term.mkVar("x")))),
@@ -156,7 +160,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
 
   test("bindTyped returns BindError (not ValidationError) on type-check failure"):
     val badQuery = ParsedQuery(
-      quantifier = Quantifier.About(1, 2, 0.01),
+      quantifier = Quantifier.mkAbout(1, 2, 0.01),
       variable = "x",
       range = Formula.Atom(FOL("nonexistent_predicate", List(Term.mkVar("x")))),
       scope = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
@@ -172,7 +176,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
 
   test("evaluateTyped returns BindError (not ValidationError) for malformed query"):
     val badQuery   = ParsedQuery(
-      quantifier = Quantifier.About(1, 2, 0.01),
+      quantifier = Quantifier.mkAbout(1, 2, 0.01),
       variable = "x",
       range = Formula.Atom(FOL("nonexistent_predicate", List(Term.mkVar("x")))),
       scope = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
@@ -237,7 +241,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
 
   private def sortQuery(scope: Formula[FOL]): ParsedQuery =
     ParsedQuery(
-      quantifier = Quantifier.About(1, 2, 0.01),
+      quantifier = Quantifier.mkAbout(1, 2, 0.01),
       variable = "x",
       range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
       scope = scope,
@@ -260,7 +264,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     e.details match
       case List(d: TypeCheckError.UnparseableConstant) =>
         assertEquals(d.sort, TypeId("Loss"))
-        assertEquals(d.sourceText, "abc")
+        assertEquals(d.sourceText, LiteralText("abc"))
         // AC-7: the error's message is the very string the message list carries
         assertEquals(e.messages, List(d.message))
       case other => fail(s"expected one UnparseableConstant detail, got $other")
@@ -284,7 +288,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     assertEquals(e.messages, List("cannot parse 'abc' as Loss"))
 
   test("AC-6: a bind error's message is derived from its fields"):
-    val d: TypeCheckError = TypeCheckError.UnparseableConstant("n", TypeId("Loss"), "n")
+    val d: TypeCheckError = TypeCheckError.UnparseableConstant(LiteralText("n"), TypeId("Loss"), LiteralText("n"))
     assertEquals(d.message, "cannot parse 'n' as Loss")
 
   // ==================== Binder error accumulation (ADR-020) ====================
@@ -308,8 +312,9 @@ class VagueSemanticsTypedSpec extends FunSuite:
     e.details match
       case List(d: TypeCheckError.UnparseableConstant, a: TypeCheckError.ArityMismatch) =>
         assertEquals(d.sort, TypeId("Loss"))
-        assertEquals(d.sourceText, "abc")
-        assertEquals(a.symbol, "leaf")
+        assertEquals(d.sourceText, LiteralText("abc"))
+        assertEquals(a.symbol, SymbolText.of("leaf"))
+        assertEquals(a.kind, SymbolKind.Predicate)
         assertEquals(a.expected, 1)
         assertEquals(a.actual, 2)
         assert(a.message.contains("leaf"), s"second detail was '${a.message}'")
@@ -339,7 +344,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     // range = big(x, "abc") fails; scope = leaf(x, x) also fails; only the range
     // error is reported, because scope binds against the range's output environment.
     val q = ParsedQuery(
-      quantifier = Quantifier.About(1, 2, 0.01),
+      quantifier = Quantifier.mkAbout(1, 2, 0.01),
       variable = "x",
       range = bigConst("abc"),
       scope = leafArity2,
@@ -348,7 +353,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     val e = bindErrorForQuery(q, sortModel)
     assertEquals(e.details.length, 1)
     e.details.head match
-      case d: TypeCheckError.UnparseableConstant => assertEquals(d.sourceText, "abc")
+      case d: TypeCheckError.UnparseableConstant => assertEquals(d.sourceText, LiteralText("abc"))
       case other => fail(s"expected the range's UnparseableConstant, got $other")
 
   test("AC-E: mergeEnvs reports every conflicting variable, not just the first"):
@@ -385,7 +390,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       Formula.And(probAtom("u"), probAtom("v")),
     )
     val q                   = ParsedQuery(
-      quantifier = Quantifier.About(1, 2, 0.01),
+      quantifier = Quantifier.mkAbout(1, 2, 0.01),
       variable = "x",
       range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
       scope = scope,
@@ -434,7 +439,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
 
   test("ModelValidationError raised when enumerable type has no registered domain (root variable)"):
     val queryOverLoss = ParsedQuery(
-      quantifier = Quantifier.About(1, 2, 0.01),
+      quantifier = Quantifier.mkAbout(1, 2, 0.01),
       variable = "l",
       range = Formula.Atom(FOL("hasloss", List(Term.mkVar("l")))),
       scope = Formula.True,
@@ -451,7 +456,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
 
   test("ModelValidationError raised when enumerable type has no registered domain (nested Forall)"):
     val queryWithInnerForall = ParsedQuery(
-      quantifier = Quantifier.About(1, 2, 0.01),
+      quantifier = Quantifier.mkAbout(1, 2, 0.01),
       variable = "x",
       range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
       scope = Formula.mkForall("l", Formula.Atom(FOL("hasloss", List(Term.mkVar("l"))))),
@@ -467,7 +472,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
 
   test("ModelValidationError raised when enumerable type has no registered domain (nested Exists)"):
     val queryWithInnerExists = ParsedQuery(
-      quantifier = Quantifier.About(1, 2, 0.01),
+      quantifier = Quantifier.mkAbout(1, 2, 0.01),
       variable = "x",
       range = Formula.Atom(FOL("leaf", List(Term.mkVar("x")))),
       scope = Formula.mkExists("l", Formula.Atom(FOL("hasloss", List(Term.mkVar("l"))))),
@@ -500,7 +505,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
     )
     // Manually construct a BoundQuery over Loss, bypassing QueryBinder.bind
     val boundQuery       = BoundQuery(
-      quantifier = Quantifier.About(1, 2, 0.01),
+      quantifier = Quantifier.mkAbout(1, 2, 0.01),
       variable = BoundVar("l", loss),
       range = BoundFormula.Atom(
         BoundAtom(SymbolName("hasloss"), List(BoundTerm.VarRef(BoundVar("l", loss))))
@@ -549,7 +554,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       BoundFormula.Atom(BoundAtom(sentinel, List(BoundTerm.VarRef(x)))),
     )
     val boundQuery = BoundQuery(
-      quantifier = Quantifier.About(1, 2, 0.01),
+      quantifier = Quantifier.mkAbout(1, 2, 0.01),
       variable = x,
       range = BoundFormula.Atom(BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x)))),
       scope = scope,
@@ -572,7 +577,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       BoundFormula.Atom(BoundAtom(sentinel, List(BoundTerm.VarRef(x)))),
     )
     val boundQuery = BoundQuery(
-      quantifier = Quantifier.About(1, 2, 0.01),
+      quantifier = Quantifier.mkAbout(1, 2, 0.01),
       variable = x,
       range = BoundFormula.Atom(BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x)))),
       scope = scope,
@@ -595,7 +600,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       BoundFormula.Atom(BoundAtom(sentinel, List(BoundTerm.VarRef(x)))),
     )
     val boundQuery = BoundQuery(
-      quantifier = Quantifier.About(1, 2, 0.01),
+      quantifier = Quantifier.mkAbout(1, 2, 0.01),
       variable = x,
       range = BoundFormula.Atom(BoundAtom(SymbolName("leaf"), List(BoundTerm.VarRef(x)))),
       scope = scope,
@@ -608,5 +613,92 @@ class VagueSemanticsTypedSpec extends FunSuite:
     assert(result.isRight, s"Expected Right, got $result")
     assert(!dispatched, "Imp consequent was dispatched despite antecedent being False")
     assertEquals(result.toOption.get.satisfyingElements.size, 2) // Imp(False, _) vacuously true
+
+  // ==================== Typed refusals through parse, bind and evaluate ====================
+
+  private val siteCatalog = TypeCatalog.unsafe(
+    types = Set(DomainType(asset), ValueType(lossSort)),
+    constants = Map("acme" -> asset),
+    functions = Map(SymbolName("p95") -> FunctionSig(List(asset), lossSort)),
+    predicates = Map(
+      SymbolName("leaf") -> PredicateSig(List(asset)),
+      SymbolName("big")  -> PredicateSig(List(asset, lossSort)),
+    ),
+  )
+
+  private val siteModel =
+    val dispatcher = new RuntimeDispatcher:
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] = Right(1.0)
+      override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
+        Right(true)
+      override def functionSymbols: Set[SymbolName]  = Set(SymbolName("p95"))
+      override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"), SymbolName("big"))
+    FolModel(siteCatalog, RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = dispatcher))
+      .fold(e => fail(s"FolModel construction failed: $e"), identity)
+
+  end siteModel
+
+  private def refusalFor(text: String, answerTuple: Map[String, Value] = Map.empty): QueryError =
+    VagueQueryParser.parse(text) match
+      case Left(e)      => fail(s"expected the text to parse, got ${e.formatted}")
+      case Right(query) =>
+        VagueSemantics.evaluateTyped(query, siteModel, answerTuple = answerTuple) match
+          case Left(e)  => e
+          case Right(_) => fail("expected evaluateTyped to refuse the query")
+
+  test("a type mismatch from query text reports its site: a variable, a constant, a function's return"):
+    val cases = List(
+      "Q[~]^{1/2} x (leaf(x), big(x, x))"         ->
+        TypeCheckError.TypeMismatch(lossSort, asset, MismatchSite.Variable(VariableText.of("x"))),
+      "Q[~]^{1/2} x (leaf(x), big(x, \"acme\"))" ->
+        TypeCheckError.TypeMismatch(lossSort, asset, MismatchSite.Constant(LiteralText("acme"))),
+      "Q[~]^{1/2} x (leaf(x), leaf(p95(x)))"      ->
+        TypeCheckError.TypeMismatch(asset, lossSort, MismatchSite.FunctionReturn(SymbolText.of("p95"))),
+    )
+    cases.foreach((text, expected) => assertEquals(refusalFor(text), QueryError.BindError(List(expected))))
+    assertEquals(
+      refusalFor("Q[~]^{1/2} x (leaf(x), big(x, x))").message,
+      "Query type-checking failed: type mismatch in variable 'x': expected Loss, actual Asset",
+    )
+
+  test("the two answer-tuple problems arrive as ValidationError with their typed problem"):
+    val text = "Q[~]^{1/2} x (big(x, y), leaf(x))(y)"
+    val missing = refusalFor(text)
+    assertEquals(
+      missing,
+      QueryError.ValidationError(
+        QueryError.ValidationProblem.MissingAnswerValue(VariableText.of("y")),
+        SourcePosition.Unknown,
+      ),
+    )
+    assertEquals(missing.formatted, "Validation error in 'answer_tuple': Missing answer tuple value for 'y'")
+    val wrongSort = refusalFor(text, Map("y" -> vA))
+    assertEquals(
+      wrongSort,
+      QueryError.ValidationError(
+        QueryError.ValidationProblem.AnswerSortMismatch(VariableText.of("y"), lossSort, asset),
+        SourcePosition.Unknown,
+      ),
+    )
+    assertEquals(
+      wrongSort.formatted,
+      "Validation error in 'answer_tuple': Type mismatch for answer variable 'y': expected Loss, actual Asset",
+    )
+
+  test("each EvaluationFailure carries its phase and message"):
+    import QueryError.EvaluationFailure.*
+    val cases = List(
+      PredicateRefused(SymbolName("leaf"), "no leaf")                   -> ("predicate:leaf", "no leaf"),
+      FunctionRefused(SymbolName("p95"), "no p95")                      -> ("function:p95", "no p95"),
+      VariableSortMismatch(VariableText.of("x"), asset, lossSort)        ->
+        ("typed_term", "Variable 'x' has type Loss, expected Asset"),
+    )
+    cases.foreach { case (failure, (phase, message)) =>
+      assertEquals((failure.phase, failure.message), (phase, message))
+      assertEquals(
+        QueryError.EvaluationError(failure).formatted,
+        s"Evaluation error in $phase: $message",
+      )
+    }
 
 end VagueSemanticsTypedSpec

@@ -1,6 +1,9 @@
 package vql.typed
 
+import lexer.VariableText
+import parser.SourcePosition
 import vql.error.QueryError
+import vql.error.QueryError.{EvaluationFailure, ValidationProblem}
 import vql.quantifier.VagueQuantifier
 import vql.result.{EvaluationOutput, VagueQueryResult}
 import vql.sampling.{
@@ -87,17 +90,16 @@ object TypedSemantics:
           case None                               =>
             Left(
               QueryError.ValidationError(
-                message = s"Missing answer tuple value for '${boundVar.name}'",
-                field = "answer_tuple",
+                ValidationProblem.MissingAnswerValue(VariableText.of(boundVar.name)),
+                SourcePosition.Unknown,
               )
             )
           case Some(v) if v.sort == boundVar.sort => Right(env)
           case Some(v)                            =>
             Left(
               QueryError.ValidationError(
-                message =
-                  s"Type mismatch for answer variable '${boundVar.name}': expected ${boundVar.sort.value}, actual ${v.sort.value}",
-                field = "answer_tuple",
+                ValidationProblem.AnswerSortMismatch(VariableText.of(boundVar.name), boundVar.sort, v.sort),
+                SourcePosition.Unknown,
               )
             )
       }
@@ -244,12 +246,7 @@ object TypedSemantics:
       value <- model.dispatcher
         .evalPredicate(atom.name, args)
         .left
-        .map(msg =>
-          QueryError.EvaluationError(
-            message = msg,
-            phase = s"predicate:${atom.name.value}",
-          )
-        )
+        .map(msg => QueryError.EvaluationError(EvaluationFailure.PredicateRefused(atom.name, msg)))
     yield value
 
   private def evalTerms(terms: List[BoundTerm], env: Env, model: RuntimeModel): Either[
@@ -269,16 +266,14 @@ object TypedSemantics:
         env
           .get(v.name)
           .toRight(
-            QueryError.UnboundVariableError(v.name, env.keySet)
+            QueryError.UnboundVariableError(VariableText.of(v.name), env.keySet)
           )
           .flatMap { value =>
             if value.sort == v.sort then Right(value)
             else
               Left(
                 QueryError.EvaluationError(
-                  message =
-                    s"Variable '${v.name}' has type ${value.sort.value}, expected ${v.sort.value}",
-                  phase = "typed_term",
+                  EvaluationFailure.VariableSortMismatch(VariableText.of(v.name), v.sort, value.sort)
                 )
               )
           }
@@ -300,12 +295,7 @@ object TypedSemantics:
           result    <- model.dispatcher
             .evalFunction(name, argValues)
             .left
-            .map(msg =>
-              QueryError.EvaluationError(
-                message = msg,
-                phase = s"function:${name.value}",
-              )
-            )
+            .map(msg => QueryError.EvaluationError(EvaluationFailure.FunctionRefused(name, msg)))
         yield Value(sort, result)
 
   private def emptyResult(quantifier: VagueQuantifier): VagueQueryResult =

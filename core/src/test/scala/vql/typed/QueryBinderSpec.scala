@@ -1,9 +1,10 @@
 package vql.typed
 
 import TypeDecl.*
+import lexer.{LiteralText, SymbolText, VariableText}
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
-import vql.error.TypeCheckError
+import vql.error.{MismatchSite, SymbolKind, TypeCheckError}
 import vql.logic.ParsedQuery
 import vql.quantifier.Quantifier
 
@@ -319,7 +320,7 @@ class QueryBinderSpec extends FunSuite:
         val matched = errs.collect {
           case e @ TypeCheckError.UnparseableConstant(name, sort, src) => (name, sort, src)
         }
-        assertEquals(matched, List(("0.05", loss, "0.05")))
+        assertEquals(matched, List((LiteralText("0.05"), loss, LiteralText("0.05"))))
       case Right(_)   => fail("expected Left(UnparseableConstant)")
 
   test("sort with no validator falls through to UnknownConstantOrLiteral"):
@@ -347,8 +348,8 @@ class QueryBinderSpec extends FunSuite:
       case Left(errs) =>
         assert(
           errs.exists {
-            case TypeCheckError.UnknownConstantOrLiteral("5000000") => true
-            case _                                                  => false
+            case TypeCheckError.UnknownConstantOrLiteral(name) => name == LiteralText("5000000")
+            case _                                       => false
           },
           s"expected UnknownConstantOrLiteral, got $errs",
         )
@@ -362,5 +363,99 @@ class QueryBinderSpec extends FunSuite:
     intercept[IllegalArgumentException](BoundVar("risk-id", asset))
     val f = Formula.Atom(FOL("leaf", List(Term.mkVar("x"))))
     intercept[IllegalArgumentException](QueryBinder.bindSatisfyingFormula(f, "risk-id", catalog))
+
+  // ==================== Typed fields of each bind error ====================
+
+  private def atom(p: String, args: Term*): Formula[FOL] = Formula.Atom(FOL(p, args.toList))
+
+  private def bindErrors(
+    range: Formula[FOL],
+    scope: Formula[FOL],
+    answerVars: List[String] = Nil,
+    cat: TypeCatalog = catalog,
+  ): List[TypeCheckError] =
+    val query = ParsedQuery(Quantifier.mkAtLeast(1, 2), "x", range, scope, answerVars)
+    QueryBinder.bind(query, cat) match
+      case Left(errs) => errs
+      case Right(_)   => fail("expected the binder to refuse the query")
+
+  private val leafX = atom("leaf", Term.mkVar("x"))
+
+  test("UnknownPredicate and UnknownFunction carry the symbol's text"):
+    assertEquals(bindErrors(leafX, atom("nope", Term.mkVar("x"))), List(TypeCheckError.UnknownPredicate(SymbolText.of("nope"))))
+    assertEquals(
+      bindErrors(leafX, atom("gt_loss", Term.mkFn("p99", List(Term.mkVar("x"))), Term.mkConst("5"))),
+      List(TypeCheckError.UnknownFunction(SymbolText.of("p99"))),
+    )
+
+  test("an arity mismatch carries SymbolKind.Predicate on an atom and SymbolKind.Function on an application"):
+    val onAtom = bindErrors(leafX, atom("leaf", Term.mkVar("x"), Term.mkVar("x")))
+    assertEquals(onAtom, List(TypeCheckError.ArityMismatch(SymbolText.of("leaf"), SymbolKind.Predicate, 1, 2)))
+    assertEquals(onAtom.map(_.message), List("arity mismatch for 'leaf': expected 1, actual 2"))
+    val onFn   = bindErrors(
+      leafX,
+      atom("gt_loss", Term.mkFn("p95", List(Term.mkVar("x"), Term.mkVar("x"))), Term.mkConst("5")),
+    )
+    assertEquals(onFn, List(TypeCheckError.ArityMismatch(SymbolText.of("p95"), SymbolKind.Function, 1, 2)))
+    assertEquals(onFn.map(_.message), List("arity mismatch for 'p95': expected 1, actual 2"))
+
+  test("UnknownConstantOrLiteral carries the constant's text"):
+    assertEquals(
+      bindErrors(leafX, atom("leaf", Term.mkConst("zz"))),
+      List(TypeCheckError.UnknownConstantOrLiteral(LiteralText("zz"))),
+    )
+
+  test("TypeMismatch names its site: a variable, a constant, or a function's return"):
+    assertEquals(
+      bindErrors(leafX, atom("gt_loss", Term.mkVar("x"), Term.mkConst("5"))),
+      List(TypeCheckError.TypeMismatch(loss, asset, MismatchSite.Variable(VariableText.of("x")))),
+    )
+    val withConstant = TypeCatalog.unsafe(
+      types = Set(DomainType(asset), ValueType(loss)),
+      constants = Map("acme" -> asset),
+      predicates = Map(SymbolName("leaf") -> PredicateSig(List(asset)), SymbolName("big") -> PredicateSig(List(loss))),
+    )
+    assertEquals(
+      bindErrors(leafX, atom("big", Term.mkConst("acme")), cat = withConstant),
+      List(TypeCheckError.TypeMismatch(loss, asset, MismatchSite.Constant(LiteralText("acme")))),
+    )
+    assertEquals(
+      bindErrors(leafX, atom("gt_prob", Term.mkFn("p95", List(Term.mkVar("x"))), Term.mkConst("0.5"))),
+      List(TypeCheckError.TypeMismatch(prob, loss, MismatchSite.FunctionReturn(SymbolText.of("p95")))),
+    )
+
+  test("UnboundAnswerVar, UnconstrainedVar and ConflictingTypes carry the variable's text"):
+    assertEquals(bindErrors(leafX, leafX, answerVars = List("z")), List(TypeCheckError.UnboundAnswerVar(VariableText.of("z"))))
+    assertEquals(
+      bindErrors(atom("leaf", Term.mkVar("y")), leafX, answerVars = List("y")),
+      List(TypeCheckError.UnconstrainedVar(VariableText.of("x"))),
+    )
+    val conflict = Formula.And(
+      atom("gt_loss", Term.mkVar("y"), Term.mkConst("5")),
+      atom("gt_prob", Term.mkVar("y"), Term.mkConst("0.5")),
+    )
+    assertEquals(
+      bindErrors(leafX, conflict),
+      List(TypeCheckError.ConflictingTypes(VariableText.of("y"), loss, prob)),
+    )
+
+  test("each TypeCheckError's message is its sentence, word for word"):
+    import TypeCheckError.*
+    val cases: List[(TypeCheckError, String)] = List(
+      UnknownPredicate(SymbolText.of("nope"))                                 -> "unknown predicate: nope",
+      UnknownFunction(SymbolText.of("+"))                                     -> "unknown function: +",
+      ArityMismatch(SymbolText.of("leaf"), SymbolKind.Predicate, 1, 2)        -> "arity mismatch for 'leaf': expected 1, actual 2",
+      UnknownConstantOrLiteral(LiteralText("IT Risk"))                        -> "unknown constant or literal: IT Risk",
+      TypeMismatch(loss, asset, MismatchSite.Variable(VariableText.of("x")))  -> "type mismatch in variable 'x': expected Loss, actual Asset",
+      TypeMismatch(loss, asset, MismatchSite.Constant(LiteralText("acme")))   -> "type mismatch in constant 'acme': expected Loss, actual Asset",
+      TypeMismatch(prob, loss, MismatchSite.FunctionReturn(SymbolText.of("p95"))) -> "type mismatch in function 'p95' return: expected Probability, actual Loss",
+      UnboundAnswerVar(VariableText.of("z"))                                  -> "unbound answer variable: z",
+      UnconstrainedVar(VariableText.of("x"))                                  -> "unconstrained quantifier variable: x",
+      ConflictingTypes(VariableText.of("y"), loss, prob)                      -> "conflicting inferred types for 'y': Loss vs Probability",
+      UnparseableConstant(LiteralText("abc"), loss, LiteralText("abc"))       -> "cannot parse 'abc' as Loss",
+      TypeNotQuantifiable(loss)                                               -> "type 'Loss' is not a domain type and cannot be quantified over",
+      UnexpectedFreeVar(VariableText.of("y'"))                                -> "unexpected free variable 'y'': a satisfying-set formula may only mention its one variable",
+    )
+    cases.foreach((error, sentence) => assertEquals(error.message, sentence))
 
 end QueryBinderSpec

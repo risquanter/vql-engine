@@ -24,7 +24,7 @@ enum Quantifier:
    *
    * Example: Q[~#]^{1/2} means "about half"
    */
-  case About(k: Int, n: Int, tolerance: Double)
+  case About private[quantifier] (k: Int, n: Int, tolerance: Double)
 
   /**
    * At least about k/n (Q[≥]) - "at least about k/n"
@@ -33,7 +33,7 @@ enum Quantifier:
    *
    * Example: Q[≥]^{3/4} means "at least about three quarters"
    */
-  case AtLeast(k: Int, n: Int, tolerance: Double)
+  case AtLeast private[quantifier] (k: Int, n: Int, tolerance: Double)
 
   /**
    * At most about k/n (Q[≤]) - "at most about k/n"
@@ -42,7 +42,7 @@ enum Quantifier:
    *
    * Example: Q[≤]^{1/4} means "at most about one quarter"
    */
-  case AtMost(k: Int, n: Int, tolerance: Double)
+  case AtMost private[quantifier] (k: Int, n: Int, tolerance: Double)
 
 end Quantifier
 
@@ -53,7 +53,8 @@ object Quantifier:
    *
    * OCaml reference: formulas.ml let mk_and p q = And(p,q) and mk_or p q = Or(p,q)
    *
-   * These provide validation and maintain invariants.
+   * The case constructors are closed to this package, so every `Quantifier` outside it is built
+   * here: `k/n` is a proportion with `n > 0`, and the tolerance lies in `[0, 1]`.
    */
   def mkAbout(k: Int, n: Int, tol: Double = 0.1): Quantifier =
     require(n > 0, "Denominator must be positive")

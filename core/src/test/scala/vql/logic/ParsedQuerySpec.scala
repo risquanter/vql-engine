@@ -1,8 +1,11 @@
 package vql.logic
 
+import lexer.VariableText
 import logic.{FOL, Formula, Term}
+import parser.SourcePosition
 import munit.FunSuite
-import vql.error.QueryException
+import vql.error.{QueryError, QueryException}
+import vql.error.QueryError.ValidationProblem
 import vql.quantifier.Quantifier
 
 class ParsedQuerySpec extends FunSuite:
@@ -147,6 +150,13 @@ class ParsedQuerySpec extends FunSuite:
       )
     }
     assert(error.getMessage.contains("must occur free in the range"))
+    assertEquals(
+      error.error,
+      QueryError.ValidationError(
+        ValidationProblem.QuantifiedVariableNotInRange(VariableText.of("x"), Set(VariableText.of("y"))),
+        SourcePosition.Unknown,
+      ),
+    )
   }
 
   test("mk validates range variables subset of answer vars") {
@@ -160,6 +170,13 @@ class ParsedQuerySpec extends FunSuite:
       )
     }
     assert(error.getMessage.contains("must be subset of answer variables"))
+    assertEquals(
+      error.error,
+      QueryError.ValidationError(
+        ValidationProblem.RangeVariablesNotAnswered(Set(VariableText.of("y")), Nil),
+        SourcePosition.Unknown,
+      ),
+    )
   }
 
   test("mk accepts valid binary range with answer var") {

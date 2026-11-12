@@ -1,11 +1,10 @@
 package vql.parser
 
-import lexer.{Lexer, LexerError, Token}
-import logic.{FOL, Formula, Term}
-import parser.{FOLAtomParser, FormulaParser}
-import parser.Combinators.{tokenLabel, tokensLabel}
+import lexer.{Found, GrammarSymbol, Lexer, LexerError, Token, TokenKind, WordText}
+import parser.{FOLAtomParser, FormulaParser, SourcePosition}
+import parser.Combinators.{ParseFailure, SyntaxError, tokenLabel}
 import util.StringUtil
-import vql.error.{QueryError, QueryException}
+import vql.error.{ParseContext, ParseRefusal, QueryError, QueryException, QuantifierPart}
 import vql.logic.ParsedQuery
 import vql.quantifier.Quantifier
 
@@ -31,41 +30,36 @@ object VagueQueryParser:
 
   // ── Public API ──────────────────────────────────────────────────────
 
-  /** Parse a vague query string. */
+  /**
+   * Parse a vague query string.
+   *
+   * `Left(QueryError.ParseError)` when the text is no query, and `Left(QueryError.ValidationError)`
+   * when a parsed query breaks a range rule. An exception that is neither the parsers' own failure
+   * nor a `QueryException` propagates.
+   */
   def parse(s: String): Either[QueryError, ParsedQuery] =
     try
       val tokens             = mergeDecimalTokens(Lexer.lex(StringUtil.explode(s)))
       val (query, remaining) = parseTokens(tokens)
-      if remaining.nonEmpty then
-        Left(
-          QueryError.ParseError(
-            s"Unexpected tokens after query: ${tokensLabel(remaining)}",
-            s,
-            Some(s.length - tokensLabel(remaining).length),
-            Map("remaining_tokens" -> tokensLabel(remaining)),
-          )
-        )
-      else Right(query)
+      remaining match
+        case Nil           => Right(query)
+        case first :: more =>
+          Left(refused(ParseRefusal.TrailingTokens(TokenKind.of(first), more.map(TokenKind.of))))
     catch
-      case e: QueryException => Left(e.error)
+      case e: QueryException =>
+        Left(e.error)
       case e: LexerError     =>
-        Left(
-          QueryError.ParseError(
-            s"Lexer error: ${e.getMessage}",
-            s,
-            None,
-            Map("exception" -> e.getClass.getSimpleName),
-          )
-        )
-      case e: Exception      =>
-        Left(
-          QueryError.ParseError(
-            s"Unexpected error during parsing: ${e.getMessage}",
-            s,
-            None,
-            Map("exception" -> e.getClass.getSimpleName),
-          )
-        )
+        Left(QueryError.ParseError(ParseRefusal.Lexical(e.failure), SourcePosition.At(s.length - e.remaining)))
+      case e: ParseFailure   =>
+        Left(refused(ParseRefusal.Formula(e.failure)))
+      case e: SyntaxError    =>
+        Left(refused(ParseRefusal.Formula(e.failure)))
+
+  private def refused(refusal: ParseRefusal): QueryError.ParseError =
+    QueryError.ParseError(refusal, SourcePosition.Unknown)
+
+  /** The tokens of `Q [ op ] ^ {` and the numerator. */
+  private val quantifierPrefixLength: Int = 7
 
   // ── Combinators ─────────────────────────────────────────────────────
   // Each is List[Token] => (A, List[Token]) — the ParseResult pattern.
@@ -78,7 +72,7 @@ object VagueQueryParser:
     // 2. x
     val (variable, t2)   = parseVariable(t1)
     // 3. (
-    val t3               = expect(Token.LParen, t2, "range formula")
+    val t3               = expect(GrammarSymbol.LParen, t2, ParseContext.RangeFormula)
     // 4. R(x,y') range formula — delegate to the formula parser (OCaml style).
     //    `,` is not an infix operator, so parsing stops at the range/scope comma.
     val (range, t4)      = FormulaParser.parse(
@@ -86,14 +80,14 @@ object VagueQueryParser:
       FOLAtomParser.parseAtom,
     )(t3)
     // 5. ,
-    val t5               = expect(Token.Comma, t4, "scope formula")
+    val t5               = expect(GrammarSymbol.Comma, t4, ParseContext.ScopeFormula)
     // 6. φ(x,y) — delegate to formula parser (OCaml style)
     val (scope, t6)      = FormulaParser.parse(
       FOLAtomParser.parseInfixAtom,
       FOLAtomParser.parseAtom,
     )(t5)
     // 7. )
-    val t7               = expect(Token.RParen, t6, "answer variables")
+    val t7               = expect(GrammarSymbol.RParen, t6, ParseContext.AnswerVariables)
     // 8. Optional answer variables (y₁, …, yₘ)
     val (answerVars, t8) = parseAnswerVars(t7)
     // 9. Construct & validate
@@ -118,10 +112,10 @@ object VagueQueryParser:
       case Token.Word("Q") :: Token.LBracket :: opTok :: Token.RBracket ::
         Token.OpSym("^") :: Token.LBrace :: rest =>
         val op          = opLabel(opTok)
-        val (k, afterK) = parseInteger(rest, "numerator k")
-        val afterSlash  = expect(Token.OpSym("/"), afterK, "denominator")
-        val (n, afterN) = parseInteger(afterSlash, "denominator n")
-        val afterBrace  = expect(Token.RBrace, afterN, "tolerance or end")
+        val (k, afterK) = parseInteger(rest, QuantifierPart.Numerator)
+        val afterSlash  = expect(GrammarSymbol.Divide, afterK, ParseContext.Denominator)
+        val (n, afterN) = parseInteger(afterSlash, QuantifierPart.Denominator)
+        val afterBrace  = expect(GrammarSymbol.RBrace, afterN, ParseContext.ToleranceOrEnd)
 
         // Optional tolerance [ε]
         val (tolerance, afterTol) = afterBrace match
@@ -131,61 +125,51 @@ object VagueQueryParser:
           case _ =>
             (0.1, afterBrace) // Default tolerance
 
-        val quantifier = op match
-          case "~" | "~#" => Quantifier.About(k, n, tolerance)
-          case ">=" | "≥" => Quantifier.AtLeast(k, n, tolerance)
-          case "<=" | "≤" => Quantifier.AtMost(k, n, tolerance)
+        val build: (Int, Int, Double) => Quantifier = op match
+          case "~" | "~#" => Quantifier.mkAbout
+          case ">=" | "≥" => Quantifier.mkAtLeast
+          case "<=" | "≤" => Quantifier.mkAtMost
           case _          =>
-            throw QueryException(
-              QueryError.ParseError(
-                s"Invalid quantifier operator: $op (expected ~, >=, or <=)",
-                tokensLabel(tokens),
-                None,
-                Map("operator" -> op, "valid_operators" -> "~, >=, <="),
-              )
-            )
+            throw QueryException(refused(ParseRefusal.UnknownQuantifierOperator(TokenKind.of(opTok))))
+
+        val quantifier = checkedQuantifier(k, n, tolerance, build)
 
         (quantifier, afterTol)
 
       case _ =>
         throw QueryException(
-          QueryError.ParseError(
-            s"Expected quantifier Q[op]^{k/n}, got: ${tokensLabel(tokens.take(7))}",
-            tokensLabel(tokens),
-            None,
-            Map("expected" -> "Q[op]^{k/n}", "got" -> tokensLabel(tokens.take(7))),
-          )
+          refused(ParseRefusal.QuantifierExpected(tokens.take(quantifierPrefixLength).map(TokenKind.of)))
         )
+
+  /**
+   * Builds the quantifier once its threshold `k/n` is a proportion and its tolerance lies in
+   * `[0, 1]`, and throws the typed refusal otherwise. `build` checks the same bounds again.
+   */
+  private def checkedQuantifier(
+    k: Int,
+    n: Int,
+    tolerance: Double,
+    build: (Int, Int, Double) => Quantifier,
+  ): Quantifier =
+    if n <= 0 || k < 0 || k > n then
+      throw QueryException(refused(ParseRefusal.FractionOutOfRange(k, n)))
+    else if tolerance < 0 || tolerance > 1 then
+      throw QueryException(refused(ParseRefusal.ToleranceOutOfRange(tolerance)))
+    else build(k, n, tolerance)
 
   /** Parse variable name: single identifier token. */
   private def parseVariable(tokens: List[Token]): (String, List[Token]) =
     tokens match
       case Token.Word(v) :: rest if isIdentifier(v) => (v, rest)
-      case head :: _                                =>
-        throw QueryException(
-          QueryError.ParseError(
-            s"Expected variable identifier, got: ${tokenLabel(head)}",
-            tokensLabel(tokens),
-            None,
-            Map("got" -> tokenLabel(head), "expected" -> "variable identifier"),
-          )
-        )
-      case Nil                                      =>
-        throw QueryException(
-          QueryError.ParseError(
-            "Expected variable identifier, got end of input",
-            "",
-            None,
-            Map("expected" -> "variable identifier"),
-          )
-        )
+      case _                                        =>
+        throw QueryException(refused(ParseRefusal.VariableExpected(Found.of(tokens))))
 
   /** Parse optional answer variables: (y₁, …, yₘ) */
   private def parseAnswerVars(tokens: List[Token]): (List[String], List[Token]) =
     tokens match
       case Token.LParen :: rest =>
         val (vars, afterVars) = parseVariableList(rest)
-        val afterClose        = expect(Token.RParen, afterVars, "end of answer variables")
+        val afterClose        = expect(GrammarSymbol.RParen, afterVars, ParseContext.EndOfAnswerVariables)
         (vars, afterClose)
       case _                    =>
         (Nil, tokens) // No answer variables (Boolean query)
@@ -200,24 +184,8 @@ object VagueQueryParser:
           (acc :+ v, rest)
         case Token.RParen :: _                                       =>
           (acc, tokens) // Empty list or end of list
-        case head :: _ =>
-          throw QueryException(
-            QueryError.ParseError(
-              s"Expected variable in list, got: ${tokenLabel(head)}",
-              tokensLabel(tokens),
-              None,
-              Map("got" -> tokenLabel(head), "expected" -> "variable identifier"),
-            )
-          )
-        case Nil       =>
-          throw QueryException(
-            QueryError.ParseError(
-              "Expected variable in list, got end of input",
-              "",
-              None,
-              Map("expected" -> "variable identifier"),
-            )
-          )
+        case _                                                       =>
+          throw QueryException(refused(ParseRefusal.AnswerVariableExpected(Found.of(tokens))))
     loop(tokens, Nil)
 
   end parseVariableList
@@ -225,65 +193,22 @@ object VagueQueryParser:
   // ── Helpers (OCaml-style) ───────────────────────────────────────────
 
   /** Expect a specific token — OCaml pattern from fol.ml. */
-  private def expect(expected: Token, tokens: List[Token], context: String): List[Token] =
+  private def expect(expected: GrammarSymbol, tokens: List[Token], before: ParseContext): List[Token] =
     tokens match
-      case `expected` :: rest => rest
-      case actual :: _        =>
-        throw QueryException(
-          QueryError.ParseError(
-            s"Expected '${tokenLabel(expected)}' before $context, got '${tokenLabel(actual)}'",
-            tokensLabel(tokens),
-            None,
-            Map(
-              "expected" -> tokenLabel(expected),
-              "got"      -> tokenLabel(actual),
-              "context"  -> context,
-            ),
-          )
-        )
-      case Nil                =>
-        throw QueryException(
-          QueryError.ParseError(
-            s"Expected '${tokenLabel(expected)}' before $context, got end of input",
-            "",
-            None,
-            Map("expected" -> tokenLabel(expected), "context" -> context),
-          )
-        )
+      case head :: rest if TokenKind.of(head) == TokenKind.Symbol(expected) => rest
+      case _                                                                =>
+        throw QueryException(refused(ParseRefusal.SymbolExpected(expected, before, Found.of(tokens))))
 
   /** Parse integer token (a `Word` whose payload is all digits). */
-  private def parseInteger(tokens: List[Token], context: String): (Int, List[Token]) =
+  private def parseInteger(tokens: List[Token], part: QuantifierPart): (Int, List[Token]) =
     tokens match
       case Token.Word(num) :: rest if num.nonEmpty && num.forall(_.isDigit) =>
         try (num.toInt, rest)
         catch
           case _: NumberFormatException =>
-            throw QueryException(
-              QueryError.ParseError(
-                s"Integer out of range for $context: $num",
-                tokensLabel(tokens),
-                None,
-                Map("value" -> num, "context" -> context),
-              )
-            )
-      case head :: _                                                        =>
-        throw QueryException(
-          QueryError.ParseError(
-            s"Expected integer for $context, got: ${tokenLabel(head)}",
-            tokensLabel(tokens),
-            None,
-            Map("got" -> tokenLabel(head), "expected" -> "integer", "context" -> context),
-          )
-        )
-      case Nil                                                              =>
-        throw QueryException(
-          QueryError.ParseError(
-            s"Expected integer for $context, got end of input",
-            "",
-            None,
-            Map("expected" -> "integer", "context" -> context),
-          )
-        )
+            throw QueryException(refused(ParseRefusal.IntegerOutOfRange(part, WordText(num))))
+      case _                                                                =>
+        throw QueryException(refused(ParseRefusal.IntegerExpected(part, Found.of(tokens))))
 
   /**
    * Render the operator slot inside `Q[…]` as a string for downstream matching.
