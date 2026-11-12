@@ -15,7 +15,7 @@ Consumers write `"com.risquanter" %%% "vql-engine" % "<version>"`.
 |---|---|---|
 | `pr-build.yml` ("PR build") | pull requests to main | Tests only (JVM + Scala.js). References no secrets, so runs from fork PRs are safe by construction. |
 | `ci-build.yml` ("CI Build + Sigstore provenance") | push to main | Tests, then stages a Maven-layout bundle (`sbt publish` → `target/bundle`), GPG-signs and Sigstore-signs every jar/pom, and uploads the zipped bundle as a run artifact (7-day retention). Each run's ID identifies a releasable bundle. |
-| `release.yml` ("Release") | manual dispatch | Two jobs. `verify-authorization` checks the supplied TOTP code against the org secret (60-second period, YubiKey OATH credential). `sign-and-publish` (gated on the first job, runs in the `release` environment restricted to main) downloads the named ci-build run's bundle, verifies every artifact's Sigstore signature against ci-build's OIDC identity on main, refuses SNAPSHOT versions, uploads to the Central Portal as a staged `USER_MANAGED` deployment, and creates the git tag plus GitHub release. |
+| `release.yml` ("Release") | manual dispatch | Two jobs. `verify-authorization` checks the supplied TOTP code against the org secret (60-second period, YubiKey OATH credential) with the runner's preinstalled `python3`, accepting the current window and the two before it. `sign-and-publish` (gated on the first job, runs in the `release` environment restricted to main) refuses SNAPSHOT versions, then checks that the named run is a successful ci-build run and that the tag `v<version>` points at the commit it built and carries a signature from `.github/allowed_signers`. Only then does it download the bundle, verify every artifact's Sigstore signature against ci-build's OIDC identity on main, upload to the Central Portal as a staged `USER_MANAGED` deployment, and create the GitHub release on the existing tag. It never creates the tag. |
 
 The split exists so that no human-triggered run ever builds the artifacts it publishes: release.yml only republishes what ci-build.yml already built and signed on main, and PR runs never touch signing at all.
 
@@ -28,19 +28,91 @@ Do not rename `ci-build.yml`: release.yml verifies Sigstore certificates against
 
 ## Cutting a release
 
-1. Set a non-SNAPSHOT version in `build.sbt` (`ThisBuild / version := "X.Y.Z"`), commit, push to main.
-2. Wait for the resulting ci-build run to go green and note its run ID (Actions → the run → the number in the URL, or `gh run list --workflow ci-build.yml`).
-3. Generate a TOTP code from the YubiKey. The credential period is 60 seconds; the release run verifies the code within seconds of starting and accepts the current window plus the two prior ones (about 180 seconds of validity), so any freshly generated code works — no need to time it to a window boundary:
+Run every command in one terminal, from the repository checkout. Each step sets
+shell variables that a later step reads, so a new terminal starts again from
+step 2.
 
-   ```bash
-   ykman oath accounts code -s '60/risquanter/simulation-util:release'
-   ```
+Prerequisites on the maintainer's machine:
 
-   The single org-wide OATH credential is named `60/risquanter/simulation-util:release`; the same code authorizes releases in every risquanter repo.
-4. Actions → "Release (Maven Central Publisher Portal, GPG-signed)" → Run workflow; enter the ci-build run ID and the TOTP code.
-5. Both jobs green means the deployment is staged. Finish at <https://central.sonatype.com/publishing/deployments>: review and click Publish (or Drop). Publication to Central is irreversible.
+- `gh` is logged in (`gh auth status`).
+- git signs with the hardware SSH key: `gpg.format` is `ssh`, and
+  `user.signingkey` names the key. Its public half is a signing key on the
+  GitHub account and a line in `.github/allowed_signers`.
+- `ykman` reaches the YubiKey.
 
-Do not push another version change to main between steps 2 and 4: release.yml reads the version from main's build.sbt at dispatch time and it must match the bundle being released.
+**1. Set the version, commit with a signature, push to main.**
+
+```bash
+sed -i 's/^ThisBuild \/ version      := .*/ThisBuild \/ version      := "X.Y.Z"/' build.sbt
+git add build.sbt            # and the release's other files
+git commit -S -m "…"
+git push
+```
+
+The version must not be a SNAPSHOT. On `main` with upstream `origin/main`,
+`git push` pushes `main` to `origin`.
+
+**2. Wait for the ci-build run of that push, and read the commit it built.**
+
+```bash
+RUN_ID=$(gh run list --workflow ci-build.yml --branch main --limit 1 --json databaseId -q '.[0].databaseId')
+gh run watch "$RUN_ID" --exit-status
+HEAD_SHA=$(gh run view "$RUN_ID" --json headSha -q .headSha)
+echo "run $RUN_ID built $HEAD_SHA"
+```
+
+`--exit-status` makes the watch fail when the run fails, and a failed run is
+not released. The printed commit is the one step 1 pushed.
+
+**3. Sign the release tag on exactly that commit, check it, push it.**
+
+```bash
+VERSION=$(sed -n 's#^ThisBuild / version[[:space:]]*:=[[:space:]]*"\([^"]*\)".*#\1#p' build.sbt)
+git tag -s "v$VERSION" "$HEAD_SHA" -m "v$VERSION"
+git tag -v "v$VERSION"
+git push origin "v$VERSION"
+```
+
+The YubiKey asks for a touch. `release.yml` refuses a tag that is unsigned,
+that is signed by a key outside `.github/allowed_signers`, or that points at any
+other commit.
+
+**4. Dispatch the release with a fresh TOTP code, and watch it.**
+
+```bash
+gh workflow run release.yml -f run_id="$RUN_ID" -f totp_code="$(ykman oath accounts code -s '60/risquanter/simulation-util:release')"
+sleep 5
+RELEASE_RUN_ID=$(gh run list --workflow release.yml --limit 1 --json databaseId -q '.[0].databaseId')
+gh run watch "$RELEASE_RUN_ID" --exit-status
+```
+
+`ykman` prints the code of the current 60-second window at once. The workflow
+accepts that window and the two before it, and it checks the code seconds
+after dispatch, so a fresh code is always valid. The org-wide OATH credential
+`60/risquanter/simulation-util:release` authorizes releases in every
+risquanter repository. `sleep 5` lets the new run appear before `gh run list`
+reads it.
+
+**5. Check that the commit and the tag are verified on GitHub.**
+
+```bash
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+TAG_OBJECT=$(gh api "repos/$REPO/git/ref/tags/v$VERSION" -q .object.sha)
+gh api "repos/$REPO/commits/$HEAD_SHA" -q .commit.verification
+gh api "repos/$REPO/git/tags/$TAG_OBJECT" -q .verification
+gh release view "v$VERSION"
+```
+
+Both `verification` objects read `"verified": true` and `"reason": "valid"`.
+GitHub then shows the Verified badge on the commit and on the release's tag.
+
+**6. Publish.** With both release jobs green, the deployment is staged. Finish
+at <https://central.sonatype.com/publishing/deployments>: review it and click
+Publish, or Drop. Publication to Central is irreversible.
+
+Do not push another version change to main between steps 2 and 4.
+`release.yml` reads the version from main's `build.sbt` when it is dispatched,
+and that version must match the bundle and the tag.
 
 ## Dependency automation
 
