@@ -909,9 +909,9 @@ enum TokenKind:
   case StrayCharacter
 
   def label: String = this match
-    case Word(text)       => text
-    case Decimal(text)    => text
-    case Literal(content) => "\"" + content + "\""
+    case Word(text)       => text.value
+    case Decimal(text)    => text.value
+    case Literal(content) => "\"" + content.value + "\""
     case Symbol(symbol)   => symbol.text
     case UnknownOperator  => "unknown operator"
     case StrayCharacter   => "unexpected character"
@@ -1083,9 +1083,12 @@ the apostrophe in it.** A quoted literal never holds an apostrophe. An
 apostrophe still reaches a consumer inside a word, because
 `StringUtil.alphanumeric` keeps it.
 
-`lexStringLit` gains one arm after the `\n` arm and before the closing-quote
-arm: a character not in `literalChars` throws
-`LexerError(RefusedLiteralCharacter, inp.length)`. The two existing arms throw
+`lexStringLit` gains one arm after the closing-quote arm: a character not in
+`literalChars` throws `LexerError(RefusedLiteralCharacter, inp.length)`. The
+closing quote is outside the alphabet, so the new arm must follow the arm that
+ends the literal. The plan first placed it before that arm, which would have
+refused every closing quote. The implementation of Phase 2 corrected the
+order on 2026-11-12. The two existing arms throw
 `LexerError(UnterminatedLiteral, 0)` and `LexerError(NewlineInLiteral,
 inp.length)`. `inp.length` is computed only on the failure path.
 
