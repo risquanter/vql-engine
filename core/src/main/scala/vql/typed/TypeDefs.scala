@@ -1,24 +1,19 @@
 package vql.typed
 
-opaque type TypeId = String
+/**
+ * [[vql.id.TypeId]] under this package's path. The companion declares its result type, so an
+ * inferred `TypeId(s)` is a `TypeId` and never its underlying `String`.
+ */
+type TypeId = vql.id.TypeId
 
 object TypeId:
+  def apply(value: String): TypeId = vql.id.TypeId(value)
 
-  def apply(value: String): TypeId =
-    require(value.nonEmpty, "TypeId must be non-empty")
-    value
-
-  extension (s: TypeId) def value: String = s
-
-opaque type SymbolName = String
+/** [[vql.id.SymbolName]] under this package's path, declared as [[TypeId]] is. */
+type SymbolName = vql.id.SymbolName
 
 object SymbolName:
-
-  def apply(value: String): SymbolName =
-    require(value.nonEmpty, "SymbolName must be non-empty")
-    value
-
-  extension (s: SymbolName) def value: String = s
+  def apply(value: String): SymbolName = vql.id.SymbolName(value)
 
 /**
  * Declares a type's role in the [[TypeCatalog]].

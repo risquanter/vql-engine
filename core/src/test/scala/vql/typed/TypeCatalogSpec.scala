@@ -5,6 +5,14 @@ import munit.FunSuite
 
 class TypeCatalogSpec extends FunSuite:
 
+  test("TypeId and SymbolName under vql.typed are the types declared in vql.id"):
+    val sort: vql.id.TypeId       = TypeId("Asset")
+    val symbol: vql.id.SymbolName = SymbolName("p95")
+    val back: TypeId              = vql.id.TypeId("Asset")
+    assertEquals(sort, back)
+    assertEquals(sort.value, "Asset")
+    assertEquals(symbol.value, "p95")
+
   test("validate succeeds for coherent catalog"):
     val asset = TypeId("Asset")
     val loss  = TypeId("Loss")
