@@ -6,8 +6,7 @@
 test), live docs swept, `build.sbt`/README/Architecture/CHANGELOG at `0.13.1`;
 full suite green both platforms; shipped to Central as **0.13.1**. Remaining
 downstream (separate repo): register's lockstep `import fol.*` → `import vql.*`
-rewrite on the pin bump. Sequenced after the fragment-membership API (0.12.x).
-See "Release sequencing — T-011 and T-000" below and
+rewrite on the pin bump. Sequenced after the fragment-membership API (0.12.x),
 [T-011](#t-011--fragment-membership-api-register-facing-targeting-0120).
 
 **Scope:** rename every `fol.*` package across `core/src/**` — the complete set,
@@ -74,7 +73,13 @@ The `catalog.constants: Map[String, TypeId]` feature is an OCaml-heritage artifa
 
 ## T-003 — Typed literal pipeline and function return-type normalizer
 
-**Status:** DEFERRED (documented as-is, 2026-04-03).
+**Status:** RESOLVED by ADR-015. An inline literal is a `BoundTerm.LiteralRef`
+whose `value` is the carrier its sort's `literalValidator` produced (ADR-015 §4),
+and a function result is the carrier its lambda returned. A dispatcher reads
+both with `args(i).extract[A]`, which widens numbers (ADR-015 §2), so no
+normalizer is needed. `LiteralValue` and its cases no longer exist, and
+`TypedFunctionImpl.of` is identity-shaped. The text below records the problem
+as it was stated.
 
 A `TypedFunctionImpl.of` combinator pattern was sketched where the consumer lambda returns a native `A` and a `wrap: A => LiteralValue` normalizer converts it, so the framework constructs `Value(resultSort, literalValue)`. This eliminates the two-tier raw world for value-type function results: currently a function lambda can return any `raw` (e.g. a plain `Double` 0.07), while inline literals produce `LiteralValue` variants (`FloatLiteral(0.05)`). Downstream dispatcher lambdas that receive arguments from both sources must handle both raw shapes.
 
@@ -257,8 +262,15 @@ TimeoutError, ConfigError`.
 
 ## T-009 — Evaluator short-circuit and dispatcher-error masking under non-total models (investigation)
 
-**Status:** PENDING — investigation. Surfaced by the Phase 3 complex review
-(2026-08-10, `DONE_PLAN-range-formula-and-satisfying-set.md`).
+**Status:** RULED (user, 2026-11-15), not implemented. A dispatcher error is an
+unknown truth value under Kleene's strong three-valued logic. `false ∧ unknown`
+is `false`, `true ∨ unknown` is `true`, and `∃` is true if any binding is true,
+else an error if any binding errored, else false. A formula fails only when the
+error could change its result, so the outcome no longer depends on operand
+order or on the domain's iteration order. A total model sees no change in result
+or cost. Implementing it amends ADR-017 §7 and is a MINOR release. Surfaced by
+the Phase 3 complex review (2026-08-10,
+`DONE_PLAN-range-formula-and-satisfying-set.md`).
 
 **Observation:** `TypedSemantics.evalFormula` short-circuits `And`/`Or`/`Imp`
 and the `∀`/`∃` folds. When a dispatcher raises `Left(EvaluationError)` for some
@@ -329,7 +341,7 @@ parse-through tests; both fragments (`Targeting`, `Screening(k)`) ship.
 [ADR-018](ADR-018.md) records the design (Accepted 2026-08-12);
 [DONE_PLAN-fragment-membership-api.md](DONE_PLAN-fragment-membership-api.md) is the plan.
 Bundles as the additive (non-breaking) Central release **0.12.0**, ahead of the
-T-000 package rename (0.13.1). See "Release sequencing — T-011 and T-000" below.
+T-000 package rename (0.13.1).
 The contract and rulings below are retained as the specification of the shipped
 code.
 
@@ -438,37 +450,10 @@ traversal, `Term.Const`/`Term.Var` admitted and every `Term.Fn` rejected by
 
 ---
 
-## Release sequencing — T-011 and T-000
-
-register consumes this engine only as Central binaries and absorbs one bounded
-breaking change per pin bump. Sequenced so each release is independently
-adoptable:
-
-| Version | Change | Breaking? | Rationale |
-|---|---|---|---|
-| 0.11.0 (shipped) | formula ranges + `satisfyingSet`; 4 `QueryError` variants removed | breaking (error surface) | on Central; register migrates AppError + prunes one server test |
-| **0.12.0** (shipped) | fragment-membership API ([T-011](#t-011--fragment-membership-api-register-facing-targeting-0120)) | **no — additive** | register needs it for M2/M3 write-path validation; adds no import rewrite, adopted on register's schedule |
-| **0.13.1** (shipped) | package rename `fol.*` → `vql.*` ([T-000](#t-000--scala-package-rename-fol--vql)) | **yes — import rewrite** | isolated so register's pin bump is a pure mechanical import rewrite, including `fol.fragment` → `vql.fragment`, with nothing else to reason about |
-
-**Order rationale:** fragment API first because register needs it sooner and it
-is non-breaking, so register adopts without a forced import rewrite. The rename
-lands last so register does the whole-surface import rewrite once, against the
-final package layout (fragment API included).
-
-**T-008** (prune 10 more dead `QueryError` variants) is a **third, separate**
-breaking release — never bundled with T-000 or T-011 — coordinated with the
-register AppError change it forces. Version TBD, after 0.13.1.
-
-**Open for register to confirm:** the order between 0.12.0 and 0.13.1 depends on
-register's M2/M3 timing versus its readiness to do the import rewrite. Engine
-recommends fragment-first as above; register may request the reverse given
-advance notice of the target versions.
-
----
-
 ## T-012 — First-class literal type tags in the grammar (node-name vs id, generalisable)
 
-**Status:** PENDING — recorded, not scheduled. The concrete driver (register's
+**Status:** RESOLVED. Register's actual need is already met by domain-returning
+functions. The concrete driver (register's
 need to force a query author to state whether a quoted literal names a tree node
 or is a node id) is met instead by **register-side domain-returning functions over
 dedicated literal sorts**, entirely within the existing position-decides-sort
@@ -516,8 +501,7 @@ carry explicitly-tagged literal forms, not just nodes.
 - **`FOLPrinter`** — round-trip the tag.
 - Wide test surface across all the above.
 - **Release:** a breaking Central release (early-semver minor, pre-1.0),
-  coordinated with the register pin bump per the release-sequencing discipline
-  above.
+  coordinated with register's pin bump.
 
 **Why deferred, not done now:** the immediate node/id disambiguation is already
 solved register-side with no grammar change — the `node_id` / `node_named`
@@ -536,7 +520,8 @@ change (this item).
 
 ## T-013 — Layer 4 rows that name register's refusal records
 
-**Status:** OPEN.
+**Status:** RESOLVED. Both rows in `.claude/skills/vql-adr-constraints/SKILL.md`
+name what register holds now.
 
 register now consumes 0.18.0's typed refusals. Two rows of Layer 4 in
 `.claude/skills/vql-adr-constraints/SKILL.md` describe register as it was
