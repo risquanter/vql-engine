@@ -558,3 +558,32 @@ before that:
 
 **Scope:** rewrite both rows to name what register holds now. No engine code
 changes.
+
+## T-014 — A nesting depth bound in the formula parser
+
+**Status:** OPEN.
+
+`FormulaParser` and `TermParser` are recursive descent with no depth bound, and
+each nesting level and each binary connective takes stack frames. On a 1 MiB
+thread stack, `FOLParser.parse` throws `StackOverflowError` on:
+
+- 260 nested parentheses around one atom, `"(" * 260 + "p(x)" + ")" * 260`,
+  which is 524 characters (250 levels parse);
+- a flat chain of 200 atoms, `List.fill(200)("p(x)").mkString("\\/")`, which is
+  1 198 characters (150 atoms parse). `/\` behaves the same.
+
+`StackOverflowError` is a `VirtualMachineError`, so it is not caught as a parse
+refusal. Inside a ZIO effect under the default runtime it is fatal, and the
+process exits with status 255. `VagueQueryParser` calls the same
+`FormulaParser.parse`, so a screening query reaches it too.
+
+**Scope:** a maximum nesting depth, counted over parentheses, negations and
+connective chains, past which `parse` returns a typed `ParseError` at the
+position where the bound was crossed. A connective chain is parsed iteratively
+so its length does not count as depth. The bound is a named constant, or a
+parser parameter a consumer sets.
+
+**Context:** register PLAN-RISKTRANSFORM §7.6.12 decision 20, the length bound
+of a stored targeting predicate. Measured in register's `commonJVM/console`
+against 0.18.0 on JDK 21. `core/src/main/scala/parser/` and
+`core/src/main/scala/lexer/` are unchanged from `v0.18.0` to `v0.19.0`.
