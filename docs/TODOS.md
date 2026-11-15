@@ -88,7 +88,15 @@ A `TypedFunctionImpl.of` combinator pattern was sketched where the consumer lamb
 
 ## T-004 — Domain-returning functions and entity identity representation
 
-**Status:** DEFERRED pending use case (2026-04-04).
+**Status:** RESOLVED by `PLAN-node-returning-functions.md` (0.19.0). The tension
+below was that a function's result was a closed `LiteralValue`, so a domain
+entity had no carrier. ADR-015 replaced that with `Value(sort, raw: Any)` and the
+consumer's `Extract[A]`, so the carrier of a domain sort is the consumer's, as it
+is for every value in a model's domains. The guard
+`TypeCatalogError.FunctionReturnIsDomainType` is removed, and ADR-014 §1 states
+that a function may return a domain sort. The use case is register's
+`node_id(…)` and `node_named(…)` (register, `docs/dev/plans/PLAN-RISKTRANSFORM.md`
+§7.6.12 decision 15). The text below is the record as it stood when deferred.
 
 The function return normalisation plan (T-003 / `PLAN-function-return-normalisation.md`)
 scopes `evalFunction` return type to `Either[String, LiteralValue]`. This implicitly
@@ -462,14 +470,14 @@ advance notice of the target versions.
 
 **Status:** PENDING — recorded, not scheduled. The concrete driver (register's
 need to force a query author to state whether a quoted literal names a tree node
-or is a node id) is met instead by **distinct register-side predicates over
+or is a node id) is met instead by **register-side domain-returning functions over
 dedicated literal sorts**, entirely within the existing position-decides-sort
-binding — no grammar change and no domain-returning functions. Register registers
-`named(x, "…")` (its second argument a `NodeNameLiteral` sort whose literal
-validator is a name→id lookup) and `has_id(x, "…")` (second argument a
-`NodeIdLiteral` sort whose validator parses the id), plus `eq(x, y)` for
-node-to-node identity. Because each kind occupies a different predicate slot, each
-slot's sort carries a single-purpose validator and nothing guesses. This item
+binding — no grammar change. Register declares `node_id: (NodeIdLiteral) -> Node`
+and `node_named: (NodeNameLiteral) -> Node` (register,
+`docs/dev/plans/PLAN-RISKTRANSFORM.md` §7.6.12 decision 15). Each function's
+argument sort carries a single-purpose validator, so the function name states the
+literal's kind and nothing guesses. Engine 0.19.0 admits such functions
+(T-004). This item
 records the more general alternative — author-declared literal kinds in the
 grammar — for when tagged literals are wanted across many sorts rather than being
 handled per-predicate as register does for nodes alone.
@@ -512,19 +520,19 @@ carry explicitly-tagged literal forms, not just nodes.
   above.
 
 **Why deferred, not done now:** the immediate node/id disambiguation is already
-solved register-side with no grammar change — distinct `named` / `has_id`
-predicates over dedicated `NodeNameLiteral` / `NodeIdLiteral` sorts, each sort's
+solved register-side with no grammar change — the `node_id` / `node_named`
+functions over dedicated `NodeIdLiteral` / `NodeNameLiteral` sorts, each sort's
 validator single-purpose. First-class tagged literals are worth their
 cross-cutting cost only if tagged literals are wanted broadly across sorts, which
 no current use case needs. Re-open when a second sort needs author-declared
-literal kinds and the per-predicate approach stops scaling.
+literal kinds and the per-function approach stops scaling.
 
 **Context:** register node-name-vs-id explicit-typing analysis (2026-08-24);
 `vql/typed/QueryBinder.scala` `bindTermExpected`, `logic/Term.scala`,
-`vql/typed/TypeCatalog.scala`. Alternative taken: register-side distinct
-node-reference predicates (`eq` / `named` / `has_id`) over dedicated literal
-sorts, disambiguating by predicate slot at bind time — not domain-returning
-functions (T-004), not a grammar change (this item).
+`vql/typed/TypeCatalog.scala`. Alternative taken: register-side domain-returning
+functions (`node_id` / `node_named`, T-004) over dedicated literal sorts,
+disambiguating by the function's argument sort at bind time — not a grammar
+change (this item).
 
 ## T-013 — Layer 4 rows that name register's refusal records
 

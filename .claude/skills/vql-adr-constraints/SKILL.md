@@ -62,7 +62,7 @@ Whether the sum is an `enum` or a `sealed trait`, and how a shared accessor is d
 **Always:** ADR-001 · ADR-014 · ADR-015 · ADR-017 · ADR-020 · ADR-012
 The catalog as a contract valid by construction and `bind` as the single compilation step (ADR-001), the bind-time quantifiability check that must not be dropped (ADR-014), the literal branch through `literalValidators` and the `ConstRef`/`LiteralRef` split (ADR-015 §4), the range as a formula and its free-variable rules (ADR-017), where the binder accumulates errors and where it must not (ADR-020), and the error channel (ADR-012).
 
-**Also:** ADR-016 if the literal payload's typing changes · ADR-023 if a `TypeCheckError` variant is added, removed or reshaped, because `BindError.details` carries it to the consumer unchanged.
+**Also:** ADR-016 if the literal payload's typing changes · ADR-023 if a `TypeCheckError` variant is added, removed or reshaped, because `BindError.details` carries it to the consumer unchanged · ADR-018 if what a function may return or `TypeCatalog.domainReturningFunctions` changes, because a consumer's targeting fragment admits that set.
 
 ### Changing evaluation, the runtime model or the dispatcher
 
@@ -92,8 +92,8 @@ Which failures are `require` and which are `Either` (ADR-012), where a parser th
 
 ### Changing fragment membership
 
-**Always:** ADR-018 · ADR-007 · ADR-004 · ADR-006
-The tree walk over the existing parser's output and its first-violation result (ADR-018), the reason the parser is not forked (ADR-007), the package's import limits (ADR-004), and the encoding of `Fragment` and `FragmentViolation` (ADR-006).
+**Always:** ADR-018 · ADR-007 · ADR-004 · ADR-006 · ADR-014 · ADR-023
+The tree walk over the existing parser's output and its first-violation result (ADR-018), the reason the parser is not forked (ADR-007), the package's import limits (ADR-004), the encoding of `Fragment` and `FragmentViolation` (ADR-006), the rule on sorts that the admitted function set is derived from (ADR-014 §1), and the `SymbolName` the set holds (ADR-023).
 
 ### Writing, amending or retiring a decision record
 
@@ -122,7 +122,7 @@ ADR-003 rules out `scala.util.Random`, `java.util.Random` and `commons-math3`. N
 | ADR-015 | `ADR-015.md` | Accepted | Symmetric value boundaries: `LiteralParser[A]` for injection, `Extract[A]` for extraction, one declaration site per sort and carrier |
 | ADR-016 | `ADR-016-carrier-witness-on-symmetric-value-typeclasses.md` | Proposed | The `Carrier[A]` storage witness for literal payloads, the `ConstRef`/`LiteralRef` split, adoption as a per-phase decision |
 | ADR-017 | `ADR-017.md` | Accepted | Formula ranges: extraction over the active domain, closed-world negation, the denominator, range validation, the satisfying-set entry |
-| ADR-018 | `ADR-018.md` | Accepted | Structural fragment membership over the parse tree: `Fragment`, `FragmentViolation`, `FragmentCheck.check` |
+| ADR-018 | `ADR-018.md` | Accepted | Structural fragment membership over the parse tree: `Fragment`, `FragmentViolation`, `FragmentCheck.check`, and the admitted functions of `Targeting` |
 | ADR-019 | `ADR-019.md` | Superseded by ADR-023 | Bind-error detail across the error/typed boundary: primitive fields, one renderer, the fold in the facade |
 | ADR-020 | `ADR-020.md` | Accepted | Binder error accumulation: only across same-input siblings, the strict accumulating product, conflict accumulation in `mergeEnvs` |
 | ADR-021 | `ADR-021.md` | Superseded by ADR-023 | One `BindErrorDetail` case per `TypeCheckError` variant and an exhaustive facade fold |
@@ -151,6 +151,7 @@ Read it as an index of collisions, not as a substitute for either record. Where 
 | ADR-007 C12 × ADR-022 | C12's letter says `failwith` becomes `throw new Exception(…)`. The ported parsers throw `ParseFailure`, `SyntaxError` and `LexerError`, subclasses that carry a typed value whose `message` is the OCaml text. Reverting them to a plain `Exception` loses the typed refusal, and catching `Exception` at a boundary reports a defect as the caller's mistake. *Stated in ADR-007's review criterion and ADR-022 §5.* |
 | ADR-020 × ADR-014 × ADR-017 | ADR-020 makes the binder accumulate, which invites extending accumulation to every check. `TypeNotQuantifiable` and the satisfying-formula chain (`UnconstrainedVar` → `UnexpectedFreeVar` → `TypeNotQuantifiable`) run at sequential, environment-threaded points and stay short-circuiting. Accumulating there manufactures cascade errors. *Stated in ADR-020's cross-ADR section.* |
 | ADR-017 × ADR-002 | ADR-017 §4 has `ParsedQuery.mk` enforce the range rules by throwing, which reads as breaking ADR-012's `Either` rule for vague code. The throw sits behind `VagueQueryParser.parse`'s single `Either` boundary, under ADR-002. *Stated in ADR-017 §4.* |
+| ADR-018 × ADR-014 | ADR-018's `Targeting` admits functions by name, and reads as a symbol whitelist a consumer writes by hand. The names come from a rule on sorts: `TypeCatalog.domainReturningFunctions` selects the functions whose return sort is a `DomainType`. ADR-014 alone shows no fragment, and ADR-018 alone shows no sort. Changing what a function may return changes what a consumer's fragment admits. *Stated in both records' cross-ADR sections and ADR-014 §1.* |
 | ADR-012 × ADR-018 | `FragmentCheck.check` returns an `Either`, which reads as an operational-failure channel under ADR-012. It is a membership result with a reason. `Screening(k)` carries no `require` on `k` because `check` is total for a negative `k`. *Stated in ADR-018's cross-ADR section.* |
 
 A change that spans two Layer 1 activities is where a new collision is likely. When one is found, write the reconciliation into both records' cross-ADR sections and add a row here.
@@ -166,6 +167,7 @@ register (sibling checkout `/home/danago/projects/register/`, records in `docs/d
 | ADR-015 §1, §4 | ADR-029 §3, row "FOL `VagueQueryParser.parse`" | register's injection defence states that "node references resolve at bind time through per-sort literal validators … whitelist-constrained, never interpolated". That holds while the binder routes constant-position tokens through `literalValidators` and never through text substitution. A change to the binder's literal branch reaches register's injection boundary. |
 | ADR-023 §2 | ADR-028 appendix §5, "Error Responses" | register's refusal table states that `UnknownReferences` means "Every bind error is a quoted node reference no literal validator accepts". register decides that by reading `TypeCheckError.UnparseableConstant.sort` against its own sort names. Renaming that field, changing what it holds, or splitting `UnparseableConstant` changes which refusal register reports, with no compile error if the field survives under another meaning. |
 | ADR-001, ADR-015 | ADR-028 §1–§2, §4 | ADR-028 describes register's integration as a `TypeCatalog` and a `MapDispatcher` evaluated through `VagueSemantics.evaluateTyped`, with every argument read by `extract[A]`, and states that the library is parsed on both platforms (`QueryRequest.resolve` in the cross-compiled `common` module). A change to those entry points, or dropping the Scala.js build, makes those sections wrong. |
+| ADR-018 §3 | ADR-029 §3, row `TargetingPredicate.create` | register states the targeting fragment as "no quantifiers, no function terms". That held while `Targeting` refused every `Term.Fn`. `Targeting` admits the functions a consumer passes, and register passes the domain-returning functions of its catalog. A change to what `Targeting` admits, or to `domainReturningFunctions`, changes what register's request boundary accepts. |
 | ADR-022 §2, §3 | ADR-035, the section on what of the caller's query text a refusal may carry, which step 5.7 of register's `docs/dev/plans/PLAN-UES-UNIFIED-ERROR-SHAPE.md` adds | register states which engine refusal fields it may pass to a client or a log, and what each holds. That rests on the token kinds, on the text types and their content, and on the literal alphabet `[A-Za-z0-9 /_.+-]`. Widening a text type, admitting a character to the alphabet, or adding a field that holds caller text makes that section wrong. |
 
 ---

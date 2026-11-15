@@ -67,7 +67,7 @@ Supported quantifier operators: About (`~`), AtLeast (`>=`), AtMost (`<=`), each
 
 The range `R(x, y')` is a full FOL formula, so the quantified population can be a compound set — `Q[<=]^{1/3} x (server(x) /\ ~patched(x), exploitable(x))`. Negation is closed-world over the sort's active domain (see [docs/VagueQuantifiers.md](docs/VagueQuantifiers.md) and [docs/ADR-017.md](docs/ADR-017.md)). A separate `VagueSemantics.satisfyingSet(formula, variable, folModel)` entry point evaluates a bare single-free-variable formula to its exact satisfying set, with no quantifier or sampling.
 
-For consumers that admit only a restricted sub-language, `vql.fragment.FragmentCheck.check(formula, fragment)` tests a parsed `Formula[FOL]` for structural membership in a `Fragment` (`Targeting` — no quantifiers or function applications; `Screening(k)` — quantifier nesting depth ≤ k), returning the first `FragmentViolation` otherwise. It runs on the parse tree, needs no model, and forks no parser (see [docs/ADR-018.md](docs/ADR-018.md)).
+For consumers that admit only a restricted sub-language, `vql.fragment.FragmentCheck.check(formula, fragment)` tests a parsed `Formula[FOL]` for structural membership in a `Fragment` (`Targeting(admitted)` — no quantifiers, and no function applications outside a given set; `Screening(k)` — quantifier nesting depth ≤ k), returning the first `FragmentViolation` otherwise. It runs on the parse tree, needs no model, and forks no parser. A consumer that admits exactly the functions returning a domain sort passes `TypeCatalog.domainReturningFunctions` (see [docs/ADR-018.md](docs/ADR-018.md)).
 
 ## Architecture
 

@@ -3,6 +3,33 @@
 This project follows early-semver (pre-1.0): breaking changes bump the minor
 version.
 
+## 0.19.0
+
+### Changed (breaking)
+
+- **A function may return a domain sort.** `TypeCatalog` accepts a
+  `FunctionSig` whose return sort is a `DomainType`, and the case
+  `TypeCatalogError.FunctionReturnIsDomainType` is removed. Binding checks the
+  return sort against the position the application fills. The engine does not
+  check that the result is an element of the registered domain. See ADR-014.
+- **`Fragment.Targeting` takes the functions it admits.** It is
+  `Targeting(admittedFunctions: Set[SymbolName])`. `Targeting(Set.empty)` is
+  the rule the nullary `Targeting` stated. An admitted application's arguments
+  are checked by the same rule. See ADR-018.
+- **`FragmentViolation.FunctionApplicationNotAllowed.function` is a
+  `SymbolText`.** See ADR-022.
+- **`TypeCatalogError.UnknownType` is `UnknownType(typeId: TypeId, site: DeclarationSite)`.**
+  `site.label` is the sentence `location` held, except that a literal
+  validator's label no longer repeats the sort.
+- **`TypeCatalogError.NameCollision` is `NameCollision(symbol: SymbolName)`.**
+
+### Added
+
+- `TypeCatalog.domainReturningFunctions`: the functions whose declared return
+  sort is a `DomainType`.
+- `vql.typed.DeclarationSite`: the place in a catalog declaration that names a
+  type, with a derived `label`.
+
 ## 0.18.0
 
 ### Changed (breaking)
