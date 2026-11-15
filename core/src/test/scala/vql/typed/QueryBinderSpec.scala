@@ -458,4 +458,44 @@ class QueryBinderSpec extends FunSuite:
     )
     cases.foreach((error, sentence) => assertEquals(error.message, sentence))
 
+
+  // ==================== A function returning a domain sort ====================
+
+  private val assetId = TypeId("AssetId")
+
+  private val catalogWithLookup = TypeCatalog.unsafe(
+    types = Set(DomainType(asset), ValueType(assetId), ValueType(loss)),
+    functions = Map(SymbolName("asset_with_id") -> FunctionSig(List(assetId), asset)),
+    predicates = Map(
+      SymbolName("same")    -> PredicateSig(List(asset, asset)),
+      SymbolName("gt_loss") -> PredicateSig(List(loss, loss)),
+    ),
+    literalValidators = Map(
+      assetId -> (s => Some(s)),
+      loss    -> LiteralParser.asValidator[Long],
+    ),
+  )
+
+  test("an application returning a domain sort binds in a domain-sort position"):
+    val range = atom("same", Term.mkVar("x"), Term.mkFn("asset_with_id", List(Term.mkConst("a2"))))
+    val query = ParsedQuery(Quantifier.mkAtLeast(1, 1), "x", range, Formula.True, Nil)
+    val bound = QueryBinder.bind(query, catalogWithLookup).fold(e => fail(s"bind failed: $e"), identity)
+
+    assertEquals(bound.variable.sort, asset)
+    bound.range match
+      case BoundFormula.Atom(BoundAtom(_, List(BoundTerm.VarRef(_), BoundTerm.FnApp(_, _, sort)))) =>
+        assertEquals(sort, asset)
+      case other                                                                                  =>
+        fail(s"expected same(VarRef, FnApp), got $other")
+
+  test("an application returning a domain sort is refused in a value-sort position"):
+    val lookup = Term.mkFn("asset_with_id", List(Term.mkConst("a2")))
+    val range  = atom("same", Term.mkVar("x"), Term.mkVar("x"))
+    assertEquals(
+      bindErrors(range, atom("gt_loss", lookup, Term.mkConst("5")), cat = catalogWithLookup),
+      List(
+        TypeCheckError.TypeMismatch(loss, asset, MismatchSite.FunctionReturn(SymbolText.of("asset_with_id")))
+      ),
+    )
+
 end QueryBinderSpec

@@ -4,7 +4,7 @@ import lexer.{LiteralText, SymbolText, VariableText}
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
 import vql.error.{MismatchSite, QueryError, SymbolKind, TypeCheckError}
-import parser.SourcePosition
+import parser.{FOLParser, SourcePosition}
 import vql.logic.ParsedQuery
 import vql.parser.VagueQueryParser
 import vql.quantifier.Quantifier
@@ -700,5 +700,54 @@ class VagueSemanticsTypedSpec extends FunSuite:
         s"Evaluation error in $phase: $message",
       )
     }
+
+
+  // ==================== A function returning a domain sort, end to end ====================
+
+  private val assetIdSort = TypeId("AssetId")
+
+  private val lookupModel =
+    val lookupCatalog = TypeCatalog.unsafe(
+      types = Set(DomainType(asset), ValueType(assetIdSort)),
+      functions = Map(SymbolName("asset_with_id") -> FunctionSig(List(assetIdSort), asset)),
+      predicates = Map(
+        SymbolName("same")     -> PredicateSig(List(asset, asset)),
+        SymbolName("critical") -> PredicateSig(List(asset)),
+      ),
+      literalValidators = Map(assetIdSort -> (s => Some(s))),
+    )
+    val dispatcher    = new RuntimeDispatcher:
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] =
+        (name.value, args) match
+          case ("asset_with_id", List(id)) => Right(id.raw)
+          case (other, _)                  => Left(s"No function implementation for '$other'")
+      override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
+        (name.value, args) match
+          case ("same", List(a, b))  => Right(a.raw == b.raw)
+          case ("critical", List(_)) => Right(true)
+          case (other, _)            => Left(s"No predicate implementation for '$other'")
+      override def functionSymbols: Set[SymbolName]  = Set(SymbolName("asset_with_id"))
+      override def predicateSymbols: Set[SymbolName] = Set(SymbolName("same"), SymbolName("critical"))
+    val domain        = Set("a1", "a2", "a3").map(Value(asset, _))
+    FolModel(lookupCatalog, RuntimeModel(domains = Map(asset -> domain), dispatcher = dispatcher))
+      .fold(e => fail(s"FolModel construction failed: $e"), identity)
+
+  end lookupModel
+
+  test("e2e: a domain-returning function selects the node its literal names"):
+    val query  = VagueQueryParser
+      .parse("""Q[>=]^{1/1} x (same(x, asset_with_id("a2")), critical(x))""")
+      .fold(e => fail(s"expected the text to parse, got ${e.formatted}"), identity)
+    val output = VagueSemantics
+      .evaluateTyped(query, lookupModel, samplingParams = SamplingParams.exact)
+      .fold(e => fail(s"evaluateTyped failed: ${e.formatted}"), identity)
+    assertEquals(output.rangeElements.toSet, Set(Value(asset, "a2")))
+
+    def satisfying(text: String): Either[QueryError, Set[Value]] =
+      val formula = FOLParser.parse(text).fold(e => fail(s"parse failed for [$text]: $e"), identity)
+      VagueSemantics.satisfyingSet(formula, "x", lookupModel)
+
+    assertEquals(satisfying("""same(x, asset_with_id("a2"))"""), Right(Set(Value(asset, "a2"))))
+    assertEquals(satisfying("""same(x, asset_with_id("zz"))"""), Right(Set.empty[Value]))
 
 end VagueSemanticsTypedSpec

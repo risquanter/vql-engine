@@ -1,16 +1,21 @@
 package vql.fragment
 
+import lexer.SymbolText
+import vql.id.SymbolName
+
 /**
  * A structural sub-language of FOL that a formula's parse tree may or may not lie within.
- * Membership is decided by [[FragmentCheck.check]] and depends only on the tree's shape — no sorts,
- * no model.
+ * Membership is decided by [[FragmentCheck.check]] and depends on the tree's shape and on the
+ * fragment's own parameters. No sort and no model takes part.
  */
 enum Fragment:
   /**
-   * No quantifier nodes and no function-application terms. Admits variables and inline literals
-   * (`Term.Const`); rejects every `Term.Fn`, arithmetic operators included.
+   * No quantifier nodes, and no function application outside `admittedFunctions`. Admits variables
+   * and inline literals (`Term.Const`). An admitted application's arguments are walked by the same
+   * rule, so a refused function inside an admitted one is still refused. `Targeting(Set.empty)`
+   * admits no function at all, arithmetic operators included.
    */
-  case Targeting
+  case Targeting(admittedFunctions: Set[SymbolName])
 
   /**
    * Quantifier nesting depth (quantifier rank) at most `maxQuantifierDepth`, 0-indexed: the largest
@@ -29,8 +34,8 @@ enum FragmentViolation:
   /** Targeting: a `Forall`/`Exists` node is present. */
   case QuantifierNotAllowed
 
-  /** Targeting: a `Term.Fn` is present; `function` is that application's name. */
-  case FunctionApplicationNotAllowed(function: String)
+  /** Targeting: a `Term.Fn` outside the admitted set is present; `function` is its name. */
+  case FunctionApplicationNotAllowed(function: SymbolText)
 
   /**
    * Screening: the formula's maximum quantifier nesting depth `found` exceeds the fragment's

@@ -1,26 +1,32 @@
 package vql.typed
 
 import TypeDecl.*
+import vql.error.SymbolKind
 
 case class FunctionSig(params: List[TypeId], returns: TypeId)
 
 case class PredicateSig(params: List[TypeId])
 
-enum TypeCatalogError:
-  /**
-   * A type referenced in a signature or validator is not declared in [[TypeCatalog.types]].
-   * `location` names the signature site, e.g. `"function 'p95' return type"` or
-   * `"predicate 'hasloss' parameter 0"`, following compiler-engineering convention that every
-   * diagnostic names its source site.
-   */
-  case UnknownType(name: String, location: String)
-  case NameCollision(name: String)
+/** The place in a catalog declaration that names a type. */
+enum DeclarationSite:
+  case Constant(name: String)
+  case Parameter(symbol: SymbolName, kind: SymbolKind, index: Int)
+  case FunctionReturn(function: SymbolName)
+  case LiteralValidator
 
-  /**
-   * A function declares a [[DomainType]] sort as its return type, which is unsupported. Functions
-   * must return [[ValueType]] sorts. See ADR-015 §1 and T-004.
-   */
-  case FunctionReturnIsDomainType(functionName: String, returnType: String)
+  def label: String = this match
+    case Constant(name)                             => s"constant '$name'"
+    case Parameter(symbol, SymbolKind.Function, i)  => s"function '${symbol.value}' parameter $i"
+    case Parameter(symbol, SymbolKind.Predicate, i) => s"predicate '${symbol.value}' parameter $i"
+    case FunctionReturn(function)                   => s"function '${function.value}' return type"
+    case LiteralValidator                           => "literal validator"
+
+enum TypeCatalogError:
+  /** `typeId` is named at `site` and is not declared in [[TypeCatalog.types]]. */
+  case UnknownType(typeId: TypeId, site: DeclarationSite)
+
+  /** `symbol` is declared both as a function and as a predicate. */
+  case NameCollision(symbol: SymbolName)
 
 /**
  * A validated type catalog.
@@ -46,6 +52,14 @@ case class TypeCatalog private (
    * enforce domain coverage. See ADR-014.
    */
   def domainTypes: Set[TypeId] = types.collect { case DomainType(typeId) => typeId }
+
+  /**
+   * Functions whose declared return sort is a domain type. A consumer whose targeting fragment
+   * admits exactly these applications passes this set to `Fragment.Targeting` and writes no list of
+   * names.
+   */
+  def domainReturningFunctions: Set[SymbolName] =
+    functions.collect { case (sym, sig) if domainTypes.contains(sig.returns) => sym }.toSet
 
 end TypeCatalog
 
@@ -107,48 +121,44 @@ object TypeCatalog:
 
     constants.foreach { (key, s) =>
       if !typeIds.contains(s) then
-        unknownTypes += TypeCatalogError.UnknownType(s.value, s"constant '$key'")
+        unknownTypes += TypeCatalogError.UnknownType(s, DeclarationSite.Constant(key))
     }
-
-    val domainTypeIds = types.collect { case DomainType(typeId) => typeId }
 
     functions.foreach { (sym, sig) =>
       sig.params.zipWithIndex.foreach { (s, i) =>
         if !typeIds.contains(s) then
           unknownTypes += TypeCatalogError.UnknownType(
-            s.value,
-            s"function '${sym.value}' parameter $i",
+            s,
+            DeclarationSite.Parameter(sym, SymbolKind.Function, i),
           )
       }
       if !typeIds.contains(sig.returns) then
         unknownTypes += TypeCatalogError.UnknownType(
-          sig.returns.value,
-          s"function '${sym.value}' return type",
+          sig.returns,
+          DeclarationSite.FunctionReturn(sym),
         )
-      else if domainTypeIds.contains(sig.returns) then
-        unknownTypes += TypeCatalogError.FunctionReturnIsDomainType(sym.value, sig.returns.value)
     }
 
     predicates.foreach { (sym, sig) =>
       sig.params.zipWithIndex.foreach { (s, i) =>
         if !typeIds.contains(s) then
           unknownTypes += TypeCatalogError.UnknownType(
-            s.value,
-            s"predicate '${sym.value}' parameter $i",
+            s,
+            DeclarationSite.Parameter(sym, SymbolKind.Predicate, i),
           )
       }
     }
 
     literalValidators.keys.foreach { s =>
       if !typeIds.contains(s) then
-        unknownTypes += TypeCatalogError.UnknownType(s.value, s"literal validator for '${s.value}'")
+        unknownTypes += TypeCatalogError.UnknownType(s, DeclarationSite.LiteralValidator)
     }
 
     val collisions =
       functions.keySet
         .intersect(predicates.keySet)
         .toList
-        .map(n => TypeCatalogError.NameCollision(n.value))
+        .map(TypeCatalogError.NameCollision(_))
 
     unknownTypes.result() ++ collisions
 

@@ -1,8 +1,10 @@
 package vql.fragment
 
+import lexer.SymbolText
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
 import parser.FOLParser
+import vql.id.SymbolName
 
 /**
  * [[FragmentCheck]] decides structural membership of a parsed `Formula[FOL]` in a [[Fragment]],
@@ -19,55 +21,80 @@ class FragmentCheckSpec extends FunSuite:
   // ==================== Targeting: admit ====================
 
   test("targeting admits a bare atom over variables"):
-    assertEquals(FragmentCheck.check(atom("p", mkVar("x")), Fragment.Targeting), Right(()))
+    assertEquals(FragmentCheck.check(atom("p", mkVar("x")), Fragment.Targeting(Set.empty)), Right(()))
 
   test("targeting admits inline literals (Term.Const) and variables"):
     // p(x, 42): the literal is a Const, not a function application
     assertEquals(
-      FragmentCheck.check(atom("p", mkVar("x"), mkConst("42")), Fragment.Targeting),
+      FragmentCheck.check(atom("p", mkVar("x"), mkConst("42")), Fragment.Targeting(Set.empty)),
       Right(()),
     )
 
   test("targeting admits connectives over admissible atoms"):
     val f = Formula.And(atom("p", mkVar("x")), Formula.Not(atom("q", mkVar("y"))))
-    assertEquals(FragmentCheck.check(f, Fragment.Targeting), Right(()))
+    assertEquals(FragmentCheck.check(f, Fragment.Targeting(Set.empty)), Right(()))
 
   // ==================== Targeting: reject ====================
 
   test("targeting rejects a universal quantifier"):
     val f = Formula.mkForall("x", atom("p", mkVar("x")))
     assertEquals(
-      FragmentCheck.check(f, Fragment.Targeting),
+      FragmentCheck.check(f, Fragment.Targeting(Set.empty)),
       Left(FragmentViolation.QuantifierNotAllowed),
     )
 
   test("targeting rejects an existential quantifier"):
     val f = Formula.mkExists("x", atom("p", mkVar("x")))
     assertEquals(
-      FragmentCheck.check(f, Fragment.Targeting),
+      FragmentCheck.check(f, Fragment.Targeting(Set.empty)),
       Left(FragmentViolation.QuantifierNotAllowed),
     )
 
   test("targeting rejects a function-application term, naming the function"):
     val f = atom("p", mkFn("f", List(mkVar("x"))))
     assertEquals(
-      FragmentCheck.check(f, Fragment.Targeting),
-      Left(FragmentViolation.FunctionApplicationNotAllowed("f")),
+      FragmentCheck.check(f, Fragment.Targeting(Set.empty)),
+      Left(FragmentViolation.FunctionApplicationNotAllowed(SymbolText.of("f"))),
     )
 
   test("targeting rejects an arithmetic operator term (it is a Term.Fn)"):
     // gt(x + y, z): `+` is a function application
     val f = atom("gt", mkFn("+", List(mkVar("x"), mkVar("y"))), mkVar("z"))
     assertEquals(
-      FragmentCheck.check(f, Fragment.Targeting),
-      Left(FragmentViolation.FunctionApplicationNotAllowed("+")),
+      FragmentCheck.check(f, Fragment.Targeting(Set.empty)),
+      Left(FragmentViolation.FunctionApplicationNotAllowed(SymbolText.of("+"))),
     )
 
   test("targeting reports the outermost function of a nested application"):
     val f = atom("p", mkFn("f", List(mkFn("g", List(mkVar("x"))))))
     assertEquals(
-      FragmentCheck.check(f, Fragment.Targeting),
-      Left(FragmentViolation.FunctionApplicationNotAllowed("f")),
+      FragmentCheck.check(f, Fragment.Targeting(Set.empty)),
+      Left(FragmentViolation.FunctionApplicationNotAllowed(SymbolText.of("f"))),
+    )
+
+  // ==================== Targeting: admitted functions ====================
+
+  private val nodeId: Set[SymbolName] = Set(SymbolName("node_id"))
+
+  test("targeting admits an application of an admitted function"):
+    val f = atom("eq", mkVar("x"), mkFn("node_id", List(mkConst("a1"))))
+    assertEquals(FragmentCheck.check(f, Fragment.Targeting(nodeId)), Right(()))
+
+  test("targeting refuses a function nested inside an admitted one, naming it"):
+    val f = atom("eq", mkVar("x"), mkFn("node_id", List(mkFn("p95", List(mkVar("y"))))))
+    assertEquals(
+      FragmentCheck.check(f, Fragment.Targeting(nodeId)),
+      Left(FragmentViolation.FunctionApplicationNotAllowed(SymbolText.of("p95"))),
+    )
+
+  test("an admitted application on the left does not hide a quantifier on the right"):
+    val f = Formula.And(
+      atom("eq", mkVar("x"), mkFn("node_id", List(mkConst("a1")))),
+      Formula.mkExists("y", atom("p", mkVar("y"))),
+    )
+    assertEquals(
+      FragmentCheck.check(f, Fragment.Targeting(nodeId)),
+      Left(FragmentViolation.QuantifierNotAllowed),
     )
 
   // ==================== Targeting: first-violation order (pre-order, left-to-right)
@@ -78,21 +105,21 @@ class FragmentCheckSpec extends FunSuite:
     val f =
       Formula.And(atom("p", mkFn("f", List(mkVar("x")))), Formula.mkExists("y", atom("q", mkVar("y"))))
     assertEquals(
-      FragmentCheck.check(f, Fragment.Targeting),
-      Left(FragmentViolation.FunctionApplicationNotAllowed("f")),
+      FragmentCheck.check(f, Fragment.Targeting(Set.empty)),
+      Left(FragmentViolation.FunctionApplicationNotAllowed(SymbolText.of("f"))),
     )
 
   test("a right-side quantifier is reported when the left operand is admissible"):
     val f = Formula.And(atom("p", mkVar("x")), Formula.mkExists("y", atom("q", mkVar("y"))))
     assertEquals(
-      FragmentCheck.check(f, Fragment.Targeting),
+      FragmentCheck.check(f, Fragment.Targeting(Set.empty)),
       Left(FragmentViolation.QuantifierNotAllowed),
     )
 
   test("a quantifier node is reported before a function application inside its body"):
     val f = Formula.mkForall("x", atom("p", mkFn("f", List(mkVar("x")))))
     assertEquals(
-      FragmentCheck.check(f, Fragment.Targeting),
+      FragmentCheck.check(f, Fragment.Targeting(Set.empty)),
       Left(FragmentViolation.QuantifierNotAllowed),
     )
 
@@ -157,23 +184,31 @@ class FragmentCheckSpec extends FunSuite:
     FOLParser.parse(s).fold(e => fail(s"parse failed for [$s]: $e"), identity)
 
   test("e2e: a plain predicate application is in Targeting"):
-    assertEquals(FragmentCheck.check(parsed("P(x)"), Fragment.Targeting), Right(()))
+    assertEquals(FragmentCheck.check(parsed("P(x)"), Fragment.Targeting(Set.empty)), Right(()))
 
   test("e2e: a parsed literal argument is a Const, so it stays in Targeting"):
     // `5` parses to Term.Const; the atom has no function application
-    assertEquals(FragmentCheck.check(parsed("x < 5"), Fragment.Targeting), Right(()))
+    assertEquals(FragmentCheck.check(parsed("x < 5"), Fragment.Targeting(Set.empty)), Right(()))
 
   test("e2e: a parsed quantifier leaves Targeting"):
     assertEquals(
-      FragmentCheck.check(parsed("forall x . P(x)"), Fragment.Targeting),
+      FragmentCheck.check(parsed("forall x . P(x)"), Fragment.Targeting(Set.empty)),
       Left(FragmentViolation.QuantifierNotAllowed),
     )
 
   test("e2e: parsed arithmetic is a function application, rejected by Targeting"):
     // `2 * x + 3 = y` → the `=` atom's first term is the Fn `+`
     assertEquals(
-      FragmentCheck.check(parsed("2 * x + 3 = y"), Fragment.Targeting),
-      Left(FragmentViolation.FunctionApplicationNotAllowed("+")),
+      FragmentCheck.check(parsed("2 * x + 3 = y"), Fragment.Targeting(Set.empty)),
+      Left(FragmentViolation.FunctionApplicationNotAllowed(SymbolText.of("+"))),
+    )
+
+  test("e2e: a parsed node_id application is admitted only when node_id is in the set"):
+    val f = parsed("""eq(x, node_id("01HQ"))""")
+    assertEquals(FragmentCheck.check(f, Fragment.Targeting(nodeId)), Right(()))
+    assertEquals(
+      FragmentCheck.check(f, Fragment.Targeting(Set.empty)),
+      Left(FragmentViolation.FunctionApplicationNotAllowed(SymbolText.of("node_id"))),
     )
 
   test("e2e: nested parsed quantifiers screen at depth 2 but not depth 1"):

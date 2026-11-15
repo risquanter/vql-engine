@@ -2,6 +2,7 @@ package vql.typed
 
 import TypeDecl.*
 import munit.FunSuite
+import vql.error.SymbolKind
 
 class TypeCatalogSpec extends FunSuite:
 
@@ -88,10 +89,7 @@ class TypeCatalogSpec extends FunSuite:
     )
 
     assert(result.isLeft)
-    assert(result.left.exists(_.exists {
-      case TypeCatalogError.NameCollision("foo") => true
-      case _                                     => false
-    }))
+    assert(result.left.exists(_.contains(TypeCatalogError.NameCollision(SymbolName("foo")))))
 
   // Validators may produce any consumer carrier (ADR-015 §4); e.g. parse
   // Long literals into Long carriers.
@@ -106,9 +104,7 @@ class TypeCatalogSpec extends FunSuite:
 
     assert(result.isRight)
 
-  // ==================== S-3: UnknownType.location ====================
-
-  test("UnknownType carries location string for function return type"):
+  test("UnknownType names the function return site"):
     val asset = TypeId("Asset")
     val ghost = TypeId("Ghost")
 
@@ -116,14 +112,12 @@ class TypeCatalogSpec extends FunSuite:
       types = Set(DomainType(asset)),
       functions = Map(SymbolName("p95") -> FunctionSig(List(asset), ghost)),
     ) match
-      case Left(List(TypeCatalogError.UnknownType(name, location))) =>
-        assertEquals(name, "Ghost")
-        assert(location.contains("p95"), s"location '$location' should mention 'p95'")
-        assert(
-          location.contains("return type"),
-          s"location '$location' should mention 'return type'",
-        )
-      case other => fail(s"expected exactly one UnknownType, got $other")
+      case Left(List(TypeCatalogError.UnknownType(typeId, site))) =>
+        assertEquals(typeId, ghost)
+        assertEquals(site, DeclarationSite.FunctionReturn(SymbolName("p95")))
+        assertEquals(site.label, "function 'p95' return type")
+      case other                                                    =>
+        fail(s"expected exactly one UnknownType, got $other")
 
   test("UnknownType emitted separately per site for same unknown type"):
     val asset = TypeId("Asset")
@@ -135,46 +129,54 @@ class TypeCatalogSpec extends FunSuite:
       predicates = Map(SymbolName("p") -> PredicateSig(List(ghost))),
     ) match
       case Left(errors) =>
-        val unknowns = errors.collect { case e: TypeCatalogError.UnknownType => e }
         assertEquals(
-          unknowns.length,
-          2,
-          s"expected one error per site, not deduplicated: $unknowns",
+          errors.toSet,
+          Set(
+            TypeCatalogError.UnknownType(
+              ghost,
+              DeclarationSite.Parameter(SymbolName("f"), SymbolKind.Function, 0),
+            ),
+            TypeCatalogError.UnknownType(
+              ghost,
+              DeclarationSite.Parameter(SymbolName("p"), SymbolKind.Predicate, 0),
+            ),
+          ),
         )
-        assert(
-          unknowns.exists(_.location.contains("function")),
-          s"no function-site error in $unknowns",
-        )
-        assert(
-          unknowns.exists(_.location.contains("predicate")),
-          s"no predicate-site error in $unknowns",
+        assertEquals(errors.length, 2, s"expected one error per site, not deduplicated: $errors")
+      case Right(_)     => fail("expected Left")
+    end match
+
+  test("UnknownType names the constant and literal-validator sites"):
+    val asset = TypeId("Asset")
+    val ghost = TypeId("Ghost")
+
+    TypeCatalog(
+      types = Set(DomainType(asset)),
+      constants = Map("root" -> ghost),
+      literalValidators = Map(ghost -> (s => Some(s))),
+    ) match
+      case Left(errors) =>
+        assertEquals(
+          errors.toSet,
+          Set(
+            TypeCatalogError.UnknownType(ghost, DeclarationSite.Constant("root")),
+            TypeCatalogError.UnknownType(ghost, DeclarationSite.LiteralValidator),
+          ),
         )
       case Right(_)     => fail("expected Left")
     end match
 
-  test("FunctionReturnIsDomainType emitted when function return sort is a DomainType"):
+  test("a function may declare a DomainType return sort"):
     val asset = TypeId("Asset")
-    val loss  = TypeId("Loss")
+    val node  = TypeId("Node")
 
-    TypeCatalog(
-      types = Set(DomainType(asset), DomainType(loss)),
-      functions = Map(SymbolName("p95") -> FunctionSig(List(asset), loss)),
-    ) match
-      case Left(errors) =>
-        val domainReturns = errors.collect {
-          case e: TypeCatalogError.FunctionReturnIsDomainType => e
-        }
-        assertEquals(
-          domainReturns.length,
-          1,
-          s"expected one FunctionReturnIsDomainType error: $errors",
-        )
-        assertEquals(domainReturns.head.functionName, "p95")
-        assertEquals(domainReturns.head.returnType, "Loss")
-      case Right(_)     => fail("expected Left for function returning DomainType")
-    end match
+    val result = TypeCatalog(
+      types = Set(DomainType(asset), DomainType(node)),
+      functions = Map(SymbolName("node_id") -> FunctionSig(List(asset), node)),
+    )
+    assert(result.isRight, s"DomainType return should be accepted, got $result")
 
-  test("FunctionReturnIsDomainType not emitted when function return sort is a ValueType"):
+  test("a function may declare a ValueType return sort"):
     val asset = TypeId("Asset")
     val loss  = TypeId("Loss")
 
@@ -183,5 +185,19 @@ class TypeCatalogSpec extends FunSuite:
       functions = Map(SymbolName("p95") -> FunctionSig(List(asset), loss)),
     )
     assert(result.isRight, s"ValueType return should be accepted, got $result")
+
+  test("domainReturningFunctions holds exactly the functions returning a DomainType"):
+    val asset   = TypeId("Asset")
+    val loss    = TypeId("Loss")
+    val catalog = TypeCatalog
+      .unsafe(
+        types = Set(DomainType(asset), ValueType(loss)),
+        functions = Map(
+          SymbolName("node_id") -> FunctionSig(List(loss), asset),
+          SymbolName("p95")     -> FunctionSig(List(asset), loss),
+        ),
+      )
+
+    assertEquals(catalog.domainReturningFunctions, Set(SymbolName("node_id")))
 
 end TypeCatalogSpec
