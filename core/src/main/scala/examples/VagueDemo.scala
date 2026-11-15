@@ -6,6 +6,7 @@ import vql.sampling.SamplingParams
 import vql.semantics.VagueSemantics
 import vql.typed.{
   FolModel,
+  OrderedDomain,
   PredicateSig,
   RuntimeDispatcher,
   RuntimeModel,
@@ -43,7 +44,7 @@ import vql.typed.TypeDecl.DomainType
   )
 
   // 2. Provide the runtime data: the domain of each sort plus a dispatcher.
-  val assets     = (1 to 6).map(i => Value(asset, s"a$i")).toSet
+  val assets     = OrderedDomain.of((1 to 6).map(i => s"a$i"))
   val dispatcher = new RuntimeDispatcher:
     def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
       extensions.get(name.value) match

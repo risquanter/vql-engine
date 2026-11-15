@@ -4,6 +4,7 @@ import lexer.{Lexer, LiteralText, SymbolText, VariableText}
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
 import vql.error.{MismatchSite, ParseRefusal, QueryError, SymbolKind, TypeCheckError}
+import vql.error.QueryError.EvaluationFailure
 import parser.{FOLParser, NestingBound, SourcePosition}
 import parser.NestingFailure.{ParenthesesTooDeep, TooManyOperators}
 import vql.logic.ParsedQuery
@@ -19,6 +20,8 @@ import vql.typed.{
   BoundVar,
   FolModel,
   FunctionSig,
+  MapDispatcher,
+  OrderedDomain,
   PredicateSig,
   QueryBinder,
   RuntimeDispatcher,
@@ -47,6 +50,8 @@ class VagueSemanticsTypedSpec extends FunSuite:
   private val vA = Value(asset, "A")
   private val vB = Value(asset, "B")
 
+  private val assetDomain = OrderedDomain.of(List("A", "B"))
+
   private val query = ParsedQuery(
     quantifier = Quantifier.mkAbout(1, 2, 0.01),
     variable = "x",
@@ -71,7 +76,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
         Set(SymbolName("leaf"), SymbolName("coastal"))
 
     val model = RuntimeModel(
-      domains = Map(asset -> Set(vA, vB)),
+      domains = Map(asset -> assetDomain),
       dispatcher = dispatcher,
     )
 
@@ -104,7 +109,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"))
 
     val invalidModel = RuntimeModel(
-      domains = Map(asset -> Set(vA, vB)),
+      domains = Map(asset -> assetDomain),
       dispatcher = dispatcher,
     )
 
@@ -135,7 +140,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
         Set(SymbolName("leaf"), SymbolName("coastal"))
 
     val model = RuntimeModel(
-      domains = Map(asset -> Set(vA, vB)),
+      domains = Map(asset -> assetDomain),
       dispatcher = dispatcher,
     )
 
@@ -194,7 +199,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       override def functionSymbols: Set[SymbolName] = Set.empty
       override def predicateSymbols: Set[SymbolName]                                           =
         Set(SymbolName("leaf"), SymbolName("coastal"))
-    val model      = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = dispatcher)
+    val model      = RuntimeModel(domains = Map(asset -> assetDomain), dispatcher = dispatcher)
     val fm = FolModel(catalog, model).fold(e => fail(s"FolModel construction failed: $e"), identity)
     val result = VagueSemantics.evaluateTyped(badQuery, fm, samplingParams = SamplingParams.exact)
     result match
@@ -234,7 +239,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
         Set(SymbolName("leaf"), SymbolName("big"), SymbolName("likely"))
     FolModel(
       sortCatalog,
-      RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = dispatcher),
+      RuntimeModel(domains = Map(asset -> assetDomain), dispatcher = dispatcher),
     )
       .fold(e => fail(s"FolModel construction failed: $e"), identity)
 
@@ -380,7 +385,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
         override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"), lossP, probP)
       FolModel(
         conflictCatalog,
-        RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = dispatcher),
+        RuntimeModel(domains = Map(asset -> assetDomain), dispatcher = dispatcher),
       )
         .fold(e => fail(s"FolModel construction failed: $e"), identity)
 
@@ -447,7 +452,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       answerVars = Nil,
     )
     // Loss is enumerable in catalogWithLoss; model omits Loss domain → FolModel construction fails
-    val model  = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
+    val model  = RuntimeModel(domains = Map(asset -> assetDomain), dispatcher = losslessDispatcher)
     val result = FolModel(catalogWithLoss, model)
     result match
       case Left(e: QueryError.ModelValidationError) =>
@@ -463,7 +468,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       scope = Formula.mkForall("l", Formula.Atom(FOL("hasloss", List(Term.mkVar("l"))))),
       answerVars = Nil,
     )
-    val model  = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
+    val model  = RuntimeModel(domains = Map(asset -> assetDomain), dispatcher = losslessDispatcher)
     val result = FolModel(catalogWithLoss, model)
     result match
       case Left(e: QueryError.ModelValidationError) =>
@@ -479,7 +484,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       scope = Formula.mkExists("l", Formula.Atom(FOL("hasloss", List(Term.mkVar("l"))))),
       answerVars = Nil,
     )
-    val model  = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
+    val model  = RuntimeModel(domains = Map(asset -> assetDomain), dispatcher = losslessDispatcher)
     val result = FolModel(catalogWithLoss, model)
     result match
       case Left(e: QueryError.ModelValidationError) =>
@@ -514,7 +519,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       scope = BoundFormula.True,
       answerVars = Nil,
     )
-    val model  = RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = losslessDispatcher)
+    val model  = RuntimeModel(domains = Map(asset -> assetDomain), dispatcher = losslessDispatcher)
     // validateAgainst passes (only checks enumerable types); TypedSemantics.evaluate hits the
     // fallback
     val result = TypedSemantics.evaluate(boundQuery, model, samplingParams = SamplingParams.exact)
@@ -561,7 +566,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       scope = scope,
     )
     val model      = RuntimeModel(
-      domains = Map(asset -> Set(vA, vB)),
+      domains = Map(asset -> assetDomain),
       dispatcher = sentinelDispatcher(sentinel, () => dispatched = true),
     )
     val result = TypedSemantics.evaluate(boundQuery, model, samplingParams = SamplingParams.exact)
@@ -584,7 +589,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       scope = scope,
     )
     val model      = RuntimeModel(
-      domains = Map(asset -> Set(vA, vB)),
+      domains = Map(asset -> assetDomain),
       dispatcher = sentinelDispatcher(sentinel, () => dispatched = true),
     )
     val result = TypedSemantics.evaluate(boundQuery, model, samplingParams = SamplingParams.exact)
@@ -607,7 +612,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
       scope = scope,
     )
     val model      = RuntimeModel(
-      domains = Map(asset -> Set(vA, vB)),
+      domains = Map(asset -> assetDomain),
       dispatcher = sentinelDispatcher(sentinel, () => dispatched = true),
     )
     val result = TypedSemantics.evaluate(boundQuery, model, samplingParams = SamplingParams.exact)
@@ -634,7 +639,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
         Right(true)
       override def functionSymbols: Set[SymbolName]  = Set(SymbolName("p95"))
       override def predicateSymbols: Set[SymbolName] = Set(SymbolName("leaf"), SymbolName("big"))
-    FolModel(siteCatalog, RuntimeModel(domains = Map(asset -> Set(vA, vB)), dispatcher = dispatcher))
+    FolModel(siteCatalog, RuntimeModel(domains = Map(asset -> assetDomain), dispatcher = dispatcher))
       .fold(e => fail(s"FolModel construction failed: $e"), identity)
 
   end siteModel
@@ -729,7 +734,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
           case (other, _)            => Left(s"No predicate implementation for '$other'")
       override def functionSymbols: Set[SymbolName]  = Set(SymbolName("asset_with_id"))
       override def predicateSymbols: Set[SymbolName] = Set(SymbolName("same"), SymbolName("critical"))
-    val domain        = Set("a1", "a2", "a3").map(Value(asset, _))
+    val domain        = OrderedDomain.of(List("a1", "a2", "a3"))
     FolModel(lookupCatalog, RuntimeModel(domains = Map(asset -> domain), dispatcher = dispatcher))
       .fold(e => fail(s"FolModel construction failed: $e"), identity)
 
@@ -769,7 +774,7 @@ class VagueSemanticsTypedSpec extends FunSuite:
           case (other, _)     => Left(s"No predicate implementation for '$other'")
       override def functionSymbols: Set[SymbolName]  = Set(SymbolName("f"))
       override def predicateSymbols: Set[SymbolName] = Set(SymbolName("p"))
-    val domain         = Set("a1", "a2").map(Value(asset, _))
+    val domain         = OrderedDomain.of(List("a1", "a2"))
     FolModel(nestingCatalog, RuntimeModel(domains = Map(asset -> domain), dispatcher = dispatcher))
       .fold(e => fail(s"FolModel construction failed: $e"), identity)
 
@@ -810,6 +815,80 @@ class VagueSemanticsTypedSpec extends FunSuite:
       refusal(nestedQuery(253, 63)),
       Left((ParseRefusal.Nesting(ParenthesesTooDeep(64)), SourcePosition.Unknown)),
     )
+  }
+
+  // ==================== Order-independent evaluation through the pipeline ====================
+
+  private val qRefusal = "q is unknown for a2"
+
+  /** `r(a1)` is true and `r(a2)` false; `q(a1)` is true and `q(a2)` refused. */
+  private val partialModel =
+    val partialCatalog = TypeCatalog.unsafe(
+      types = Set(DomainType(asset)),
+      predicates = Map(SymbolName("r") -> PredicateSig(List(asset)), SymbolName("q") -> PredicateSig(List(asset))),
+    )
+    val dispatcher     = MapDispatcher(predicates =
+      Map(
+        SymbolName("r") -> (args => args.head.extract[String].map(_ == "a1")),
+        SymbolName("q") -> (args =>
+          args.head.extract[String].flatMap {
+            case "a1" => Right(true)
+            case _    => Left(qRefusal)
+          }
+        ),
+      )
+    )
+    FolModel(partialCatalog, RuntimeModel(domains = Map(asset -> OrderedDomain.of(List("a1", "a2"))), dispatcher = dispatcher))
+      .fold(e => fail(s"FolModel construction failed: $e"), identity)
+
+  end partialModel
+
+  /** The keys of the elements satisfying `scope` over the whole domain, or the evaluation's failure. */
+  private def partialSatisfying(scope: String): Either[QueryError, Set[String]] =
+    for
+      query  <- VagueQueryParser.parse(s"Q[>=]^{1/2} x (r(x) \\/ ~r(x), $scope)")
+      output <- VagueSemantics.evaluateTyped(query, partialModel, samplingParams = SamplingParams.exact)
+    yield output.satisfyingElements.flatMap(_.extract[String].toOption)
+
+  test("e2e: a refusal that cannot change the scope's result is not reported, in either operand order") {
+    assertEquals(partialSatisfying("q(x) /\\ r(x)"), Right(Set("a1")))
+    assertEquals(partialSatisfying("r(x) /\\ q(x)"), Right(Set("a1")))
+    assertEquals(
+      partialSatisfying("r(x) \\/ q(x)"),
+      Left(QueryError.EvaluationError(EvaluationFailure.PredicateRefused(SymbolName("q"), qRefusal))),
+    )
+    val formula = FOLParser.parse("q(x) /\\ r(x)").fold(e => fail(s"parse failed: ${e.message}"), identity)
+    assertEquals(
+      VagueSemantics.satisfyingSet(formula, "x", partialModel).map(_.flatMap(_.extract[String].toOption)),
+      Right(Set("a1")),
+    )
+  }
+
+  test("e2e: a sampled query over identity-hashed carriers selects the same elements in any input order") {
+    // Handle has no equals or hashCode override, so its hashCode comes from object identity.
+    final class Handle(val key: String)
+    given Ordering[Handle] = Ordering.by(_.key)
+
+    val handleCatalog = TypeCatalog.unsafe(
+      types = Set(DomainType(asset)),
+      predicates = Map(SymbolName("p") -> PredicateSig(List(asset))),
+    )
+    val dispatcher    = MapDispatcher(predicates = Map(SymbolName("p") -> (_ => Right(true))))
+    def handles: List[Handle] = List.tabulate(200)(i => Handle(f"h$i%03d"))
+    def sampledKeys(input: List[Handle]): Set[String] =
+      val folModel = FolModel(handleCatalog, RuntimeModel(domains = Map(asset -> OrderedDomain.of(input)), dispatcher = dispatcher))
+        .fold(e => fail(s"FolModel construction failed: $e"), identity)
+      val query    = VagueQueryParser.parse("Q[>=]^{1/2} x (p(x), p(x))").fold(e => fail(s"parse failed: ${e.formatted}"), identity)
+      VagueSemantics
+        .evaluateTyped(query, folModel, samplingParams = SamplingParams())
+        .fold(e => fail(s"evaluateTyped failed: ${e.formatted}"), identity)
+        .satisfyingElements
+        .map(_.raw)
+        .collect { case h: Handle => h.key }
+
+    val forward = sampledKeys(handles)
+    assert(forward.size < 200, s"expected a sample, got all ${forward.size} elements")
+    assertEquals(sampledKeys(handles.reverse), forward)
   }
 
 end VagueSemanticsTypedSpec

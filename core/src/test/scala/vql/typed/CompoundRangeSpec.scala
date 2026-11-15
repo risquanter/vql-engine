@@ -44,7 +44,7 @@ class CompoundRangeSpec extends FunSuite:
       Set(SymbolName("p"), SymbolName("q"), SymbolName("r"))
 
   private val model = RuntimeModel(
-    domains = Map(item -> Set(i1, i2, i3, i4), tag -> Set(t1, t2)),
+    domains = Map(item -> OrderedDomain.of(List("i1", "i2", "i3", "i4")), tag -> OrderedDomain.of(List("t1", "t2"))),
     dispatcher = dispatcher,
   )
 

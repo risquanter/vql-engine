@@ -19,6 +19,11 @@ object TypedSemantics:
 
   private type Env = Map[String, Value]
 
+  /** A formula's truth value. `Unknown` holds the dispatcher refusal that left it undecided. */
+  private enum Truth:
+    case Known(value: Boolean)
+    case Unknown(refusal: QueryError.EvaluationError)
+
   def evaluate(
     query: BoundQuery,
     model: RuntimeModel,
@@ -29,7 +34,7 @@ object TypedSemantics:
     val quantifier = VagueQuantifier.fromQuantifier(query.quantifier)
     for
       baseEnv       <- validateAnswerTuple(query, answerTuple)
-      rootDomain    <- model.domains
+      rootDomain    <- model.elements
         .get(query.variable.sort)
         .toRight(
           QueryError.DomainNotFoundError(
@@ -56,15 +61,15 @@ object TypedSemantics:
    * Evaluate a bound formula with one free variable to its exact satisfying set over that
    * variable's sort (ADR-017 §6).
    *
-   * Enumerates `model.domains(variable.sort)` and keeps each element for which the formula holds
-   * with the variable bound to it. Exhaustive and deterministic; no sampling.
+   * Enumerates the variable's domain in its declared order and keeps each element for which the
+   * formula holds with the variable bound to it. Exhaustive and deterministic; no sampling.
    */
   def satisfyingSet(
     formula: BoundFormula,
     variable: BoundVar,
     model: RuntimeModel,
   ): Either[QueryError, Set[Value]] =
-    model.domains.get(variable.sort) match
+    model.elements.get(variable.sort) match
       case None         =>
         Left(
           QueryError.DomainNotFoundError(
@@ -76,7 +81,7 @@ object TypedSemantics:
         domain.foldLeft[Either[QueryError, Set[Value]]](Right(Set.empty)) { (acc, candidate) =>
           for
             sat <- acc
-            ok  <- evalFormula(formula, Map(variable.name -> candidate), model)
+            ok  <- holds(formula, Map(variable.name -> candidate), model)
           yield if ok then sat + candidate else sat
         }
 
@@ -109,20 +114,20 @@ object TypedSemantics:
     query: BoundQuery,
     model: RuntimeModel,
     baseEnv: Env,
-    rootDomain: Set[Value],
-  ): Either[QueryError, Set[Value]] =
-    rootDomain.foldLeft[Either[QueryError, Set[Value]]](Right(Set.empty)) { (acc, candidate) =>
+    rootDomain: Vector[Value],
+  ): Either[QueryError, Vector[Value]] =
+    rootDomain.foldLeft[Either[QueryError, Vector[Value]]](Right(Vector.empty)) { (acc, candidate) =>
       for
         accepted <- acc
-        inRange  <- evalFormula(query.range, baseEnv + (query.variable.name -> candidate), model)
-      yield if inRange then accepted + candidate else accepted
+        inRange  <- holds(query.range, baseEnv + (query.variable.name -> candidate), model)
+      yield if inRange then accepted :+ candidate else accepted
     }
 
   private def evaluateOverRange(
     query: BoundQuery,
     model: RuntimeModel,
     baseEnv: Env,
-    rangeElements: Set[Value],
+    rangeElements: Vector[Value],
     quantifier: VagueQuantifier,
     samplingParams: SamplingParams,
     hdrConfig: HDRConfig,
@@ -149,7 +154,7 @@ object TypedSemantics:
         val result   = VagueQueryResult.fromEstimate(quantifier, estimate, rangeElements.size)
         EvaluationOutput(
           result = result,
-          rangeElements = rangeElements,
+          rangeElements = rangeElements.toSet,
           satisfyingElements = satisfying,
         )
 
@@ -162,80 +167,118 @@ object TypedSemantics:
     sample.foldLeft[Either[QueryError, Set[Value]]](Right(Set.empty)) { (acc, candidate) =>
       for
         sat <- acc
-        ok  <- evalFormula(query.scope, baseEnv + (query.variable.name -> candidate), model)
+        ok  <- holds(query.scope, baseEnv + (query.variable.name -> candidate), model)
       yield if ok then sat + candidate else sat
     }
 
+  /** The formula's truth value, failing with the refusal that left it unknown. */
+  private def holds(formula: BoundFormula, env: Env, model: RuntimeModel): Either[QueryError, Boolean] =
+    evalFormula(formula, env, model).flatMap {
+      case Truth.Known(value)     => Right(value)
+      case Truth.Unknown(refusal) => Left(refusal)
+    }
+
+  /** A dispatcher refusal becomes `Unknown`; any other failure stays a failure. */
+  private def classify(result: Either[QueryError, Boolean]): Either[QueryError, Truth] =
+    result match
+      case Right(value) => Right(Truth.Known(value))
+      case Left(
+            refusal @ QueryError.EvaluationError(
+              EvaluationFailure.PredicateRefused(_, _) | EvaluationFailure.FunctionRefused(_, _)
+            )
+          ) => Right(Truth.Unknown(refusal))
+      case Left(defect) => Left(defect)
+
+  /**
+   * The formula's truth value under Kleene's strong three-valued logic (ADR-025). An operand that
+   * decides the result alone stops evaluation; otherwise both operands are evaluated, so the result
+   * does not depend on their order.
+   */
   private def evalFormula(
     formula: BoundFormula,
     env: Env,
     model: RuntimeModel,
-  ): Either[QueryError, Boolean] =
+  ): Either[QueryError, Truth] =
     formula match
-      case BoundFormula.True            => Right(true)
-      case BoundFormula.False           => Right(false)
-      case BoundFormula.Atom(a)         => evalAtom(a, env, model)
-      case BoundFormula.Not(p)          => evalFormula(p, env, model).map(v => !v)
+      case BoundFormula.True            => Right(Truth.Known(true))
+      case BoundFormula.False           => Right(Truth.Known(false))
+      case BoundFormula.Atom(a)         => classify(evalAtom(a, env, model))
+      case BoundFormula.Not(p)          => evalFormula(p, env, model).map(negate)
       case BoundFormula.And(p, q)       =>
         evalFormula(p, env, model).flatMap {
-          case false => Right(false)
-          case true  => evalFormula(q, env, model)
+          case Truth.Known(false) => Right(Truth.Known(false))
+          case left               => evalFormula(q, env, model).map(conjoin(left, _))
         }
       case BoundFormula.Or(p, q)        =>
         evalFormula(p, env, model).flatMap {
-          case true  => Right(true)
-          case false => evalFormula(q, env, model)
+          case Truth.Known(true) => Right(Truth.Known(true))
+          case left              => evalFormula(q, env, model).map(disjoin(left, _))
         }
       case BoundFormula.Imp(p, q)       =>
         evalFormula(p, env, model).flatMap {
-          case false => Right(true) // false antecedent → implication vacuously true
-          case true  => evalFormula(q, env, model)
+          case Truth.Known(false) => Right(Truth.Known(true)) // false antecedent → vacuously true
+          case left               => evalFormula(q, env, model).map(disjoin(negate(left), _))
         }
       case BoundFormula.Iff(p, q)       =>
         for
           left  <- evalFormula(p, env, model)
           right <- evalFormula(q, env, model)
-        yield left == right
-      case BoundFormula.Forall(v, body) =>
-        model.domains.get(v.sort) match
-          case None         =>
-            Left(
-              QueryError.DomainNotFoundError(
-                typeName = v.sort,
-                availableTypes = model.domains.keySet,
-              )
-            )
-          case Some(domain) =>
-            @scala.annotation.tailrec
-            def allOf(remaining: List[Value]): Either[QueryError, Boolean] =
-              remaining match
-                case Nil           => Right(true)
-                case value :: rest =>
-                  evalFormula(body, env + (v.name -> value), model) match
-                    case Right(false) => Right(false)
-                    case Right(true)  => allOf(rest)
-                    case left         => left
-            allOf(domain.toList)
-      case BoundFormula.Exists(v, body) =>
-        model.domains.get(v.sort) match
-          case None         =>
-            Left(
-              QueryError.DomainNotFoundError(
-                typeName = v.sort,
-                availableTypes = model.domains.keySet,
-              )
-            )
-          case Some(domain) =>
-            @scala.annotation.tailrec
-            def anyOf(remaining: List[Value]): Either[QueryError, Boolean] =
-              remaining match
-                case Nil           => Right(false)
-                case value :: rest =>
-                  evalFormula(body, env + (v.name -> value), model) match
-                    case Right(true)  => Right(true)
-                    case Right(false) => anyOf(rest)
-                    case left         => left
-            anyOf(domain.toList)
+        yield (left, right) match
+          case (Truth.Known(l), Truth.Known(r)) => Truth.Known(l == r)
+          case (unknown: Truth.Unknown, _)      => unknown
+          case (_, unknown: Truth.Unknown)      => unknown
+      case BoundFormula.Forall(v, body) => quantify(body, v, env, model, decisive = false)
+      case BoundFormula.Exists(v, body) => quantify(body, v, env, model, decisive = true)
+
+  private def negate(truth: Truth): Truth =
+    truth match
+      case Truth.Known(value)     => Truth.Known(!value)
+      case unknown: Truth.Unknown => unknown
+
+  private def conjoin(left: Truth, right: Truth): Truth =
+    (left, right) match
+      case (Truth.Known(false), _) | (_, Truth.Known(false)) => Truth.Known(false)
+      case (Truth.Known(true), _)                            => right
+      case (unknown: Truth.Unknown, _)                       => unknown
+
+  private def disjoin(left: Truth, right: Truth): Truth =
+    (left, right) match
+      case (Truth.Known(true), _) | (_, Truth.Known(true)) => Truth.Known(true)
+      case (Truth.Known(false), _)                         => right
+      case (unknown: Truth.Unknown, _)                     => unknown
+
+  /**
+   * `∃` when `decisive` is true and `∀` when it is false. The first binding whose body is
+   * `Known(decisive)` decides. Otherwise the result is the first `Unknown` met, else
+   * `Known(!decisive)`.
+   */
+  private def quantify(
+    body: BoundFormula,
+    variable: BoundVar,
+    env: Env,
+    model: RuntimeModel,
+    decisive: Boolean,
+  ): Either[QueryError, Truth] =
+    model.elements.get(variable.sort) match
+      case None         =>
+        Left(
+          QueryError.DomainNotFoundError(
+            typeName = variable.sort,
+            availableTypes = model.domains.keySet,
+          )
+        )
+      case Some(domain) =>
+        @scala.annotation.tailrec
+        def walk(remaining: List[Value], firstUnknown: Option[Truth.Unknown]): Either[QueryError, Truth] =
+          remaining match
+            case Nil           => Right(firstUnknown.getOrElse(Truth.Known(!decisive)))
+            case value :: rest =>
+              evalFormula(body, env + (variable.name -> value), model) match
+                case Right(Truth.Known(b)) if b == decisive => Right(Truth.Known(decisive))
+                case Right(Truth.Known(_))                  => walk(rest, firstUnknown)
+                case Right(unknown: Truth.Unknown)          => walk(rest, firstUnknown.orElse(Some(unknown)))
+                case Left(defect)                           => Left(defect)
+        walk(domain.toList, None)
 
   private def evalAtom(atom: BoundAtom, env: Env, model: RuntimeModel): Either[
     QueryError,

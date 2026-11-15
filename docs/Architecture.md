@@ -21,7 +21,7 @@ core/src/main/scala/
     ├── parser/      VagueQueryParser
     ├── logic/       ParsedQuery
     ├── typed/       TypeCatalog, QueryBinder, BoundQuery, TypedSemantics,
-    │                RuntimeModel, RuntimeDispatcher, FolModel, Value,
+    │                RuntimeModel, OrderedDomain, RuntimeDispatcher, FolModel, Value,
     │                TypeDefs, Extract, LiteralParser
     ├── semantics/   VagueSemantics (typed facade)
     ├── sampling/    HDRSampler, ProportionEstimator, SampleSizeCalculator, NormalApprox, SamplingParams
@@ -98,7 +98,8 @@ See [ADR-001](ADR-001.md) for the full trace diagram.
 
 **Type catalog and model construction:**
 `TypeCatalog` declares sorts (`DomainType` / `ValueType`) and symbol
-signatures. `RuntimeModel` supplies each sort's domain and a
+signatures. `RuntimeModel` supplies each sort's domain, in the order the consumer
+declares through `OrderedDomain.of`, and a
 `RuntimeDispatcher` that decides predicates and functions. `FolModel`
 validates a catalog/model pair (dispatcher coverage + domain registration)
 and is the pre-validated input to evaluation. See [ADR-001](ADR-001.md).
@@ -161,6 +162,7 @@ once in `vql.error` (ADR-023). See [ADR-002](ADR-002.md) and
 | [ADR-022](ADR-022.md) | Typed Refusals |
 | [ADR-023](ADR-023.md) | Errors Declared Once above a Shared Identifier Package |
 | [ADR-024](ADR-024.md) | Parse Depth Bound — iterative lexer, nesting limits checked before parsing |
+| [ADR-025](ADR-025.md) | Order-Independent Evaluation — a dispatcher refusal is an unknown truth value; domains in a declared order |
 
 ---
 

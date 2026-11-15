@@ -29,11 +29,11 @@ class FisherYatesHDRSpec extends FunSuite:
   test("sample is always a subset of the population") {
     val config     = HDRConfig(entityId = 1, varId = 2, seed3 = 3, seed4 = 4)
     val sampler    = HDRSampler[Int](config)
-    val population = (1 to 200).toSet
+    val population = (1 to 200).toVector
 
     for n <- List(1, 5, 10, 50, 100, 199) do
       val sample = sampler.sample(population, n)
-      assert(sample.subsetOf(population), s"Sample of size $n is not a subset of population")
+      assert(sample.subsetOf(population.toSet), s"Sample of size $n is not a subset of population")
   }
 
   // ==================== 2. Without replacement ====================
@@ -43,7 +43,7 @@ class FisherYatesHDRSpec extends FunSuite:
     // array length == set size to catch any Fisher-Yates indexing bug.
     val config     = HDRConfig(seed3 = 42)
     val sampler    = HDRSampler[Int](config)
-    val population = (1 to 500).toSet
+    val population = (1 to 500).toVector
 
     for n <- List(1, 10, 50, 100, 250, 499) do
       val sample = sampler.sample(population, n)
@@ -55,7 +55,7 @@ class FisherYatesHDRSpec extends FunSuite:
   test("sample size is exactly n when n < N") {
     val config     = HDRConfig.default
     val sampler    = HDRSampler[Int](config)
-    val population = (1 to 1000).toSet
+    val population = (1 to 1000).toVector
 
     for n <- List(1, 2, 10, 100, 500, 999) do assertEquals(sampler.sample(population, n).size, n)
   }
@@ -63,7 +63,7 @@ class FisherYatesHDRSpec extends FunSuite:
   test("sample size is N when n >= N") {
     val config     = HDRConfig.default
     val sampler    = HDRSampler[Int](config)
-    val population = (1 to 50).toSet
+    val population = (1 to 50).toVector
 
     assertEquals(sampler.sample(population, 50).size, 50)
     assertEquals(sampler.sample(population, 51).size, 50)
@@ -74,7 +74,7 @@ class FisherYatesHDRSpec extends FunSuite:
 
   test("same HDRConfig always produces the same sample") {
     val config     = HDRConfig(entityId = 7, varId = 13, seed3 = 99, seed4 = 1001)
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
 
     // Create 5 independent sampler instances — all should agree
     val samples = (1 to 5).map(_ => HDRSampler[Int](config).sample(population, 20))
@@ -91,7 +91,7 @@ class FisherYatesHDRSpec extends FunSuite:
   test("reset produces identical sample") {
     val config     = HDRConfig(seed3 = 42)
     val sampler    = HDRSampler[Int](config)
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
 
     val sample1 = sampler.sample(population, 15)
     val sample2 = sampler.reset().sample(population, 15)
@@ -102,7 +102,7 @@ class FisherYatesHDRSpec extends FunSuite:
   // ==================== 5. Entity isolation ====================
 
   test("different entityId produces different samples") {
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val config1    = HDRConfig(entityId = 1)
     val config2    = HDRConfig(entityId = 2)
 
@@ -113,7 +113,7 @@ class FisherYatesHDRSpec extends FunSuite:
   }
 
   test("many different entityIds all produce distinct samples") {
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val samples    = (0L until 20L).map { eid =>
       HDRSampler[Int](HDRConfig(entityId = eid)).sample(population, 15)
     }.toSet
@@ -128,7 +128,7 @@ class FisherYatesHDRSpec extends FunSuite:
   // ==================== 6. Variable isolation ====================
 
   test("different varId produces different samples") {
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val config1    = HDRConfig(varId = 100)
     val config2    = HDRConfig(varId = 200)
 
@@ -140,7 +140,7 @@ class FisherYatesHDRSpec extends FunSuite:
 
   test("ADR-003 variable offset pattern works (occurrence +1000, loss +2000)") {
     // Mimics the register pattern: same entity, different variable offsets
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val riskHash   = 42L
 
     val occurrenceConfig = HDRConfig(entityId = riskHash, varId = riskHash + 1000L)
@@ -158,7 +158,7 @@ class FisherYatesHDRSpec extends FunSuite:
   // ==================== 7. Seed3 isolation ====================
 
   test("different seed3 produces different samples") {
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val config1    = HDRConfig(seed3 = 0L)
     val config2    = HDRConfig(seed3 = 12345L)
 
@@ -171,7 +171,7 @@ class FisherYatesHDRSpec extends FunSuite:
   // ==================== 8. Seed4 isolation ====================
 
   test("different seed4 produces different samples") {
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val config1    = HDRConfig(seed4 = 0L)
     val config2    = HDRConfig(seed4 = 99999L)
 
@@ -187,7 +187,7 @@ class FisherYatesHDRSpec extends FunSuite:
     // For each config, sample 10 out of 20.
     // Over 1000 configs, each element should be selected ~500 times (50%).
     // We accept within [400, 600] (±20% of expected).
-    val population = (1 to 20).toSet
+    val population = (1 to 20).toVector
     val n          = 10
     val numTrials  = 1000
 
@@ -214,7 +214,7 @@ class FisherYatesHDRSpec extends FunSuite:
     // For a fair shuffle, each pair (i, j) should appear together at roughly
     // C(n,2)/C(N,2) * numTrials times. We just check that no pair is grossly
     // over- or under-represented compared to others.
-    val population = (1 to 10).toSet
+    val population = (1 to 10).toVector
     val n          = 5
     val numTrials  = 2000
 
@@ -244,67 +244,67 @@ class FisherYatesHDRSpec extends FunSuite:
 
   test("sample 0 from non-empty population") {
     val sampler = HDRSampler[Int](HDRConfig.default)
-    val sample  = sampler.sample((1 to 100).toSet, 0)
+    val sample  = sampler.sample((1 to 100).toVector, 0)
     assert(sample.isEmpty)
   }
 
   test("sample from empty population") {
     val sampler = HDRSampler[String](HDRConfig.default)
-    val sample  = sampler.sample(Set.empty[String], 10)
+    val sample  = sampler.sample(Vector.empty[String], 10)
     assert(sample.isEmpty)
   }
 
   test("sample 0 from empty population") {
     val sampler = HDRSampler[Int](HDRConfig.default)
-    val sample  = sampler.sample(Set.empty[Int], 0)
+    val sample  = sampler.sample(Vector.empty[Int], 0)
     assert(sample.isEmpty)
   }
 
   test("sample 1 from singleton population") {
     val sampler = HDRSampler[Int](HDRConfig.default)
-    val sample  = sampler.sample(Set(42), 1)
+    val sample  = sampler.sample(Vector(42), 1)
     assertEquals(sample, Set(42))
   }
 
   test("sample 1 from large population") {
     val sampler = HDRSampler[Int](HDRConfig(seed3 = 42))
-    val sample  = sampler.sample((1 to 10000).toSet, 1)
+    val sample  = sampler.sample((1 to 10000).toVector, 1)
     assertEquals(sample.size, 1)
     assert(sample.head >= 1 && sample.head <= 10000)
   }
 
   test("sample N-1 from population of N") {
-    val population = (1 to 10).toSet
+    val population = (1 to 10).toVector
     val sampler    = HDRSampler[Int](HDRConfig(seed3 = 7))
     val sample     = sampler.sample(population, 9)
     assertEquals(sample.size, 9)
-    assert(sample.subsetOf(population))
+    assert(sample.subsetOf(population.toSet))
     // Exactly one element should be missing
-    assertEquals((population -- sample).size, 1)
+    assertEquals((population.toSet -- sample).size, 1)
   }
 
   test("sample N from population of N returns the full population") {
-    val population = (1 to 10).toSet
+    val population = (1 to 10).toVector
     val sampler    = HDRSampler[Int](HDRConfig.default)
-    assertEquals(sampler.sample(population, 10), population)
+    assertEquals(sampler.sample(population, 10), population.toSet)
   }
 
   test("sample N+1 from population of N returns the full population") {
-    val population = (1 to 10).toSet
+    val population = (1 to 10).toVector
     val sampler    = HDRSampler[Int](HDRConfig.default)
-    assertEquals(sampler.sample(population, 11), population)
+    assertEquals(sampler.sample(population, 11), population.toSet)
   }
 
   test("negative sample size throws") {
     val sampler = HDRSampler[Int](HDRConfig.default)
     intercept[IllegalArgumentException] {
-      sampler.sample((1 to 10).toSet, -1)
+      sampler.sample((1 to 10).toVector, -1)
     }
   }
 
   test("population of size 2, sample 1 — both elements reachable") {
     // Over many configs, element 'a' and 'b' should both appear
-    val population = Set("a", "b")
+    val population = Vector("a", "b")
     val results    = (0L until 100L).map { eid =>
       HDRSampler[String](HDRConfig(entityId = eid)).sample(population, 1)
     }
@@ -323,18 +323,18 @@ class FisherYatesHDRSpec extends FunSuite:
     // If j ever fell outside bounds, toArray access would throw ArrayIndexOutOfBoundsException.
     // We test many population sizes and sample sizes to stress the index arithmetic.
     for N <- List(1, 2, 3, 5, 10, 50, 100, 1000) do
-      val population = (1 to N).toSet
+      val population = (1 to N).toVector
       for n <- List(0, 1, N / 2, N - 1, N, N + 1).filter(_ >= 0) do
         val config  = HDRConfig(entityId = N.toLong, varId = n.toLong, seed3 = 999)
         val sampler = HDRSampler[Int](config)
         val sample  = sampler.sample(population, n)
-        assert(sample.subsetOf(population), s"N=$N, n=$n: sample not a subset of population")
+        assert(sample.subsetOf(population.toSet), s"N=$N, n=$n: sample not a subset of population")
   }
 
   // ==================== 12. Type polymorphism ====================
 
   test("works with String elements") {
-    val population = Set(
+    val population = Vector(
       "alpha",
       "bravo",
       "charlie",
@@ -350,35 +350,35 @@ class FisherYatesHDRSpec extends FunSuite:
     val sample     = sampler.sample(population, 5)
 
     assertEquals(sample.size, 5)
-    assert(sample.subsetOf(population))
+    assert(sample.subsetOf(population.toSet))
   }
 
   test("works with case class elements") {
     case class Point(x: Int, y: Int)
-    val population = (for x <- 0 to 4; y <- 0 to 4 yield Point(x, y)).toSet // 25 points
+    val population = (for x <- 0 to 4; y <- 0 to 4 yield Point(x, y)).toVector // 25 points
     val sampler    = HDRSampler[Point](HDRConfig(seed3 = 42))
     val sample     = sampler.sample(population, 10)
 
     assertEquals(sample.size, 10)
-    assert(sample.subsetOf(population))
+    assert(sample.subsetOf(population.toSet))
   }
 
   test("works with Long elements") {
-    val population = (1L to 100L).toSet
+    val population = (1L to 100L).toVector
     val sampler    = HDRSampler[Long](HDRConfig(seed3 = 42))
     val sample     = sampler.sample(population, 20)
 
     assertEquals(sample.size, 20)
-    assert(sample.subsetOf(population))
+    assert(sample.subsetOf(population.toSet))
   }
 
   test("works with Double elements") {
-    val population = (1 to 50).map(_ * 0.1).toSet
+    val population = (1 to 50).map(_ * 0.1).toVector
     val sampler    = HDRSampler[Double](HDRConfig(seed3 = 42))
     val sample     = sampler.sample(population, 10)
 
     assertEquals(sample.size, 10)
-    assert(sample.subsetOf(population))
+    assert(sample.subsetOf(population.toSet))
   }
 
   // ==================== 13. sampleWithPredicate ====================
@@ -386,7 +386,7 @@ class FisherYatesHDRSpec extends FunSuite:
   test("sampleWithPredicate counts successes correctly") {
     val config                    = HDRConfig(seed3 = 42)
     val sampler                   = HDRSampler[Int](config)
-    val population                = (1 to 100).toSet
+    val population                = (1 to 100).toVector
     val predicate: Int => Boolean = _ % 2 == 0 // even numbers
 
     val (sample, successes) = sampler.sampleWithPredicate(population, 20, predicate)
@@ -402,7 +402,7 @@ class FisherYatesHDRSpec extends FunSuite:
 
   test("sampleWithPredicate with always-true predicate") {
     val sampler             = HDRSampler[Int](HDRConfig(seed3 = 1))
-    val population          = (1 to 50).toSet
+    val population          = (1 to 50).toVector
     val (sample, successes) = sampler.sampleWithPredicate(population, 20, _ => true)
 
     assertEquals(successes, sample.size)
@@ -410,7 +410,7 @@ class FisherYatesHDRSpec extends FunSuite:
 
   test("sampleWithPredicate with always-false predicate") {
     val sampler             = HDRSampler[Int](HDRConfig(seed3 = 1))
-    val population          = (1 to 50).toSet
+    val population          = (1 to 50).toVector
     val (sample, successes) = sampler.sampleWithPredicate(population, 20, _ => false)
 
     assertEquals(successes, 0)
@@ -420,7 +420,7 @@ class FisherYatesHDRSpec extends FunSuite:
 
   test("multiple resets all produce identical results") {
     val config     = HDRConfig(entityId = 5, varId = 10, seed3 = 100, seed4 = 200)
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val sampler    = HDRSampler[Int](config)
 
     val original = sampler.sample(population, 25)
@@ -435,7 +435,7 @@ class FisherYatesHDRSpec extends FunSuite:
     // Verify that entityId=n and entityId=n+1 don't share an unusually
     // high overlap. Expected overlap for two random 20-of-100 samples is
     // ~4 elements (hypergeometric mean = n²/N). We flag if overlap > 12.
-    val population         = (1 to 100).toSet
+    val population         = (1 to 100).toVector
     val n                  = 20
     val maxExpectedOverlap = 12 // generous: E[overlap] ≈ 4, this is 3× that
 
@@ -450,7 +450,7 @@ class FisherYatesHDRSpec extends FunSuite:
   }
 
   test("sequential seed3 values produce uncorrelated samples") {
-    val population         = (1 to 100).toSet
+    val population         = (1 to 100).toVector
     val n                  = 20
     val maxExpectedOverlap = 12
 
@@ -467,17 +467,17 @@ class FisherYatesHDRSpec extends FunSuite:
   // ==================== 16. Large population stress ====================
 
   test("Fisher-Yates handles large population (100k) without error") {
-    val population = (1 to 100_000).toSet
+    val population = (1 to 100_000).toVector
     val config     = HDRConfig(entityId = 42, seed3 = 7)
     val sampler    = HDRSampler[Int](config)
 
     val sample = sampler.sample(population, 500)
     assertEquals(sample.size, 500)
-    assert(sample.subsetOf(population))
+    assert(sample.subsetOf(population.toSet))
   }
 
   test("sampling 1 from large population is fast and correct") {
-    val population = (1 to 100_000).toSet
+    val population = (1 to 100_000).toVector
     val config     = HDRConfig(seed3 = 42)
     val sampler    = HDRSampler[Int](config)
 
@@ -494,7 +494,7 @@ class FisherYatesHDRSpec extends FunSuite:
   // ==================== 17. forEntityVar factory ====================
 
   test("forEntityVar produces same result as manual HDRConfig") {
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
 
     val viaFactory = HDRSampler
       .forEntityVar[Int](
@@ -513,7 +513,7 @@ class FisherYatesHDRSpec extends FunSuite:
   }
 
   test("forEntityVar defaults seed3/seed4 to 0") {
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
 
     val withDefaults = HDRSampler
       .forEntityVar[Int](entityId = 10, varId = 20)
@@ -527,19 +527,13 @@ class FisherYatesHDRSpec extends FunSuite:
   // ==================== 18. Permutation order not trivial ====================
 
   test("sample is not just the first n elements of the population") {
-    // If Fisher-Yates weren't shuffling, we'd get the iteration order of Set.
-    // Verify we're actually shuffling.
-    val population = (1 to 100).toSet
+    // Without the shuffle, the sample would be the population's first n elements.
+    val population = (1 to 100).toVector
     val config     = HDRConfig(seed3 = 42)
     val sample     = HDRSampler[Int](config).sample(population, 10)
 
-    // The first 10 elements of Set iteration are implementation-dependent,
-    // but if the sample exactly matches them, that's suspicious.
-    val iterationOrder = population.take(10)
-    assert(
-      sample != iterationOrder,
-      "Sample should not be the trivial first-n elements of Set iteration order",
-    )
+    val firstTen = population.take(10).toSet
+    assert(sample != firstTen, "Sample should not be the population's first n elements")
   }
 
   // ==================== 19. Chi-squared goodness of fit ====================
@@ -557,7 +551,7 @@ class FisherYatesHDRSpec extends FunSuite:
 
     for trial <- 0 until numTrials do
       val config = HDRConfig(entityId = trial.toLong)
-      val sample = HDRSampler[Int](config).sample((1 to N).toSet, n)
+      val sample = HDRSampler[Int](config).sample((1 to N).toVector, n)
       sample.foreach(elem => counts(elem - 1) += 1)
 
     // Chi-squared statistic: Σ (observed - expected)² / expected

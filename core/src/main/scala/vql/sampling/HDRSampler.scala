@@ -19,7 +19,7 @@ import com.risquanter.hdr.HDR
  * Benefits over standard PRNG:
  *   - Counter-based: Direct access to any trial without computing prior values
  *   - Multi-dimensional: Independent sequences for different entities/variables
- *   - Reproducible: Same across all platforms and languages
+ *   - Reproducible: Same across all platforms and languages, for a population in the same order
  *   - Parallel-friendly: No shared state
  *   - Tested: Passes 10k exact-match reference values from Excel
  *
@@ -50,21 +50,24 @@ class HDRSampler[A](config: HDRConfig)(using ct: ClassTag[A]) extends Sampler[A]
    *
    * Time complexity: O(min(n, |population|)) Random values consumed: exactly n
    *
+   * The selection is a function of the population's order: the HDR trials fix the positions, and
+   * the population's order fixes the elements at them (ADR-025).
+   *
    * @param population
-   *   Set of elements to sample from
+   *   Elements to sample from, in a fixed order
    * @param n
    *   Number of elements to sample
    * @return
    *   Sampled elements (size = min(n, |population|))
    */
-  def sample(population: Set[A], n: Int): Set[A] =
+  def sample(population: IndexedSeq[A], n: Int): Set[A] =
     require(n >= 0, s"Sample size must be non-negative, got $n")
 
     if n == 0 || population.isEmpty then Set.empty
-    else if n >= population.size then population
+    else if n >= population.size then population.toSet
     else sampleInternal(population, n)
 
-  private def sampleInternal(population: Set[A], n: Int): Set[A] =
+  private def sampleInternal(population: IndexedSeq[A], n: Int): Set[A] =
     val populationSize = population.size
     // Convert to mutable array for in-place Fisher-Yates
     val elements       = population.toArray

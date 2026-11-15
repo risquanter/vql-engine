@@ -6,6 +6,7 @@ import munit.FunSuite
 import vql.error.{QueryError, TypeCheckError}
 import vql.typed.{
   FolModel,
+  OrderedDomain,
   PredicateSig,
   QueryBinder,
   RuntimeDispatcher,
@@ -54,7 +55,7 @@ class SatisfyingSetSpec extends FunSuite:
     override def predicateSymbols: Set[SymbolName]                                           =
       Set(SymbolName("p"), SymbolName("q"), SymbolName("r"))
 
-  private val model = RuntimeModel(domains = Map(item -> Set(a, b, c, d)), dispatcher = dispatcher)
+  private val model = RuntimeModel(domains = Map(item -> OrderedDomain.of(List("a", "b", "c", "d"))), dispatcher = dispatcher)
 
   private val folModel =
     FolModel(catalog, model).fold(e => fail(s"FolModel construction failed: $e"), identity)

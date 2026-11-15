@@ -1,6 +1,5 @@
 package vql.sampling
 
-import scala.collection.immutable.Set
 import scala.reflect.ClassTag
 
 /**
@@ -15,22 +14,23 @@ import scala.reflect.ClassTag
  */
 trait Sampler[A]:
   /**
-   * Sample n elements from the given population.
+   * Sample n elements from the given population. The population's order fixes which elements are
+   * selected, so the same population in the same order always gives the same sample (ADR-025).
    *
    * @param population
-   *   Set of elements to sample from
+   *   Elements to sample from, in a fixed order
    * @param n
    *   Number of elements to sample
    * @return
    *   Sampled elements (size may be less than n if population is small)
    */
-  def sample(population: Set[A], n: Int): Set[A]
+  def sample(population: IndexedSeq[A], n: Int): Set[A]
 
   /**
    * Sample elements and apply a predicate, counting successes.
    *
    * @param population
-   *   Set of elements to sample from
+   *   Elements to sample from, in a fixed order
    * @param n
    *   Number of elements to sample
    * @param predicate
@@ -39,7 +39,7 @@ trait Sampler[A]:
    *   (sampled elements, number of successes)
    */
   def sampleWithPredicate(
-    population: Set[A],
+    population: IndexedSeq[A],
     n: Int,
     predicate: A => Boolean,
   ): (Set[A], Int) =
@@ -69,7 +69,7 @@ object Sampler:
    * Convenience method that combines SampleSizeCalculator and HDRSampler.
    *
    * @param population
-   *   Population to sample from
+   *   Population to sample from, in a fixed order
    * @param params
    *   Statistical precision parameters (ε, α)
    * @param config
@@ -78,7 +78,7 @@ object Sampler:
    *   (sample, sample size)
    */
   def autoSample[A : ClassTag](
-    population: Set[A],
+    population: IndexedSeq[A],
     params: SamplingParams = SamplingParams(),
     config: HDRConfig = HDRConfig.default,
   ): (Set[A], Int) =

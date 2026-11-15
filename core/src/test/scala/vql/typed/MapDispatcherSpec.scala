@@ -214,7 +214,7 @@ class MapDispatcherSpec extends FunSuite:
       predicates = Map(symLeaf -> (_ => Right(true)), symGtProb -> (_ => Right(true))),
       functions = Map(symLec -> (_ => Right(0.0))),
     )
-    val model   = RuntimeModel(domains = Map(tAsset -> Set(Value(tAsset, "A"))), dispatcher = d)
+    val model   = RuntimeModel(domains = Map(tAsset -> OrderedDomain.of(List("A"))), dispatcher = d)
     assert(model.validateAgainst(catalog).isRight)
 
   test(
@@ -228,7 +228,7 @@ class MapDispatcherSpec extends FunSuite:
     )
     // gt_loss missing from dispatcher
     val d       = MapDispatcher(predicates = Map(symLeaf -> (_ => Right(true))))
-    val model   = RuntimeModel(domains = Map(tAsset -> Set(Value(tAsset, "A"))), dispatcher = d)
+    val model   = RuntimeModel(domains = Map(tAsset -> OrderedDomain.of(List("A"))), dispatcher = d)
     val result  = model.validateAgainst(catalog)
     assert(result.isLeft)
     val errors  = result.left.toOption.get
@@ -247,7 +247,7 @@ class MapDispatcherSpec extends FunSuite:
     )
     // lec present in catalog but functions map is empty
     val d       = MapDispatcher(predicates = Map(symLeaf -> (_ => Right(true))))
-    val model   = RuntimeModel(domains = Map(tAsset -> Set(Value(tAsset, "A"))), dispatcher = d)
+    val model   = RuntimeModel(domains = Map(tAsset -> OrderedDomain.of(List("A"))), dispatcher = d)
     val result  = model.validateAgainst(catalog)
     assert(result.isLeft)
     val errors  = result.left.toOption.get
@@ -360,7 +360,7 @@ class MapDispatcherSpec extends FunSuite:
   )
 
   private val model = RuntimeModel(
-    domains = Map(tAsset -> Set(domainA, domainB)),
+    domains = Map(tAsset -> OrderedDomain.of(List("A", "B"))),
     dispatcher = dispatcher,
   )
 
@@ -418,7 +418,7 @@ class MapDispatcherSpec extends FunSuite:
       ),
     )
     val failingModel      = RuntimeModel(
-      domains = Map(tAsset -> Set(domainA, domainB)),
+      domains = Map(tAsset -> OrderedDomain.of(List("A", "B"))),
       dispatcher = failingDispatcher,
     )
     val fm                =
@@ -447,7 +447,7 @@ class MapDispatcherSpec extends FunSuite:
         symP95 -> (_ => Right(5000000L)),
       ),
     )
-    val fm     = FolModel(catalog, RuntimeModel(domains = Map(tAsset -> Set(domainA, domainB)), dispatcher = failingDispatcher))
+    val fm     = FolModel(catalog, RuntimeModel(domains = Map(tAsset -> OrderedDomain.of(List("A", "B"))), dispatcher = failingDispatcher))
       .fold(e => fail(s"FolModel construction failed: $e"), identity)
     VagueSemantics.evaluateTyped(query = lecQuery, folModel = fm, samplingParams = SamplingParams.exact) match
       case Left(e: QueryError.EvaluationError) =>
@@ -465,7 +465,7 @@ class MapDispatcherSpec extends FunSuite:
       ),
     )
     val incompleteModel      = RuntimeModel(
-      domains = Map(tAsset -> Set(domainA, domainB)),
+      domains = Map(tAsset -> OrderedDomain.of(List("A", "B"))),
       dispatcher = incompleteDispatcher,
     )
     val result               = FolModel(catalog, incompleteModel)
@@ -503,7 +503,7 @@ class MapDispatcherSpec extends FunSuite:
       ),
     )
     val badModel      = RuntimeModel(
-      domains = Map(tAsset -> Set(domainA, domainB)),
+      domains = Map(tAsset -> OrderedDomain.of(List("A", "B"))),
       dispatcher = badDispatcher,
     )
     // On the JVM this is ClassCastException.

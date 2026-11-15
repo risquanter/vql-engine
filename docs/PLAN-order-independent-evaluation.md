@@ -1,8 +1,7 @@
 # Implementation Plan: Order-Independent Evaluation
 
-**Status:** DRAFT, written 2026-11-15. One decision is open, `OIE-D-1` (§2).
-The signatures in §5 are written for the recommended option. The plan confers
-no coverage until `OIE-D-1` is ruled and the plan is approved.
+**Status:** APPROVED (user, 2026-11-15). `OIE-D-1` is ruled B, and no
+decision is open (§2).
 **Version this was read at:** 0.20.0.
 **Target version:** 0.21.0. Under early-semver a pre-1.0 breaking change bumps
 the minor version. This plan changes the type of `RuntimeModel.domains` and the
@@ -106,6 +105,8 @@ when `hashCode` is computed from the element's content.
 ## 2. Decisions for the user
 
 ### OIE-D-1: where the consumer declares a domain's order
+
+**Ruled B** (user, 2026-11-15).
 
 **Why it matters now.** The order has to come from the consumer, because
 `Value.raw` is `Any` and only the consumer knows the carrier type (§4.2). Where
@@ -678,7 +679,17 @@ starts. The plan ships whole, as one release.
    Each test keeps its assertions. Only the domain's construction changes.
 5. The sampling tests pass a `Vector` where they pass a `Set` today, and keep
    their assertions: `FisherYatesHDRSpec`, `HDRSamplerSpec`, `SamplingSpec`
-   and `VagueQuantifierSpec`.
+   and `VagueQuantifierSpec`. One exception was ruled by the user on
+   2026-11-15. `SamplingSpec`'s "end-to-end sampling pipeline" asserted that a
+   single seed's estimate lies in 0.4 to 0.6. Under the sorted population
+   that seed gives 0.395, a draw in the 5.2% tail the hypergeometric
+   distribution assigns to that range. The test is replaced by two:
+   - a chi-squared goodness-of-fit test of the satisfying count over 1 000
+     entity IDs against the exact hypergeometric distribution, at α = 0.001,
+     with outcomes grouped to an expected count of at least 5 and the
+     critical value from the Wilson–Hilferty approximation;
+   - a pinned test: `seed3 = 123` over the sorted numbers 1 to 500 samples 81
+     and finds 32 satisfying, and the interval contains 0.5.
 6. `core/src/test/scala/vql/typed/OrderedDomainSpec.scala`, new, with these
    tests:
    - `of(List("b", "a", "c", "a")).carriers` is `Vector("a", "b", "c")`.

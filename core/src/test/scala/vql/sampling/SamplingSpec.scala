@@ -174,7 +174,7 @@ class SamplingSpec extends FunSuite:
     val config  = HDRConfig(seed3 = 42)
     val sampler = HDRSampler[Int](config)
 
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val sample1    = sampler.sample(population, 10)
 
     // Reset and sample again
@@ -188,28 +188,28 @@ class SamplingSpec extends FunSuite:
     val config  = HDRConfig(seed3 = 42)
     val sampler = HDRSampler[Int](config)
 
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val sample     = sampler.sample(population, 10)
 
     assertEquals(sample.size, 10, "Should sample exactly 10 elements")
-    assert(sample.subsetOf(population), "Sample should be subset of population")
+    assert(sample.subsetOf(population.toSet), "Sample should be subset of population")
   }
 
   test("sampling more than population returns entire population") {
     val config  = HDRConfig(seed3 = 42)
     val sampler = HDRSampler[Int](config)
 
-    val population = (1 to 10).toSet
+    val population = (1 to 10).toVector
     val sample     = sampler.sample(population, 100)
 
-    assertEquals(sample, population, "Should return entire population")
+    assertEquals(sample, population.toSet, "Should return entire population")
   }
 
   test("sampling empty population") {
     val config  = HDRConfig(seed3 = 42)
     val sampler = HDRSampler[String](config)
 
-    val sample = sampler.sample(Set.empty, 10)
+    val sample = sampler.sample(Vector.empty, 10)
     assert(sample.isEmpty, "Sample of empty population should be empty")
   }
 
@@ -217,7 +217,7 @@ class SamplingSpec extends FunSuite:
     val config  = HDRConfig(seed3 = 42)
     val sampler = HDRSampler[Int](config)
 
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val sample     = sampler.sample(population, 0)
 
     assert(sample.isEmpty, "Sample of size 0 should be empty")
@@ -227,7 +227,7 @@ class SamplingSpec extends FunSuite:
     val config  = HDRConfig(seed3 = 42)
     val sampler = HDRSampler[Int](config)
 
-    val population          = (1 to 100).toSet
+    val population          = (1 to 100).toVector
     val (sample, successes) = sampler.sampleWithPredicate(
       population,
       20,
@@ -241,7 +241,7 @@ class SamplingSpec extends FunSuite:
 
   test("auto sample calculates size automatically") {
     val params     = SamplingParams.default
-    val population = (1 to 1000).toSet
+    val population = (1 to 1000).toVector
 
     val (sample, sampleSize) = Sampler.autoSample(population, params)
 
@@ -265,13 +265,14 @@ class SamplingSpec extends FunSuite:
 
   test("estimate proportion with sampling") {
     val params     = SamplingParams.default
-    val population = (1 to 1000).toSet
+    val population = (1 to 1000).toVector
     val predicate  = (x: Int) => x <= 500 // 50% of elements
 
     val estimate = ProportionEstimator.estimateWithSampling(
       population,
       predicate,
       params,
+      sampler = None,
     )
 
     // Should be close to 0.5
@@ -300,9 +301,10 @@ class SamplingSpec extends FunSuite:
   test("estimate empty population") {
     val params   = SamplingParams.default
     val estimate = ProportionEstimator.estimateWithSampling(
-      Set.empty[Int],
+      Vector.empty[Int],
       x => true,
       params,
+      sampler = None,
     )
 
     assertEquals(estimate.sampleSize, 0)
@@ -311,13 +313,14 @@ class SamplingSpec extends FunSuite:
 
   test("proportion estimate meets error bound") {
     val params     = SamplingParams(epsilon = 0.1, alpha = 0.05)
-    val population = (1 to 1000).toSet
+    val population = (1 to 1000).toVector
     val predicate  = (x: Int) => x <= 500
 
     val estimate = ProportionEstimator.estimateWithSampling(
       population,
       predicate,
       params,
+      sampler = None,
     )
 
     // MOE might be slightly above epsilon due to sampling variance
@@ -352,7 +355,7 @@ class SamplingSpec extends FunSuite:
 
   test("adaptive estimate refines if needed") {
     val params     = SamplingParams(epsilon = 0.05, alpha = 0.05)
-    val population = (1 to 1000).toSet
+    val population = (1 to 1000).toVector
     val predicate  = (x: Int) => x <= 500
 
     val estimate = ProportionEstimator.adaptiveEstimate(
@@ -368,7 +371,7 @@ class SamplingSpec extends FunSuite:
 
   test("batch estimate uses single sample") {
     val params     = SamplingParams.default
-    val population = (1 to 1000).toSet
+    val population = (1 to 1000).toVector
 
     val predicates = Map(
       "even"             -> ((x: Int) => x % 2 == 0),
@@ -435,32 +438,90 @@ class SamplingSpec extends FunSuite:
 
   // ==================== Integration Tests ====================
 
-  test("end-to-end sampling pipeline") {
-    val params     = SamplingParams.default
-    val config     = HDRConfig(seed3 = 123)
-    val population = (1 to 500).toSet
-    val predicate  = (x: Int) => x <= 250 // True proportion: 0.5
+  /** Natural logs of 0!, 1!, …, n!. */
+  private def logFactorials(n: Int): Vector[Double] =
+    (1 to n).scanLeft(0.0)((acc, k) => acc + math.log(k.toDouble)).toVector
 
-    // Calculate sample size
-    val sampleSize = SampleSizeCalculator.calculateSampleSize(
-      population.size,
-      params,
-    )
+  /**
+   * P(X = x) for x in 0..n, where X counts the satisfying elements among `n` drawn without
+   * replacement from `population` elements, `satisfying` of which satisfy: the hypergeometric
+   * distribution, which an unbiased sampler produces.
+   */
+  private def hypergeometric(population: Int, satisfying: Int, n: Int): Vector[Double] =
+    val lf                                = logFactorials(population)
+    def logChoose(a: Int, b: Int): Double = lf(a) - lf(b) - lf(a - b)
+    (0 to n).toVector.map { x =>
+      if x > satisfying || n - x > population - satisfying then 0.0
+      else
+        math.exp(
+          logChoose(satisfying, x) + logChoose(population - satisfying, n - x) - logChoose(population, n)
+        )
+    }
 
-    // Sample using HDR
-    val sampler = HDRSampler[Int](config)
-    val sample  = sampler.sample(population, sampleSize)
+  /**
+   * Consecutive outcomes grouped so that each group's expected count is at least `minimum`, the
+   * condition under which the chi-squared approximation holds. A remainder below `minimum` joins
+   * the last group.
+   */
+  private def bins(expected: Vector[Double], minimum: Double): Vector[Vector[Int]] =
+    val (closed, open) =
+      expected.indices.foldLeft((Vector.empty[Vector[Int]], Vector.empty[Int])) {
+        case ((done, current), x) =>
+          val grown = current :+ x
+          if grown.map(expected).sum >= minimum then (done :+ grown, Vector.empty)
+          else (done, grown)
+      }
+    if open.isEmpty then closed else closed.init :+ (closed.last ++ open)
 
-    // Estimate
-    val estimate = ProportionEstimator.estimate(sample, predicate, params)
+  /**
+   * The chi-squared quantile at `1 - alpha` for `df` degrees of freedom, by the Wilson–Hilferty
+   * approximation: (X/df)^(1/3) is close to normal with mean 1 - 2/(9df) and variance 2/(9df).
+   */
+  private def chiSquaredCritical(df: Int, alpha: Double): Double =
+    val z = NormalApprox.inverseCDF(1.0 - alpha)
+    val v = 2.0 / (9.0 * df)
+    df * math.pow(1.0 - v + z * math.sqrt(v), 3)
 
-    // Verify
+  test("end-to-end sampling: the satisfying count follows the hypergeometric distribution") {
+    val populationSize  = 500
+    val satisfying      = 250
+    val seeds           = 1000
+    val alpha           = 0.001 // the probability that an unbiased sampler fails this test
+    val minimumExpected = 5.0
+    val params          = SamplingParams.default
+    val population      = (1 to populationSize).toVector
+    val predicate       = (x: Int) => x <= satisfying
+    val n               = SampleSizeCalculator.calculateSampleSize(population.size, params)
+
+    val observed = (0 until seeds)
+      .map(seed => HDRSampler[Int](HDRConfig(entityId = seed.toLong, seed3 = 123)).sample(population, n).count(predicate))
+      .groupMapReduce(identity)(_ => 1)(_ + _)
+    val expected = hypergeometric(populationSize, satisfying, n).map(_ * seeds)
+    val groups   = bins(expected, minimumExpected)
+    val chiSq    = groups.map { group =>
+      val e = group.map(expected).sum
+      val o = group.map(observed.getOrElse(_, 0)).sum.toDouble
+      (o - e) * (o - e) / e
+    }.sum
+    val critical = chiSquaredCritical(groups.size - 1, alpha)
+
     assert(
-      estimate.proportion >= 0.4 && estimate.proportion <= 0.6,
-      s"Estimate ${estimate.proportion} not close to true 0.5",
+      chiSq < critical,
+      s"Chi-squared = $chiSq exceeds the critical value $critical (df=${groups.size - 1}, α=$alpha)",
     )
+  }
+
+  test("end-to-end sampling: a fixed seed over a fixed population gives a fixed estimate") {
+    val params     = SamplingParams.default
+    val population = (1 to 500).toVector
+    val predicate  = (x: Int) => x <= 250
+    val sampleSize = SampleSizeCalculator.calculateSampleSize(population.size, params)
+    val sample     = HDRSampler[Int](HDRConfig(seed3 = 123)).sample(population, sampleSize)
+    val estimate   = ProportionEstimator.estimate(sample, predicate, params)
+
+    assertEquals(estimate.sampleSize, 81)
+    assertEquals(estimate.successes, 32)
     assert(estimate.contains(0.5), "CI should contain true proportion")
-    assertEquals(estimate.sampleSize, sampleSize)
   }
 
 end SamplingSpec

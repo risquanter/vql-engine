@@ -179,8 +179,8 @@ boundary. See [ADR-017](ADR-017.md) §6.
 | Build model | `vql.typed.FolModel` | `apply(catalog, runtimeModel): Either[QueryError, FolModel]` |
 | Type-check query | `vql.typed.QueryBinder` | `bind(query, catalog): Either[…, BoundQuery]` |
 | Extract D_R | `vql.typed.TypedSemantics` | `collectRangeElements(query, model, env)` |
-| Evaluate scope | `vql.typed.TypedSemantics` | `evalFormula(scope, env, model)` |
-| Sample S ⊆ D_R | `vql.sampling.HDRSampler` | `sample(population, n): Set[A]` |
+| Evaluate scope | `vql.typed.TypedSemantics` | `holds(scope, env, model)` |
+| Sample S ⊆ D_R | `vql.sampling.HDRSampler` | `sample(population: IndexedSeq[A], n): Set[A]` |
 | Calculate Prop_D | `vql.sampling.ProportionEstimator` | `estimateWithSampling(…)` |
 | Check quantifier | `vql.result.VagueQueryResult` | `fromEstimate(vq, estimate, N)` |
 | Full pipeline | `vql.semantics.VagueSemantics` | `evaluateTyped(q, folModel, …)` |

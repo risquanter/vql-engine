@@ -19,9 +19,44 @@ trait RuntimeDispatcher:
   def functionSymbols: Set[SymbolName]
   def predicateSymbols: Set[SymbolName]
 
+/**
+ * The elements of one domain sort, sorted by the ordering the consumer gives for the sort's
+ * carrier. Evaluation walks the elements in this order, and sampling selects by position in it, so
+ * a result depends on the elements and not on how the collection holding them iterates (ADR-025).
+ */
+final case class OrderedDomain private (carriers: Vector[Any])
+
+object OrderedDomain:
+
+  /**
+   * The distinct `carriers`, sorted by `ordering`. Requires that `ordering` ranks no two distinct
+   * carriers equal, because such a pair would keep its input order.
+   *
+   * {{{
+   * OrderedDomain.of(List("b", "a", "c", "a")).carriers == Vector("a", "b", "c")
+   * }}}
+   */
+  def of[A](carriers: Iterable[A])(using ordering: Ordering[A]): OrderedDomain =
+    val sorted = carriers.toVector.distinct.sorted
+    require(
+      sorted.lazyZip(sorted.drop(1)).forall((a, b) => ordering.compare(a, b) < 0),
+      "OrderedDomain.of: the ordering ranks two distinct carriers equal",
+    )
+    new OrderedDomain(sorted)
+
+end OrderedDomain
+
+/**
+ * The runtime data a catalog is evaluated against: one [[OrderedDomain]] per domain sort, and the
+ * dispatcher that computes each function and predicate.
+ */
 case class RuntimeModel(
-  domains: Map[TypeId, Set[Value]],
+  domains: Map[TypeId, OrderedDomain],
   dispatcher: RuntimeDispatcher):
+
+  /** Each domain's elements as `Value`s of its sort, in the domain's order. */
+  private[typed] val elements: Map[TypeId, Vector[Value]] =
+    domains.map((sort, domain) => sort -> domain.carriers.map(Value(sort, _)))
 
   def validateAgainst(catalog: TypeCatalog): Either[List[RuntimeModelError], RuntimeModel] =
     val missingFns     = catalog.functions.keySet

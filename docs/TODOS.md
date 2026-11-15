@@ -262,14 +262,10 @@ TimeoutError, ConfigError`.
 
 ## T-009 — Evaluator short-circuit and dispatcher-error masking under non-total models (investigation)
 
-**Status:** RULED (user, 2026-11-15), not implemented. A dispatcher error is an
-unknown truth value under Kleene's strong three-valued logic. `false ∧ unknown`
-is `false`, `true ∨ unknown` is `true`, and `∃` is true if any binding is true,
-else an error if any binding errored, else false. A formula fails only when the
-error could change its result, so the outcome no longer depends on operand
-order or on the domain's iteration order. A total model sees no change in result
-or cost. Implementing it amends ADR-017 §7 and is a MINOR release. Surfaced by
-the Phase 3 complex review (2026-08-10,
+**Status:** RESOLVED by `PLAN-order-independent-evaluation` (ADR-025). A
+dispatcher refusal is an unknown truth value under Kleene's strong
+three-valued logic, so a formula fails only when the refusal could change its
+result. Surfaced by the Phase 3 complex review (2026-08-10,
 `DONE_PLAN-range-formula-and-satisfying-set.md`).
 
 **Observation:** `TypedSemantics.evalFormula` short-circuits `And`/`Or`/`Imp`
@@ -304,9 +300,9 @@ to change it.
 
 ## T-010 — HDR sample subset determinism depends on `Set` iteration order (investigation, low priority)
 
-**Status:** PENDING — investigation, LOW priority. Sampling is not exercised in
-practice today (register evaluates with `SamplingParams.exact`), but the gap
-should be known and fixed. Surfaced by the Phase 3 complex review (2026-08-10).
+**Status:** RESOLVED by `PLAN-order-independent-evaluation` (ADR-025). Each
+domain holds its elements in an order the consumer declares through
+`OrderedDomain.of`, and the sampler selects by position in that order.
 
 **Observation:** `HDRSampler.sample` builds `population.toArray` and runs a
 partial Fisher-Yates shuffle with the deterministic HDR PRNG. The PRNG is

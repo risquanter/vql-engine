@@ -6,7 +6,7 @@ import vql.fragment.{Fragment, FragmentCheck}
 import vql.parser.VagueQueryParser
 import vql.sampling.SamplingParams
 import vql.semantics.VagueSemantics
-import vql.typed.{FolModel, FunctionSig, PredicateSig, RuntimeDispatcher, RuntimeModel, SymbolName, TypeCatalog, TypeId, Value}
+import vql.typed.{FolModel, FunctionSig, OrderedDomain, PredicateSig, RuntimeDispatcher, RuntimeModel, SymbolName, TypeCatalog, TypeId, Value}
 import vql.typed.TypeDecl.DomainType
 
 /** Runs a query at both nesting limits through the whole pipeline on a thread whose stack is 1 MiB. */
@@ -35,7 +35,7 @@ class NestingBoundStackSpec extends FunSuite:
           case (other, _)     => Left(s"No predicate implementation for '$other'")
       override def functionSymbols: Set[SymbolName]  = Set(SymbolName("f"))
       override def predicateSymbols: Set[SymbolName] = Set(SymbolName("p"))
-    FolModel(catalog, RuntimeModel(domains = Map(asset -> Set(Value(asset, "a1"))), dispatcher = dispatcher))
+    FolModel(catalog, RuntimeModel(domains = Map(asset -> OrderedDomain.of(List("a1"))), dispatcher = dispatcher))
       .fold(e => fail(s"FolModel construction failed: $e"), identity)
 
   end model

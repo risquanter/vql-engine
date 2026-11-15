@@ -3,6 +3,38 @@
 This project follows early-semver (pre-1.0): breaking changes bump the minor
 version.
 
+## 0.21.0
+
+### Changed (breaking)
+
+- **`RuntimeModel.domains` holds an `OrderedDomain` per sort.** A domain is
+  built with `OrderedDomain.of(carriers)(using Ordering[A])`, which sorts the
+  carriers once. An ordering that ranks two distinct carriers equal is refused
+  with `IllegalArgumentException`. See ADR-025.
+- **Every sampling entry takes its population as `IndexedSeq[A]`:**
+  `Sampler.sample`, `sampleWithPredicate`, `Sampler.autoSample`,
+  `ProportionEstimator.estimateWithSampling`, `adaptiveEstimate` and
+  `batchEstimate`. The population's order fixes which elements are sampled.
+- **`ProportionEstimator.estimateWithSampling`'s `sampler` has no default.** A
+  caller with no sampler passes `None`.
+- **A dispatcher refusal fails a formula only when it could change the
+  result.** Evaluation treats a refused predicate or function as an unknown
+  truth value under Kleene's strong three-valued logic. A query that failed
+  on a refusal no other operand could outweigh still fails. A query whose
+  result the refusal cannot change now returns that result. See ADR-025.
+
+### Added
+
+- `vql.typed.OrderedDomain`.
+
+### Fixed
+
+- A result no longer depends on operand order: `p ∧ q` and `q ∧ p` give the
+  same outcome.
+- A result and a sample no longer depend on a `Set`'s iteration order, so a
+  carrier whose `hashCode` comes from object identity gives the same result
+  on every run.
+
 ## 0.20.0
 
 ### Changed (breaking)

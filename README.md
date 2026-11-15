@@ -20,7 +20,7 @@ Parse a query in the paper's syntax and evaluate it through the typed, many-sort
 import vql.parser.VagueQueryParser
 import vql.semantics.VagueSemantics
 import vql.sampling.SamplingParams
-import vql.typed.{FolModel, RuntimeModel, RuntimeDispatcher, TypeCatalog, PredicateSig, TypeId, SymbolName, Value}
+import vql.typed.{FolModel, OrderedDomain, RuntimeModel, RuntimeDispatcher, TypeCatalog, PredicateSig, TypeId, SymbolName, Value}
 import vql.typed.TypeDecl.DomainType
 
 // 1. Declare the sort and predicate signatures.
@@ -33,8 +33,8 @@ val catalog = TypeCatalog.unsafe(
   )
 )
 
-// 2. Provide the runtime data: the domain of each sort plus a dispatcher.
-val values = Set(Value(asset, "a1"), Value(asset, "a2"), Value(asset, "a3"), Value(asset, "a4"))
+// 2. Provide the runtime data: the domain of each sort, sorted by an Ordering of its carrier, plus a dispatcher.
+val values = OrderedDomain.of(List("a1", "a2", "a3", "a4"))
 val dispatcher = new RuntimeDispatcher:
   def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
     name.value match

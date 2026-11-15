@@ -31,9 +31,9 @@ case class ProportionEstimate(
     s"Successes must be in [0, sampleSize], got $successes (sampleSize=$sampleSize)",
   )
 
-  // Allow small floating point tolerance for CI bounds
   require(
-    confidenceInterval._1 - 0.0001 <= proportion && proportion <= confidenceInterval._2 + 0.0001,
+    confidenceInterval._1 - ProportionEstimate.IntervalTolerance <= proportion &&
+      proportion <= confidenceInterval._2 + ProportionEstimate.IntervalTolerance,
     s"Proportion $proportion not in confidence interval $confidenceInterval",
   )
 
@@ -87,6 +87,9 @@ end ProportionEstimate
 
 object ProportionEstimate:
 
+  /** How far a proportion may fall outside its interval through floating-point rounding. */
+  private val IntervalTolerance: Double = 0.0001
+
   /** Empty estimate for zero-element populations/samples. */
   def empty(params: SamplingParams = SamplingParams()): ProportionEstimate =
     ProportionEstimate(
@@ -105,6 +108,17 @@ object ProportionEstimate:
  * sample statistics.
  */
 object ProportionEstimator:
+
+  /** The significance levels `significantDifference` has a critical value for. */
+  private val Alpha95: Double = 0.05
+  private val Alpha99: Double = 0.01
+
+  /** How close `alpha` must be to a known level to use that level's critical value. */
+  private val AlphaTolerance: Double = 0.0001
+
+  /** Two-tailed critical values of the standard normal at `Alpha95` and `Alpha99`. */
+  private val ZCritical95: Double = 1.96
+  private val ZCritical99: Double = 2.576
 
   /**
    * Estimate proportion from a sample.
@@ -157,7 +171,7 @@ object ProportionEstimator:
    * Automatically calculates required sample size and performs sampling.
    *
    * @param population
-   *   Full population
+   *   Full population, in a fixed order; the order fixes which elements are sampled (ADR-025)
    * @param predicate
    *   Condition to test
    * @param params
@@ -165,16 +179,16 @@ object ProportionEstimator:
    * @param config
    *   HDR PRNG configuration (4-layer seed hierarchy)
    * @param sampler
-   *   Override sampling strategy (default: HDR)
+   *   Sampling strategy; `None` samples with an [[HDRSampler]] built from `config`
    * @return
    *   Proportion estimate with confidence interval
    */
   def estimateWithSampling[A](
-    population: Set[A],
+    population: IndexedSeq[A],
     predicate: A => Boolean,
     params: SamplingParams = SamplingParams(),
     config: HDRConfig = HDRConfig.default,
-    sampler: Option[Sampler[A]] = None,
+    sampler: Option[Sampler[A]],
   )(using ClassTag[A]
   ): ProportionEstimate =
 
@@ -234,7 +248,7 @@ object ProportionEstimator:
    * or population exhausted.
    *
    * @param population
-   *   Full population
+   *   Full population, in a fixed order; the order fixes which elements are sampled (ADR-025)
    * @param predicate
    *   Condition to test
    * @param params
@@ -245,7 +259,7 @@ object ProportionEstimator:
    *   Proportion estimate with confidence interval
    */
   def adaptiveEstimate[A](
-    population: Set[A],
+    population: IndexedSeq[A],
     predicate: A => Boolean,
     params: SamplingParams = SamplingParams(),
     config: HDRConfig = HDRConfig.default,
@@ -291,7 +305,7 @@ object ProportionEstimator:
   def significantDifference(
     estimate1: ProportionEstimate,
     estimate2: ProportionEstimate,
-    alpha: Double = 0.05,
+    alpha: Double = Alpha95,
   ): Boolean =
     // Two-proportion z-test
     val p1 = estimate1.proportion
@@ -313,9 +327,9 @@ object ProportionEstimator:
         val z = math.abs(p1 - p2) / se
 
         // Critical value for two-tailed test
-        val zCritical = if math.abs(alpha - 0.05) < 0.0001 then 1.96
-        else if math.abs(alpha - 0.01) < 0.0001 then 2.576
-        else 1.96 // Default to 95% confidence
+        val zCritical = if math.abs(alpha - Alpha95) < AlphaTolerance then ZCritical95
+        else if math.abs(alpha - Alpha99) < AlphaTolerance then ZCritical99
+        else ZCritical95 // an unrecognised level uses the 95% value
 
         z > zCritical
     end if
@@ -328,7 +342,7 @@ object ProportionEstimator:
    * Efficiently estimate proportions for multiple predicates using same sample.
    *
    * @param population
-   *   Full population
+   *   Full population, in a fixed order; the order fixes which elements are sampled (ADR-025)
    * @param predicates
    *   Multiple conditions to test
    * @param params
@@ -337,7 +351,7 @@ object ProportionEstimator:
    *   Map of predicate names to proportion estimates
    */
   def batchEstimate[A](
-    population: Set[A],
+    population: IndexedSeq[A],
     predicates: Map[String, A => Boolean],
     params: SamplingParams = SamplingParams(),
     config: HDRConfig = HDRConfig.default,

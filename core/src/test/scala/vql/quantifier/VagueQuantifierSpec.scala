@@ -20,7 +20,7 @@ class VagueQuantifierSpec extends FunSuite:
    */
   def evaluateOn[A : reflect.ClassTag](
     q: VagueQuantifier,
-    population: Set[A],
+    population: IndexedSeq[A],
     predicate: A => Boolean,
     params: SamplingParams = SamplingParams.exact,
     config: HDRConfig = HDRConfig.default,
@@ -30,6 +30,7 @@ class VagueQuantifierSpec extends FunSuite:
       predicate,
       params,
       config,
+      sampler = None,
     )
     VagueQueryResult.fromEstimate(q, estimate, population.size)
 
@@ -142,7 +143,7 @@ class VagueQuantifierSpec extends FunSuite:
   // Evaluation tests
 
   test("evaluate with sampling on population") {
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val predicate  = (x: Int) => x <= 50 // Exactly 50%
     val params     = SamplingParams()
     val config     = HDRConfig(seed3 = 42)
@@ -158,7 +159,7 @@ class VagueQuantifierSpec extends FunSuite:
   }
 
   test("evaluate exact on population") {
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val predicate  = (x: Int) => x <= 50 // Exactly 50%
 
     val q      = Approximately(0.5, 0.01)
@@ -169,7 +170,7 @@ class VagueQuantifierSpec extends FunSuite:
   }
 
   test("evaluate most on majority") {
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val predicate  = (x: Int) => x <= 80 // 80% satisfy
 
     val result = evaluateOn(VagueQuantifier.most, population, predicate)
@@ -179,7 +180,7 @@ class VagueQuantifierSpec extends FunSuite:
   }
 
   test("evaluate few on minority") {
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val predicate  = (x: Int) => x <= 20 // 20% satisfy
 
     val result = evaluateOn(VagueQuantifier.few, population, predicate)
@@ -189,7 +190,7 @@ class VagueQuantifierSpec extends FunSuite:
   }
 
   test("evaluate on empty population") {
-    val population = Set.empty[Int]
+    val population = Vector.empty[Int]
     val predicate  = (x: Int) => true
 
     val result = evaluateOn(VagueQuantifier.some, population, predicate)
@@ -201,7 +202,7 @@ class VagueQuantifierSpec extends FunSuite:
   // Statistical significance tests
 
   test("result significance for approximately with tight CI") {
-    val population = (1 to 1000).toSet
+    val population = (1 to 1000).toVector
     val predicate  = (x: Int) => x <= 500 // Exactly 50%
     val params     = SamplingParams(epsilon = 0.01, alpha = 0.05)
     val config     = HDRConfig(seed3 = 42)
@@ -215,7 +216,7 @@ class VagueQuantifierSpec extends FunSuite:
   }
 
   test("result significance for at-least with clear margin") {
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val predicate  = (x: Int) => x <= 90 // 90% satisfy
 
     val q      = AtLeast(0.7)
@@ -226,7 +227,7 @@ class VagueQuantifierSpec extends FunSuite:
   }
 
   test("result significance for at-most with clear margin") {
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val predicate  = (x: Int) => x <= 10 // 10% satisfy
 
     val q      = AtMost(0.3)
@@ -237,7 +238,7 @@ class VagueQuantifierSpec extends FunSuite:
   }
 
   test("result summary formatting") {
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val predicate  = (x: Int) => x <= 75
 
     val result  = evaluateOn(VagueQuantifier.most, population, predicate)
@@ -294,7 +295,7 @@ class VagueQuantifierSpec extends FunSuite:
   // Integration tests
 
   test("chain multiple quantifier evaluations") {
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
 
     val predicates = Map(
       "low"  -> ((x: Int) => x <= 20), // 20%

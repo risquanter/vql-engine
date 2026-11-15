@@ -1,6 +1,7 @@
 package vql.sampling
 
 import munit.FunSuite
+import vql.typed.OrderedDomain
 
 /**
  * Test suite for HDR Sampler
@@ -14,7 +15,7 @@ class HDRSamplerSpec extends FunSuite:
     val config  = HDRConfig(seed3 = 42)
     val sampler = HDRSampler[Int](config)
 
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val sample1    = sampler.sample(population, 10)
 
     // Reset and sample again with same config
@@ -31,7 +32,7 @@ class HDRSamplerSpec extends FunSuite:
     val sampler1 = HDRSampler[Int](config1)
     val sampler2 = HDRSampler[Int](config2)
 
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val sample1    = sampler1.sample(population, 10)
     val sample2    = sampler2.sample(population, 10)
 
@@ -45,7 +46,7 @@ class HDRSamplerSpec extends FunSuite:
     val sampler1 = HDRSampler[Int](config1)
     val sampler2 = HDRSampler[Int](config2)
 
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val sample1    = sampler1.sample(population, 10)
     val sample2    = sampler2.sample(population, 10)
 
@@ -56,28 +57,28 @@ class HDRSamplerSpec extends FunSuite:
     val config  = HDRConfig(seed3 = 42)
     val sampler = HDRSampler[Int](config)
 
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val sample     = sampler.sample(population, 10)
 
     assertEquals(sample.size, 10, "Should sample exactly 10 elements")
-    assert(sample.subsetOf(population), "Sample should be subset of population")
+    assert(sample.subsetOf(population.toSet), "Sample should be subset of population")
   }
 
   test("HDR sampling more than population returns entire population") {
     val config  = HDRConfig(seed3 = 42)
     val sampler = HDRSampler[Int](config)
 
-    val population = (1 to 10).toSet
+    val population = (1 to 10).toVector
     val sample     = sampler.sample(population, 100)
 
-    assertEquals(sample, population, "Should return entire population")
+    assertEquals(sample, population.toSet, "Should return entire population")
   }
 
   test("HDR sampling empty population") {
     val config  = HDRConfig(seed3 = 42)
     val sampler = HDRSampler[String](config)
 
-    val sample = sampler.sample(Set.empty, 10)
+    val sample = sampler.sample(Vector.empty, 10)
     assert(sample.isEmpty, "Sample of empty population should be empty")
   }
 
@@ -85,7 +86,7 @@ class HDRSamplerSpec extends FunSuite:
     val config  = HDRConfig(seed3 = 42)
     val sampler = HDRSampler[Int](config)
 
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val sample     = sampler.sample(population, 0)
 
     assert(sample.isEmpty, "Sample of size 0 should be empty")
@@ -98,7 +99,7 @@ class HDRSamplerSpec extends FunSuite:
       seed3 = 42,
     )
 
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
     val sample     = sampler.sample(population, 10)
 
     assertEquals(sample.size, 10)
@@ -107,13 +108,14 @@ class HDRSamplerSpec extends FunSuite:
   test("HDR integration with ProportionEstimator") {
     val config = HDRConfig(entityId = 1, varId = 100, seed3 = 42)
 
-    val population = (1 to 1000).toSet
+    val population = (1 to 1000).toVector
     val predicate  = (x: Int) => x <= 500 // 50% of elements
 
     val estimate = ProportionEstimator.estimateWithSampling(
       population,
       predicate,
       config = config,
+      sampler = None,
     )
 
     // Should be close to 0.5
@@ -126,7 +128,7 @@ class HDRSamplerSpec extends FunSuite:
   test("HDR produces consistent results across multiple samples") {
     val config = HDRConfig(entityId = 999, varId = 888, seed3 = 12345)
 
-    val population = (1 to 100).toSet
+    val population = (1 to 100).toVector
 
     // Sample 3 times with same config
     val sampler1 = HDRSampler[Int](config)
@@ -140,6 +142,20 @@ class HDRSamplerSpec extends FunSuite:
 
     assertEquals(sample1, sample2)
     assertEquals(sample2, sample3)
+  }
+
+  test("an ordered domain of identity-hashed carriers samples the same keys in any input order") {
+    // Handle has no equals or hashCode override, so its hashCode comes from object identity.
+    final class Handle(val key: String)
+    given Ordering[Handle] = Ordering.by(_.key)
+
+    def handles: List[Handle]                   = List.tabulate(200)(i => Handle(f"h$i%03d"))
+    def sampledKeys(input: List[Handle]): Set[String] =
+      HDRSampler[Any](HDRConfig(seed3 = 42))
+        .sample(OrderedDomain.of(input).carriers, 50)
+        .collect { case h: Handle => h.key }
+
+    assertEquals(sampledKeys(handles), sampledKeys(handles.reverse))
   }
 
 end HDRSamplerSpec

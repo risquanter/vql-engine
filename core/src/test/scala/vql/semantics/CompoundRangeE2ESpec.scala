@@ -5,6 +5,7 @@ import vql.parser.VagueQueryParser
 import vql.sampling.SamplingParams
 import vql.typed.{
   FolModel,
+  OrderedDomain,
   PredicateSig,
   RuntimeDispatcher,
   RuntimeModel,
@@ -67,7 +68,7 @@ class CompoundRangeE2ESpec extends FunSuite:
     val c      = Value(item, "c"); val d = Value(item, "d")
     // p = {a,b}, q = {b,c} → p /\ q = {b}
     val model  = RuntimeModel(
-      domains = Map(item -> Set(a, b, c, d)),
+      domains = Map(item -> OrderedDomain.of(List("a", "b", "c", "d"))),
       dispatcher = dispatcherOf(
         p = r => r == "a" || r == "b",
         q = r => r == "b" || r == "c",
@@ -85,7 +86,7 @@ class CompoundRangeE2ESpec extends FunSuite:
     val c      = Value(item, "c"); val d = Value(item, "d")
     // p = {a,b} → ~p = {c,d}
     val model  = RuntimeModel(
-      domains = Map(item -> Set(a, b, c, d)),
+      domains = Map(item -> OrderedDomain.of(List("a", "b", "c", "d"))),
       dispatcher = dispatcherOf(
         p = r => r == "a" || r == "b",
         q = _ => false,
@@ -99,7 +100,7 @@ class CompoundRangeE2ESpec extends FunSuite:
     // 100-element domain; p true on all, q true on even-indexed → range p /\ q = 50 elements.
     // A strict (non-exact) sampling parameter samples the SCOPE only; the range
     // population is still the full 50-element compound set.
-    val items  = (0 until 100).map(i => Value(item, i.toString)).toSet
+    val items  = OrderedDomain.of((0 until 100).map(_.toString))
     val model  = RuntimeModel(
       domains = Map(item -> items),
       dispatcher = dispatcherOf(

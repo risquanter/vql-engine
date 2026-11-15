@@ -66,15 +66,15 @@ The catalog as a contract valid by construction and `bind` as the single compila
 
 ### Changing evaluation, the runtime model or the dispatcher
 
-**Always:** ADR-001 · ADR-014 · ADR-015 · ADR-017 · ADR-012
-Startup validation of dispatcher coverage and domain registration, done once (ADR-001 §4), the startup half of the two orthogonal checks (ADR-014 §3), the extraction boundary `Extract[A]` and the ban on casts at dispatcher call sites (ADR-015), exact range extraction and the satisfying-set contract (ADR-017), and the error channel (ADR-012).
+**Always:** ADR-001 · ADR-014 · ADR-015 · ADR-017 · ADR-025 · ADR-012
+Startup validation of dispatcher coverage and domain registration, done once (ADR-001 §4), the startup half of the two orthogonal checks (ADR-014 §3), the extraction boundary `Extract[A]` and the ban on casts at dispatcher call sites (ADR-015), exact range extraction and the satisfying-set contract (ADR-017), a dispatcher refusal as an unknown truth value and the declared domain order every walk reads (ADR-025), and the error channel (ADR-012).
 
 **Also:** ADR-003 if sampling parameters or the scope estimate are involved · ADR-004 if a new operation object is added · ADR-024 if a new recursion over the tree is added, because it is measured against the nesting limits.
 
 ### Changing sampling or estimation
 
-**Always:** ADR-003 · ADR-017 · ADR-012
-The HDR generator as the only randomness and the single code path for exact and sampled (ADR-003), the invariant that range extraction is never sampled (ADR-017 §2), and `require` for construction invariants of the parameters (ADR-012).
+**Always:** ADR-003 · ADR-017 · ADR-025 · ADR-012
+The HDR generator as the only randomness and the single code path for exact and sampled (ADR-003), the invariant that range extraction is never sampled (ADR-017 §2), the population as an ordered sequence in its domain's declared order (ADR-025), and `require` for construction invariants of the parameters (ADR-012).
 
 ### Adding or changing a failure, `QueryError` or bind-error detail
 
@@ -129,6 +129,7 @@ ADR-003 rules out `scala.util.Random`, `java.util.Random` and `commons-math3`. N
 | ADR-022 | `ADR-022.md` | Accepted | Typed refusals: one case per sentence template, token kinds and bounded text types, the literal alphabet, `SourcePosition`, boundaries that convert only the parsers' own failures |
 | ADR-023 | `ADR-023.md` | Accepted | Errors declared once in `vql.error`, `TypeId` and `SymbolName` in `vql.id`, the import directions between `vql.id`, `vql.error` and `vql.typed` |
 | ADR-024 | `ADR-024.md` | Accepted | The parse depth bound: the iterative lexer, `NestingBound.check` at both `Either` boundaries, what the counts bound, and the measured limits |
+| ADR-025 | `ADR-025.md` | Accepted | Order-independent evaluation: a dispatcher refusal as an unknown truth value under Kleene's strong logic, `OrderedDomain` and the declared order evaluation and sampling read |
 | — | `ADR-00X.md` | Active | The authoring template for a record. Not a decision record |
 
 ---
@@ -154,6 +155,8 @@ Read it as an index of collisions, not as a substitute for either record. Where 
 | ADR-017 × ADR-002 | ADR-017 §4 has `ParsedQuery.mk` enforce the range rules by throwing, which reads as breaking ADR-012's `Either` rule for vague code. The throw sits behind `VagueQueryParser.parse`'s single `Either` boundary, under ADR-002. *Stated in ADR-017 §4.* |
 | ADR-024 × ADR-007 | ADR-024's bound reads as a change to the parser, which ADR-007 freezes. The check runs on the token list at the boundary, outside every combinator, so C1 and C6 hold. Only the lexer departs, from C10's recursive prepend, and its OCaml originals stay in scaladoc. Threading a depth counter through the combinators breaks C1 or C6. *Stated in ADR-024's cross-ADR section and ADR-007's review criterion.* |
 | ADR-024 × ADR-022 | A refusal raised at a token reads as one that has a position, and ADR-022 §4 reports `At` where an offset is exact. No single token is at fault for a nesting refusal, and tokens carry no offset, so the refusal reports `SourcePosition.Unknown`. *Stated in both records' cross-ADR sections.* |
+| ADR-025 × ADR-017 | ADR-017 reads the range as set algebra, and an unknown truth value reads as breaking it. An element whose membership is unknown fails evaluation and never enters a set, so the reading holds for every result evaluation returns. Range extraction stays exhaustive. *Stated in both records' cross-ADR sections.* |
+| ADR-025 × ADR-003 | ADR-003 claims a sample is reproducible, which reads as holding for any population. It holds for a population in the same order. The domain's declared order supplies that order, so sampling from a `Set` breaks the claim. *Stated in ADR-003 §2 and ADR-025's cross-ADR section.* |
 | ADR-018 × ADR-014 | ADR-018's `Targeting` admits functions by name, and reads as a symbol whitelist a consumer writes by hand. The names come from a rule on sorts: `TypeCatalog.domainReturningFunctions` selects the functions whose return sort is a `DomainType`. ADR-014 alone shows no fragment, and ADR-018 alone shows no sort. Changing what a function may return changes what a consumer's fragment admits. *Stated in both records' cross-ADR sections and ADR-014 §1.* |
 | ADR-012 × ADR-018 | `FragmentCheck.check` returns an `Either`, which reads as an operational-failure channel under ADR-012. It is a membership result with a reason. `Screening(k)` carries no `require` on `k` because `check` is total for a negative `k`. *Stated in ADR-018's cross-ADR section.* |
 
@@ -168,10 +171,10 @@ register (sibling checkout `/home/danago/projects/register/`, records in `docs/d
 | vql-engine | register | The dependency |
 |---|---|---|
 | ADR-015 §1, §4 | ADR-029 §3, row "FOL `VagueQueryParser.parse`" | register's injection defence states that "node references resolve at bind time through per-sort literal validators … whitelist-constrained, never interpolated". That holds while the binder routes constant-position tokens through `literalValidators` and never through text substitution. A change to the binder's literal branch reaches register's injection boundary. |
-| ADR-023 §2 | ADR-028 appendix §5, "Error Responses" | register's refusal table states that `UnknownReferences` means "Every bind error is a quoted node reference no literal validator accepts". register decides that by reading `TypeCheckError.UnparseableConstant.sort` against its own sort names. Renaming that field, changing what it holds, or splitting `UnparseableConstant` changes which refusal register reports, with no compile error if the field survives under another meaning. |
-| ADR-001, ADR-015 | ADR-028 §1–§2, §4 | ADR-028 describes register's integration as a `TypeCatalog` and a `MapDispatcher` evaluated through `VagueSemantics.evaluateTyped`, with every argument read by `extract[A]`, and states that the library is parsed on both platforms (`QueryRequest.resolve` in the cross-compiled `common` module). A change to those entry points, or dropping the Scala.js build, makes those sections wrong. |
+| ADR-023 §2 | ADR-028 appendix §5, "Error Responses" | register's refusal table states that an `Unbound` refusal is `UNKNOWN_REFERENCE` "when every problem names a node the tree does not hold; `BIND_FAILED` otherwise". register decides that by reading `TypeCheckError.UnparseableConstant.sort`: `BindProblem.namesAbsentNode` holds when that sort is one of register's node-reference sorts. Renaming that field, changing what it holds, or splitting `UnparseableConstant` changes which code register reports, with no compile error if the field survives under another meaning. |
+| ADR-001, ADR-015 | ADR-028 §1–§2, §4 | ADR-028 describes register's integration as a `TypeCatalog` and a `MapDispatcher` evaluated through `VagueSemantics.evaluateTyped`, with every argument read by `extract[A]`, and states that the library is parsed on both platforms (`QueryRequest.resolve` in the cross-compiled `common` module). A change to those entry points, or dropping the Scala.js build, makes those sections wrong. The appendix's "Domain" row states the domain as `RuntimeModel.domains(sort): Set[Value]`, so a change to the domain's type makes it wrong too. |
 | ADR-018 §3 | ADR-029 §3, row `TargetingPredicate.create` | register states the targeting fragment as "no quantifiers, no function terms". That held while `Targeting` refused every `Term.Fn`. `Targeting` admits the functions a consumer passes, and register passes the domain-returning functions of its catalog. A change to what `Targeting` admits, or to `domainReturningFunctions`, changes what register's request boundary accepts. |
-| ADR-022 §2, §3 | ADR-035, the section on what of the caller's query text a refusal may carry, which step 5.7 of register's `docs/dev/plans/PLAN-UES-UNIFIED-ERROR-SHAPE.md` adds | register states which engine refusal fields it may pass to a client or a log, and what each holds. That rests on the token kinds, on the text types and their content, and on the literal alphabet `[A-Za-z0-9 /_.+-]`. Widening a text type, admitting a character to the alphabet, or adding a field that holds caller text makes that section wrong. |
+| ADR-022 §2, §3 | ADR-035 §5, "What of the Caller's Query Text a Refusal May Carry" | register states which engine refusal fields it may pass to a client or a log, and what each holds. That rests on the token kinds, on the text types and their content, and on the literal alphabet `[A-Za-z0-9 /_.+-]`. Widening a text type, admitting a character to the alphabet, or adding a field that holds caller text makes that section wrong. |
 
 ---
 
