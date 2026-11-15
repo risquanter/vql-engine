@@ -41,12 +41,12 @@ The files are listed in ADR-007's scope tables: `parser/`, `lexer/`, `logic/`, `
 **Always:** ADR-007 · ADR-002 · ADR-012 · ADR-004 · ADR-022
 Characteristics C1–C13 and the review criterion that benchmarks every change against them (ADR-007), the throw-inside, `Either`-at-the-edge parser discipline (ADR-002), the one place the error-channel policy defers to the port (ADR-012, "Relationship to ADR-007"), the rule that the foundation imports nothing from `vql.*` (ADR-004), and the typed values the throws carry, the token kinds and the literal alphabet (ADR-022).
 
-**Also:** ADR-006 if a primitive carrier is refined into an ADT (C13 requires ADR-006's encoding).
+**Also:** ADR-006 if a primitive carrier is refined into an ADT (C13 requires ADR-006's encoding) · ADR-024 if the lexer, a parser or a recursive walk of the tree changes, because the nesting limits are measured against their stack use.
 
 ### Changing the vague query grammar or `VagueQueryParser`
 
-**Always:** ADR-002 · ADR-007 · ADR-012 · ADR-017 · ADR-022
-The single `Either` boundary at `VagueQueryParser.parse` (ADR-002 §2), the frozen combinators it is layered on (ADR-007), the two `Either` boundaries of the library (ADR-012), the range production and `ParsedQuery.mk`'s surface validation (ADR-017 §4), and one `ParseRefusal` case per sentence template with the failures the boundary may convert (ADR-022).
+**Always:** ADR-002 · ADR-007 · ADR-012 · ADR-017 · ADR-022 · ADR-024
+The single `Either` boundary at `VagueQueryParser.parse` (ADR-002 §2), the frozen combinators it is layered on (ADR-007), the two `Either` boundaries of the library (ADR-012), the range production and `ParsedQuery.mk`'s surface validation (ADR-017 §4), one `ParseRefusal` case per sentence template with the failures the boundary may convert (ADR-022), and the nesting check before parsing, whose count must cover every construct that adds a tree level (ADR-024 §3, §5).
 
 **Also:** ADR-018 if the parse tree's shape changes, since fragment membership walks it · ADR-001 if `ParsedQuery` changes, since the binder consumes it.
 
@@ -69,7 +69,7 @@ The catalog as a contract valid by construction and `bind` as the single compila
 **Always:** ADR-001 · ADR-014 · ADR-015 · ADR-017 · ADR-012
 Startup validation of dispatcher coverage and domain registration, done once (ADR-001 §4), the startup half of the two orthogonal checks (ADR-014 §3), the extraction boundary `Extract[A]` and the ban on casts at dispatcher call sites (ADR-015), exact range extraction and the satisfying-set contract (ADR-017), and the error channel (ADR-012).
 
-**Also:** ADR-003 if sampling parameters or the scope estimate are involved · ADR-004 if a new operation object is added.
+**Also:** ADR-003 if sampling parameters or the scope estimate are involved · ADR-004 if a new operation object is added · ADR-024 if a new recursion over the tree is added, because it is measured against the nesting limits.
 
 ### Changing sampling or estimation
 
@@ -128,6 +128,7 @@ ADR-003 rules out `scala.util.Random`, `java.util.Random` and `commons-math3`. N
 | ADR-021 | `ADR-021.md` | Superseded by ADR-023 | One `BindErrorDetail` case per `TypeCheckError` variant and an exhaustive facade fold |
 | ADR-022 | `ADR-022.md` | Accepted | Typed refusals: one case per sentence template, token kinds and bounded text types, the literal alphabet, `SourcePosition`, boundaries that convert only the parsers' own failures |
 | ADR-023 | `ADR-023.md` | Accepted | Errors declared once in `vql.error`, `TypeId` and `SymbolName` in `vql.id`, the import directions between `vql.id`, `vql.error` and `vql.typed` |
+| ADR-024 | `ADR-024.md` | Accepted | The parse depth bound: the iterative lexer, `NestingBound.check` at both `Either` boundaries, what the counts bound, and the measured limits |
 | — | `ADR-00X.md` | Active | The authoring template for a record. Not a decision record |
 
 ---
@@ -151,6 +152,8 @@ Read it as an index of collisions, not as a substitute for either record. Where 
 | ADR-007 C12 × ADR-022 | C12's letter says `failwith` becomes `throw new Exception(…)`. The ported parsers throw `ParseFailure`, `SyntaxError` and `LexerError`, subclasses that carry a typed value whose `message` is the OCaml text. Reverting them to a plain `Exception` loses the typed refusal, and catching `Exception` at a boundary reports a defect as the caller's mistake. *Stated in ADR-007's review criterion and ADR-022 §5.* |
 | ADR-020 × ADR-014 × ADR-017 | ADR-020 makes the binder accumulate, which invites extending accumulation to every check. `TypeNotQuantifiable` and the satisfying-formula chain (`UnconstrainedVar` → `UnexpectedFreeVar` → `TypeNotQuantifiable`) run at sequential, environment-threaded points and stay short-circuiting. Accumulating there manufactures cascade errors. *Stated in ADR-020's cross-ADR section.* |
 | ADR-017 × ADR-002 | ADR-017 §4 has `ParsedQuery.mk` enforce the range rules by throwing, which reads as breaking ADR-012's `Either` rule for vague code. The throw sits behind `VagueQueryParser.parse`'s single `Either` boundary, under ADR-002. *Stated in ADR-017 §4.* |
+| ADR-024 × ADR-007 | ADR-024's bound reads as a change to the parser, which ADR-007 freezes. The check runs on the token list at the boundary, outside every combinator, so C1 and C6 hold. Only the lexer departs, from C10's recursive prepend, and its OCaml originals stay in scaladoc. Threading a depth counter through the combinators breaks C1 or C6. *Stated in ADR-024's cross-ADR section and ADR-007's review criterion.* |
+| ADR-024 × ADR-022 | A refusal raised at a token reads as one that has a position, and ADR-022 §4 reports `At` where an offset is exact. No single token is at fault for a nesting refusal, and tokens carry no offset, so the refusal reports `SourcePosition.Unknown`. *Stated in both records' cross-ADR sections.* |
 | ADR-018 × ADR-014 | ADR-018's `Targeting` admits functions by name, and reads as a symbol whitelist a consumer writes by hand. The names come from a rule on sorts: `TypeCatalog.domainReturningFunctions` selects the functions whose return sort is a `DomainType`. ADR-014 alone shows no fragment, and ADR-018 alone shows no sort. Changing what a function may return changes what a consumer's fragment admits. *Stated in both records' cross-ADR sections and ADR-014 §1.* |
 | ADR-012 × ADR-018 | `FragmentCheck.check` returns an `Either`, which reads as an operational-failure channel under ADR-012. It is a membership result with a reason. `Screening(k)` carries no `require` on `k` because `check` is total for a negative `k`. *Stated in ADR-018's cross-ADR section.* |
 

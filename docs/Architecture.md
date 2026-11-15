@@ -11,7 +11,7 @@ of the codebase and the integration flow between layers.
 core/src/main/scala/
 ├── logic/           Formula, Term, FOL, Model, Valuation
 ├── parser/          Combinators, FormulaParser, FOLAtomParser, TermParser, FOLParser,
-│                    ParseError, SyntaxFailure, SourcePosition
+│                    ParseError, SyntaxFailure, SourcePosition, NestingBound, NestingFailure
 ├── lexer/           Lexer (List[Char] → List[Token]), Token, TokenKind, TokenText, LexFailure
 ├── semantics/       FOLSemantics
 ├── printer/         FOLPrinter, PrinterUtil
@@ -128,7 +128,7 @@ takes the functions it admits as a set of `SymbolName`s. A consumer that admits
 the functions returning a domain sort derives the set with
 `TypeCatalog.domainReturningFunctions`. The check runs on the parse tree before
 any typed bind, takes no `TypeCatalog` or model, and forks no parser. Callers with text parse via `FOLParser.parse` and map the foundation
-`ParseError` at their own boundary: `Syntax`, `Trailing` and `Lex` each carry a
+`ParseError` at their own boundary: `Syntax`, `Trailing`, `Lex` and `Nesting` each carry a
 typed value and a `SourcePosition`. See [ADR-018](ADR-018.md).
 
 **Error handling:**
@@ -160,6 +160,7 @@ once in `vql.error` (ADR-023). See [ADR-002](ADR-002.md) and
 | [ADR-021](ADR-021.md) | Structured Bind-Error Detail for Every `TypeCheckError` Variant (Superseded by ADR-023) |
 | [ADR-022](ADR-022.md) | Typed Refusals |
 | [ADR-023](ADR-023.md) | Errors Declared Once above a Shared Identifier Package |
+| [ADR-024](ADR-024.md) | Parse Depth Bound — iterative lexer, nesting limits checked before parsing |
 
 ---
 

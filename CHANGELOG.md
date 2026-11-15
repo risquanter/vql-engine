@@ -3,6 +3,30 @@
 This project follows early-semver (pre-1.0): breaking changes bump the minor
 version.
 
+## 0.20.0
+
+### Changed (breaking)
+
+- **An input past a nesting limit is refused before parsing.** `FOLParser.parse`
+  and `VagueQueryParser.parse` refuse a token list whose parentheses nest
+  deeper than 64, or that holds more than 256 operator tokens and quantified
+  variables. Within the limits, every input parses as before. See ADR-024.
+- **`parser.ParseError` gains the case `Nesting(failure: NestingFailure, position: SourcePosition)`.**
+  The position is always `Unknown`.
+- **`vql.error.ParseRefusal` gains the case `Nesting(failure: NestingFailure)`.**
+
+### Added
+
+- `parser.NestingBound`: `check(tokens)` and the limits `MaxParenthesisDepth`
+  and `MaxOperators`, for a caller that parses with `parseTokens`.
+- `parser.NestingFailure`: `ParenthesesTooDeep(limit)` and
+  `TooManyOperators(limit)`, with a derived `message`.
+
+### Fixed
+
+- Lexing is stack-safe. A long word, space run, quoted literal or token list
+  no longer throws `StackOverflowError`.
+
 ## 0.19.0
 
 ### Changed (breaking)

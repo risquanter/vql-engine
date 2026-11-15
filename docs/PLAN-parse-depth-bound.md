@@ -1,6 +1,6 @@
 # Implementation Plan: Parse Depth Bound
 
-**Status:** DRAFT, for approval. No decision is open (§2).
+**Status:** APPROVED (user, 2026-11-15). No decision is open (§2).
 **Version this was read at:** 0.19.0.
 **Target version:** 0.20.0. Under early-semver a pre-1.0 breaking change bumps
 the minor version. This plan adds a case to two public enums, `parser.ParseError`
@@ -635,9 +635,9 @@ next starts. The plan ships whole, as one release.
    - 256 operators give `Right(())`, and 257 give `Left(TooManyOperators(256))`.
    - `forall x1 … x256 . p(x1)` gives `Right(())`, and 257 variables give
      `Left(TooManyOperators(256))`.
-   - In `forall x . p(y) /\ q(z)`, the words after the `.` are not counted.
-     With 255 further operators the input is accepted, and with 256 it is
-     refused.
+   - In `forall x . p(y) /\ q(z)`, the words after the `.` are not counted,
+     so the formula counts 2. With 254 further operators the input is
+     accepted, and with 255 it is refused.
    - A `)` without a matching `(` gives `Right(())`.
    - Each case's `message`.
 3. `FOLParserSpec`, with these tests:
@@ -829,7 +829,7 @@ Outside this repository, one file in `register`, written once in Phase 4:
 
 This is written into `register/docs/dev/TODO.md` as one item in Phase 4.
 
-- `build.sbt` line 45: `vqlEngineVersion` to `0.20.0`.
+- `build.sbt` line 40: `vqlEngineVersion` to `0.20.0`.
 - `modules/common/.../http/errors/QueryProblem.scala`. Two matches are
   exhaustive and gain an arm each:
   - the `ParseRefusal` match, around line 262, gains `ParseRefusal.Nesting(failure)`;

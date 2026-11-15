@@ -559,31 +559,51 @@ before that:
 **Scope:** rewrite both rows to name what register holds now. No engine code
 changes.
 
-## T-014 — A nesting depth bound in the formula parser
+## T-014 — A token and parenthesis bound checked before the formula parser
 
-**Status:** OPEN.
+**Status:** RESOLVED by `PLAN-parse-depth-bound` (ADR-024).
 
-`FormulaParser` and `TermParser` are recursive descent with no depth bound, and
-each nesting level and each binary connective takes stack frames. On a 1 MiB
-thread stack, `FOLParser.parse` throws `StackOverflowError` on:
+Three recursions take stack frames in proportion to the input, and none is
+bounded:
 
-- 260 nested parentheses around one atom, `"(" * 260 + "p(x)" + ")" * 260`,
-  which is 524 characters (250 levels parse);
-- a flat chain of 200 atoms, `List.fill(200)("p(x)").mkString("\\/")`, which is
-  1 198 characters (150 atoms parse). `/\` behaves the same.
+- `Lexer.lex` builds `tok :: lex(rest)`, one frame per token, and `lexwhile`
+  takes one frame per character of a run. A chain of 3 000 `p(x)` atoms joined
+  by `\/` overflows inside the lexer, before parsing starts.
+- On every `(`, `parseAtomicFormula` first tries the infix-atom parser. That
+  parses the whole bracket as a term through the six operator levels of
+  `parseTerm`, about 20 frames per parenthesis, and repeats at each level.
+- Every consumer of the parsed tree recurses once per level, and a chain of
+  `n` connectives parses into a tree `n` levels deep. On a 1 MiB stack
+  `FragmentCheck.check` overflows on a chain of 1 280 atoms in an interpreted
+  JVM, and `toString` overflows on 3 000.
+
+The overflow point moves with the JIT state and the JDK. On a 1 MiB stack,
+register's console overflowed at 260 parentheses around one atom and at a
+200-atom chain. A warm JVM in this repository parsed 446 parentheses and 1 406
+atoms. Scala.js is unmeasured.
 
 `StackOverflowError` is a `VirtualMachineError`, so it is not caught as a parse
 refusal. Inside a ZIO effect under the default runtime it is fatal, and the
 process exits with status 255. `VagueQueryParser` calls the same
 `FormulaParser.parse`, so a screening query reaches it too.
 
-**Scope:** a maximum nesting depth, counted over parentheses, negations and
-connective chains, past which `parse` returns a typed `ParseError` at the
-position where the bound was crossed. A connective chain is parsed iteratively
-so its length does not count as depth. The bound is a named constant, or a
-parser parameter a consumer sets.
+**Scope:** `Lexer.lex` and `lexwhile` become iterative, so lexing uses constant
+stack. Before parsing, `FOLParser.parseWithLexer` and `VagueQueryParser.parse`
+make one pass over the token list. The pass counts the operator tokens and
+quantified variables, and tracks the parenthesis depth, `Token.LParen` up and
+`Token.RParen` down. At the first token past either limit, `parse` returns a
+typed `ParseError` that names the limit crossed, with an unknown position, and
+the parser does not run. That count bounds every recursion that does not go
+through parentheses, and the depth of the finished tree. The parenthesis depth bounds the term-parser path.
+No combinator changes. The iterative lexer departs from ADR-007 C10, "`lexwhile`
+accumulates via recursive prepend", and ADR-007 is amended to record it. The
+two limits are named constants, set below the worst case measured on both
+platforms in an interpreted run, across the parser, the binder,
+`FragmentCheck`, the evaluator and the printer. A realistic register predicate
+of 85 nodes is about 850 tokens and two parentheses deep.
 
 **Context:** register PLAN-RISKTRANSFORM §7.6.12 decision 20, the length bound
-of a stored targeting predicate. Measured in register's `commonJVM/console`
-against 0.18.0 on JDK 21. `core/src/main/scala/parser/` and
-`core/src/main/scala/lexer/` are unchanged from `v0.18.0` to `v0.19.0`.
+of a stored targeting predicate, ruled at 4 096 characters. Register's figures
+were measured in its `commonJVM/console` against 0.18.0 on JDK 21.
+`core/src/main/scala/parser/` and `core/src/main/scala/lexer/` are unchanged
+from `v0.18.0` to `v0.19.0`.
