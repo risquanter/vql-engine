@@ -3,6 +3,7 @@ package vql.parser
 import lexer.{Found, GrammarSymbol, LexFailure, SymbolText, TokenKind, VariableText, WordText}
 import logic.{FOL, FOLUtil, Formula, Term}
 import parser.{SourcePosition, SyntaxFailure}
+import parser.NestingFailure.TooManyOperators
 import vql.error.{ParseContext, ParseRefusal, QueryError, QuantifierPart, TypeCheckError}
 import vql.logic.ParsedQuery
 import vql.quantifier.Quantifier
@@ -648,6 +649,20 @@ class VagueQueryParserSpec extends munit.FunSuite:
     Set("y'", "1.5").foreach(name =>
       assertEquals(TypeCheckError.UnboundAnswerVar(VariableText.of(name)).message, s"unbound answer variable: $name")
     )
+  }
+
+  test("a scope of 300 negations is refused before parsing") {
+    assertEquals(
+      refusalOf("Q[>=]^{1/2} x (p(x), " + "~ " * 300 + "q(x))"),
+      (ParseRefusal.Nesting(TooManyOperators(256)), SourcePosition.Unknown),
+    )
+  }
+
+  test("the quantifier header's three operators count toward the limit") {
+    // >=, ^ and / in the header, then the negations
+    def query(negations: Int): String = "Q[>=]^{1/2} x (p(x), " + "~ " * negations + "q(x))"
+    parseOk(query(253))
+    assertEquals(refusalOf(query(254)), (ParseRefusal.Nesting(TooManyOperators(256)), SourcePosition.Unknown))
   }
 
 end VagueQueryParserSpec

@@ -1,7 +1,7 @@
 package vql.error
 
 import lexer.{Found, GrammarSymbol, LexFailure, TokenKind, WordText}
-import parser.SyntaxFailure
+import parser.{NestingFailure, SyntaxFailure}
 
 /** What the parser was about to read when it needed a symbol. */
 enum ParseContext(val label: String):
@@ -36,6 +36,7 @@ enum ParseRefusal:
   case TrailingTokens(first: TokenKind, rest: List[TokenKind])
   case Formula(failure: SyntaxFailure)
   case Lexical(failure: LexFailure)
+  case Nesting(failure: NestingFailure)
 
   def message: String = this match
     case QuantifierExpected(found)                        =>
@@ -61,6 +62,7 @@ enum ParseRefusal:
       s"Unexpected tokens after query: ${(first :: rest).map(_.label).mkString(" ")}"
     case Formula(failure)                                 => failure.message
     case Lexical(failure)                                 => s"Lexer error: ${failure.message}"
+    case Nesting(failure)                                 => failure.message
 
 object ParseRefusal:
 

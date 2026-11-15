@@ -7,7 +7,7 @@ import util.StringUtil.*
 
 class LexerSpec extends FunSuite:
 
-  // ── lexwhile (unchanged primitive) ──────────────────────────────────
+  // ── lexwhile ────────────────────────────────────────────────────────
 
   test("lexwhile consumes characters while predicate holds") {
     val (tok, rest) = lexwhile(numeric, explode("123abc"))
@@ -39,7 +39,7 @@ class LexerSpec extends FunSuite:
     assertEquals(rest, explode(" x"))
   }
 
-  // ── lex: existing behaviour, expressed in Token ADT ─────────────────
+  // ── lex, expressed in the Token ADT ─────────────────────────────────
 
   test("lex: simple arithmetic expression") {
     assertEquals(lex(explode("x + 1")), List(Word("x"), OpSym("+"), Word("1")))
@@ -228,7 +228,7 @@ class LexerSpec extends FunSuite:
     )
   }
 
-  // ── L1–L6: new behaviour for D1 fix (Plan §5.1) ─────────────────────
+  // ── punctuation and quoted literals ─────────────────────────────────
 
   test("L1 — quoted string literal yields a single StringLit with quotes stripped") {
     assertEquals(lex(explode("\"IT Risk\"")), List(StringLit("IT Risk")))
@@ -275,5 +275,27 @@ class LexerSpec extends FunSuite:
       assertEquals(e.failure, LexFailure.RefusedLiteralCharacter)
       assertEquals(e.remaining, 3)
     }
+
+  // ── stack use is constant in the input's length ─────────────────────
+
+  private val longInput: Int = 100000
+
+  test("a 100 000-character word lexes to one Word") {
+    assertEquals(lex(explode("a" * longInput)), List(Word("a" * longInput)))
+  }
+
+  test("100 000 spaces before a word lex to one token") {
+    assertEquals(lex(explode(" " * longInput + "p")), List(Word("p")))
+  }
+
+  test("a 100 000-character quoted literal lexes to one StringLit") {
+    assertEquals(lex(explode("\"" + "a" * longInput + "\"")), List(StringLit("a" * longInput)))
+  }
+
+  test("20 000 repetitions of p \\/ lex to 40 000 tokens") {
+    val tokens = lex(explode("p \\/ " * 20000))
+    assertEquals(tokens.length, 40000)
+    assertEquals(tokens.take(2), List(Word("p"), OpSym("\\/")))
+  }
 
 end LexerSpec

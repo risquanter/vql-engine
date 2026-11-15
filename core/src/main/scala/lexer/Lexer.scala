@@ -2,6 +2,8 @@ package lexer
 
 import util.StringUtil.*
 
+import scala.annotation.tailrec
+
 /**
  * Signals an unrecoverable lexer error in a `"…"`-delimited string literal.
  *
@@ -16,13 +18,13 @@ class LexerError(val failure: LexFailure, val remaining: Int) extends Exception(
 /**
  * Lexical analysis following OCaml style from intro.ml
  *
- * Converts character streams into [[Token]] streams. Key OCaml technique: accumulator-based
- * recursion with token threading.
+ * Converts character streams into [[Token]] streams. The OCaml original recurses per token; this
+ * port loops with an accumulator, so its stack use is constant in the input's length (ADR-024).
  *
- * Element-type refinement `string` ⇒ [[Token]] is permitted under fol-engine ADR-007 C13:
- * combinator shape preserved (signature arity `List[Char] => List[Token]`, exception backtracking,
- * mutual recursion); each `Token` case documents the OCaml `string` it replaces (see [[Token]]);
- * downstream parser pattern matches expand 1:1 from string-match arms to ADT-match arms.
+ * Element-type refinement `string` ⇒ [[Token]] is permitted under ADR-007 C13: combinator shape
+ * preserved (signature arity `List[Char] => List[Token]`, exception backtracking); each `Token`
+ * case documents the OCaml `string` it replaces (see [[Token]]); downstream parser pattern matches
+ * expand 1:1 from string-match arms to ADT-match arms.
  */
 object Lexer:
 
@@ -35,26 +37,21 @@ object Lexer:
    *       c::cs when prop c -> let tok,rest = lexwhile prop cs in c^tok,rest
    *     | _ -> "",inp
    *
-   * Unchanged primitive — operates on `(String, List[Char])` regardless of
-   * the outer `lex` return type (ADR-007 C10 preserved at the character level).
+   * Operates on `(String, List[Char])` regardless of the outer `lex` return type. The Scala body is
+   * iterative, so the stack use is constant in the input's length (ADR-024).
    */
   def lexwhile(prop: Char => Boolean, inp: List[Char]): (String, List[Char]) =
-    inp match
-      case c :: cs if prop(c) =>
-        val (tok, rest) = lexwhile(prop, cs)
-        (c.toString + tok, rest)
-      case _                  =>
-        ("", inp)
+    val (run, rest) = inp.span(prop)
+    (run.mkString, rest)
 
   /**
    * Single-character punctuation alphabet (closed, finite).
    *
-   * Each char in this set maps to a dedicated [[Token]] case via [[punctuationToken]]. Resolves the
-   * longstanding overlap noted in `StringUtil`: `.` and `,` would otherwise be classified as
-   * symbolic / fall-through and merged into multi-char symbolic runs.
+   * Each char in this set maps to a dedicated [[Token]] case via [[punctuationToken]]. It keeps `.`
+   * and `,` out of the multi-char symbolic runs that `StringUtil.symbolic` would place them in.
    *
-   * `;` deliberately stays out — it is not part of any current grammar arm and remains a
-   * symbolic-run token (`Token.OpSym(";")`) for backwards compatibility.
+   * `;` stays out: no grammar arm reads it, and it lexes as a symbolic-run token
+   * (`Token.OpSym(";")`).
    */
   private val punctChars: Set[Char] = Set('(', ')', '[', ']', '{', '}', ',', '.')
 
@@ -82,21 +79,24 @@ object Lexer:
    * [[literalChars]] each raise [[LexerError]].
    *
    * Caller has already consumed the opening `"`. Returns `(content, rest)` where `rest` begins
-   * immediately after the closing `"`.
+   * immediately after the closing `"`. The body is iterative, so the stack use is constant in the
+   * literal's length (ADR-024).
    */
   private def lexStringLit(inp: List[Char]): (String, List[Char]) =
-    inp match
-      case Nil                                 =>
-        throw new LexerError(LexFailure.UnterminatedLiteral, 0)
-      case '\n' :: _                           =>
-        throw new LexerError(LexFailure.NewlineInLiteral, inp.length)
-      case '"' :: rest                         =>
-        ("", rest)
-      case c :: _ if !literalChars.contains(c) =>
-        throw new LexerError(LexFailure.RefusedLiteralCharacter, inp.length)
-      case c :: cs                             =>
-        val (tail, rest) = lexStringLit(cs)
-        (c.toString + tail, rest)
+    @tailrec
+    def loop(rest: List[Char], acc: List[Char]): (String, List[Char]) =
+      rest match
+        case Nil                                 =>
+          throw new LexerError(LexFailure.UnterminatedLiteral, 0)
+        case '\n' :: _                           =>
+          throw new LexerError(LexFailure.NewlineInLiteral, rest.length)
+        case '"' :: after                        =>
+          (acc.reverse.mkString, after)
+        case c :: _ if !literalChars.contains(c) =>
+          throw new LexerError(LexFailure.RefusedLiteralCharacter, rest.length)
+        case c :: cs                             =>
+          loop(cs, c :: acc)
+    loop(inp, Nil)
 
   /**
    * Main lexer function (OCaml: lex)
@@ -118,37 +118,44 @@ object Lexer:
    *  - `"` opens a [[Token.StringLit]] branch consuming until the matching `"`
    *    (no escapes; a newline or a character outside the literal alphabet ⇒
    *    [[LexerError]]).
+   *
+   * The Scala body is iterative, so the stack use is constant in the input's length (ADR-024).
    */
   def lex(inp: List[Char]): List[Token] =
-    // Skip whitespace: snd(lexwhile space inp)
-    val (_, afterSpace) = lexwhile(space, inp)
+    @tailrec
+    def loop(inp: List[Char], acc: List[Token]): List[Token] =
+      // Skip whitespace: snd(lexwhile space inp)
+      val (_, afterSpace) = lexwhile(space, inp)
 
-    afterSpace match
-      case Nil => Nil
+      afterSpace match
+        case Nil => acc.reverse
 
-      case '"' :: cs =>
-        // String-literal branch (no OCaml counterpart).
-        val (content, rest) = lexStringLit(cs)
-        Token.StringLit(content) :: lex(rest)
+        case '"' :: cs =>
+          // String-literal branch (no OCaml counterpart).
+          val (content, rest) = lexStringLit(cs)
+          loop(rest, Token.StringLit(content) :: acc)
 
-      case c :: cs if punctChars.contains(c) =>
-        // Single-character punctuation — emit dedicated Token case.
-        punctuationToken(c) :: lex(cs)
+        case c :: cs if punctChars.contains(c) =>
+          // Single-character punctuation — emit dedicated Token case.
+          loop(cs, punctuationToken(c) :: acc)
 
-      case c :: cs =>
-        // OCaml original: alphanumeric run, symbolic run, or single-char fallthrough.
-        if alphanumeric(c) then
-          val (toktl, rest) = lexwhile(alphanumeric, cs)
-          Token.Word(c.toString + toktl) :: lex(rest)
-        else if symbolic(c) then
-          val (toktl, rest) = lexwhile(symbolic, cs)
-          Token.OpSym(c.toString + toktl) :: lex(rest)
-        else
-          // Any other character — emit as a single-char OpSym to preserve the
-          // OCaml "permissive" fallthrough for unexpected input. Reachable only
-          // for chars outside alphanumeric ∪ symbolic ∪ punctuation ∪ space ∪ {'"'}.
-          Token.OpSym(c.toString) :: lex(cs)
-    end match
+        case c :: cs =>
+          // OCaml original: alphanumeric run, symbolic run, or single-char fallthrough.
+          if alphanumeric(c) then
+            val (toktl, rest) = lexwhile(alphanumeric, cs)
+            loop(rest, Token.Word(c.toString + toktl) :: acc)
+          else if symbolic(c) then
+            val (toktl, rest) = lexwhile(symbolic, cs)
+            loop(rest, Token.OpSym(c.toString + toktl) :: acc)
+          else
+            // Any other character — emit as a single-char OpSym to preserve the
+            // OCaml "permissive" fallthrough for unexpected input. Reachable only
+            // for chars outside alphanumeric ∪ symbolic ∪ punctuation ∪ space ∪ {'"'}.
+            loop(cs, Token.OpSym(c.toString) :: acc)
+      end match
+    end loop
+
+    loop(inp, Nil)
 
   end lex
 

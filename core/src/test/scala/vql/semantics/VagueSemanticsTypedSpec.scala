@@ -1,10 +1,11 @@
 package vql.semantics
 
-import lexer.{LiteralText, SymbolText, VariableText}
+import lexer.{Lexer, LiteralText, SymbolText, VariableText}
 import logic.{FOL, Formula, Term}
 import munit.FunSuite
-import vql.error.{MismatchSite, QueryError, SymbolKind, TypeCheckError}
-import parser.{FOLParser, SourcePosition}
+import vql.error.{MismatchSite, ParseRefusal, QueryError, SymbolKind, TypeCheckError}
+import parser.{FOLParser, NestingBound, SourcePosition}
+import parser.NestingFailure.{ParenthesesTooDeep, TooManyOperators}
 import vql.logic.ParsedQuery
 import vql.parser.VagueQueryParser
 import vql.quantifier.Quantifier
@@ -749,5 +750,66 @@ class VagueSemanticsTypedSpec extends FunSuite:
 
     assertEquals(satisfying("""same(x, asset_with_id("a2"))"""), Right(Set(Value(asset, "a2"))))
     assertEquals(satisfying("""same(x, asset_with_id("zz"))"""), Right(Set.empty[Value]))
+
+  private val nestingModel =
+    val nestingCatalog = TypeCatalog.unsafe(
+      types = Set(DomainType(asset)),
+      functions = Map(SymbolName("f") -> FunctionSig(List(asset), asset)),
+      predicates = Map(SymbolName("p") -> PredicateSig(List(asset))),
+      literalValidators = Map.empty,
+    )
+    val dispatcher     = new RuntimeDispatcher:
+      override def evalFunction(name: SymbolName, args: List[Value]): Either[String, Any] =
+        (name.value, args) match
+          case ("f", List(a)) => Right(a.raw)
+          case (other, _)     => Left(s"No function implementation for '$other'")
+      override def evalPredicate(name: SymbolName, args: List[Value]): Either[String, Boolean] =
+        (name.value, args) match
+          case ("p", List(_)) => Right(true)
+          case (other, _)     => Left(s"No predicate implementation for '$other'")
+      override def functionSymbols: Set[SymbolName]  = Set(SymbolName("f"))
+      override def predicateSymbols: Set[SymbolName] = Set(SymbolName("p"))
+    val domain         = Set("a1", "a2").map(Value(asset, _))
+    FolModel(nestingCatalog, RuntimeModel(domains = Map(asset -> domain), dispatcher = dispatcher))
+      .fold(e => fail(s"FolModel construction failed: $e"), identity)
+
+  end nestingModel
+
+  /**
+   * A scope that, inside `Q[>=]^{1/2} x (p(x), …)`, reaches both nesting limits: the header's three
+   * operators and the negations make 256, and the query's `(`, `p(` and the `f(`s make 64.
+   */
+  private def nestedScope(negations: Int, applications: Int): String =
+    "~ " * negations + "p(" + "f(" * applications + "x" + ")" * applications + ")"
+
+  private def nestedQuery(negations: Int, applications: Int): String =
+    s"Q[>=]^{1/2} x (p(x), ${nestedScope(negations, applications)})"
+
+  test("e2e: a query at both nesting limits parses, binds and evaluates") {
+    val text  = nestedQuery(253, 62)
+    assertEquals(NestingBound.check(Lexer.lexString(text)), Right(()))
+    val query = VagueQueryParser
+      .parse(text)
+      .fold(e => fail(s"expected the text to parse, got ${e.formatted}"), identity)
+    assert(VagueSemantics.evaluateTyped(query, nestingModel, samplingParams = SamplingParams.exact).isRight)
+
+    val scope = FOLParser.parse(nestedScope(253, 62)).fold(e => fail(s"parse failed: $e"), identity)
+    assert(VagueSemantics.satisfyingSet(scope, "x", nestingModel).isRight)
+  }
+
+  test("e2e: one more negation or one more application is refused before parsing") {
+    def refusal(text: String) = VagueQueryParser.parse(text).left.map {
+      case QueryError.ParseError(refusal, position) => (refusal, position)
+      case other                                    => fail(s"expected a ParseError, got $other")
+    }
+    assertEquals(
+      refusal(nestedQuery(254, 62)),
+      Left((ParseRefusal.Nesting(TooManyOperators(256)), SourcePosition.Unknown)),
+    )
+    assertEquals(
+      refusal(nestedQuery(253, 63)),
+      Left((ParseRefusal.Nesting(ParenthesesTooDeep(64)), SourcePosition.Unknown)),
+    )
+  }
 
 end VagueSemanticsTypedSpec

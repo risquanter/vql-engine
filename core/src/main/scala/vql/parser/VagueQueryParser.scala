@@ -1,12 +1,14 @@
 package vql.parser
 
 import lexer.{Found, GrammarSymbol, Lexer, LexerError, Token, TokenKind, WordText}
-import parser.{FOLAtomParser, FormulaParser, SourcePosition}
+import parser.{FOLAtomParser, FormulaParser, NestingBound, SourcePosition}
 import parser.Combinators.{ParseFailure, SyntaxError, tokenLabel}
 import util.StringUtil
 import vql.error.{ParseContext, ParseRefusal, QueryError, QueryException, QuantifierPart}
 import vql.logic.ParsedQuery
 import vql.quantifier.Quantifier
+
+import scala.annotation.tailrec
 
 /**
  * Parser for vague queries (paper Section 5.2)
@@ -33,18 +35,22 @@ object VagueQueryParser:
   /**
    * Parse a vague query string.
    *
-   * `Left(QueryError.ParseError)` when the text is no query, and `Left(QueryError.ValidationError)`
-   * when a parsed query breaks a range rule. An exception that is neither the parsers' own failure
+   * `Left(QueryError.ParseError)` when the text is no query, or when its tokens cross a limit of
+   * [[NestingBound]] before any parsing. `Left(QueryError.ValidationError)` when a parsed query
+   * breaks a range rule. An exception that is neither the parsers' own failure
    * nor a `QueryException` propagates.
    */
   def parse(s: String): Either[QueryError, ParsedQuery] =
     try
-      val tokens             = mergeDecimalTokens(Lexer.lex(StringUtil.explode(s)))
-      val (query, remaining) = parseTokens(tokens)
-      remaining match
-        case Nil           => Right(query)
-        case first :: more =>
-          Left(refused(ParseRefusal.TrailingTokens(TokenKind.of(first), more.map(TokenKind.of))))
+      val tokens = mergeDecimalTokens(Lexer.lex(StringUtil.explode(s)))
+      NestingBound.check(tokens) match
+        case Left(failure) => Left(refused(ParseRefusal.Nesting(failure)))
+        case Right(())     =>
+          val (query, remaining) = parseTokens(tokens)
+          remaining match
+            case Nil           => Right(query)
+            case first :: more =>
+              Left(refused(ParseRefusal.TrailingTokens(TokenKind.of(first), more.map(TokenKind.of))))
     catch
       case e: QueryException =>
         Left(e.error)
@@ -65,7 +71,10 @@ object VagueQueryParser:
   // Each is List[Token] => (A, List[Token]) — the ParseResult pattern.
   // Throws QueryException on error, like FOLAtomParser.
 
-  /** Parse vague query from tokens — combinator style. */
+  /**
+   * Parse vague query from tokens — combinator style. Runs no nesting bound. A caller holding tokens
+   * runs [[NestingBound.check]] first.
+   */
   def parseTokens(tokens: List[Token]): (ParsedQuery, List[Token]) =
     // 1. Q[op]^{k/n}
     val (quantifier, t1) = parseQuantifier(tokens)
@@ -213,9 +222,9 @@ object VagueQueryParser:
   /**
    * Render the operator slot inside `Q[…]` as a string for downstream matching.
    *
-   * The bracketed operator may lex as a [[Token.Word]] (`~`, but `~` is in `symbolic`, so this is
-   * rare — kept defensively), a [[Token.OpSym]] (`>=`, `<=`, `~`, `~#`), or a single non-Western
-   * glyph wrapped as [[Token.OpSym]] (e.g. `≥`, `≤`).
+   * The bracketed operator lexes as a [[Token.OpSym]] (`>=`, `<=`, `~`, `~#`), as a single
+   * non-Western glyph wrapped as [[Token.OpSym]] (e.g. `≥`, `≤`), or as a [[Token.Word]] when it is
+   * alphanumeric.
    */
   private def opLabel(t: Token): String = t match
     case Token.Word(s)  => s
@@ -238,14 +247,18 @@ object VagueQueryParser:
    * such triples to `[Token.Word("0.05")]` so [[TermParser]]'s `isConstName` recognises the merged
    * form.
    *
-   * Only digit-dot-digit triples are merged; other token sequences are unchanged.
+   * Only digit-dot-digit triples are merged; other token sequences are unchanged. The body is
+   * iterative, so the stack use is constant in the number of tokens (ADR-024).
    */
   private def mergeDecimalTokens(tokens: List[Token]): List[Token] =
-    tokens match
-      case Token.Word(a) :: Token.Dot :: Token.Word(b) :: rest
-        if a.nonEmpty && a.forall(_.isDigit) && b.nonEmpty && b.forall(_.isDigit) =>
-        Token.Word(s"$a.$b") :: mergeDecimalTokens(rest)
-      case t :: rest => t :: mergeDecimalTokens(rest)
-      case Nil       => Nil
+    @tailrec
+    def loop(rest: List[Token], acc: List[Token]): List[Token] =
+      rest match
+        case Token.Word(a) :: Token.Dot :: Token.Word(b) :: more
+          if a.nonEmpty && a.forall(_.isDigit) && b.nonEmpty && b.forall(_.isDigit) =>
+          loop(more, Token.Word(s"$a.$b") :: acc)
+        case t :: more => loop(more, t :: acc)
+        case Nil       => acc.reverse
+    loop(tokens, Nil)
 
 end VagueQueryParser

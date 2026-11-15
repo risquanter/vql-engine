@@ -6,6 +6,7 @@ import logic.Formula.*
 import logic.Term.*
 import munit.FunSuite
 import parser.FOLParser
+import parser.NestingFailure.{ParenthesesTooDeep, TooManyOperators}
 
 class FOLParserSpec extends FunSuite:
 
@@ -299,6 +300,27 @@ class FOLParserSpec extends FunSuite:
           ),
         )
       ),
+    )
+  }
+
+  test("260 nested parentheses are refused before parsing") {
+    assertEquals(
+      FOLParser.parse("(" * 260 + "p(x)" + ")" * 260),
+      Left(ParseError.Nesting(ParenthesesTooDeep(64), SourcePosition.Unknown)),
+    )
+  }
+
+  test("a chain of 3 000 atoms is refused before parsing") {
+    assertEquals(
+      FOLParser.parse(List.fill(3000)("p(x)").mkString("\\/")),
+      Left(ParseError.Nesting(TooManyOperators(256), SourcePosition.Unknown)),
+    )
+  }
+
+  test("ParseError.Nesting's message is its failure's message") {
+    assertEquals(
+      ParseError.Nesting(TooManyOperators(256), SourcePosition.Unknown).message,
+      TooManyOperators(256).message,
     )
   }
 

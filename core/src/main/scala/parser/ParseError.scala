@@ -7,8 +7,8 @@ import lexer.{LexFailure, TokenKind}
  *
  * The OCaml-ported foundation parser signals failure internally by throwing (ADR-007 C2/C12). The
  * public string entries in [[FOLParser]] catch the parsers' own throws once, at the boundary, and
- * return one of these variants instead. Each variant carries the typed value its message is built
- * from.
+ * return one of these variants instead. Tokens that cross a limit of [[NestingBound]] are refused
+ * as `Nesting` before parsing. Each variant carries the typed value its message is built from.
  *
  * Foundation-local: no `vql.*` import, so the FOL core stays independently usable (ADR-004). A
  * consumer needing a richer error (e.g. `QueryError`) maps this at its own boundary, matching on
@@ -24,6 +24,9 @@ enum ParseError:
   /** Lexing failed before parsing. */
   case Lex(failure: LexFailure, position: SourcePosition)
 
+  /** The tokens crossed a nesting limit before parsing (ADR-024). The position is always `Unknown`. */
+  case Nesting(failure: NestingFailure, position: SourcePosition)
+
   /** Stored per case, so an abstract member the case parameters implement (ADR-006 §3). */
   def position: SourcePosition
 
@@ -32,5 +35,6 @@ enum ParseError:
     case Syntax(failure, _)       => failure.message
     case Trailing(first, rest, _) => s"Unparsed input: ${(first :: rest).map(_.label).mkString(" ")}"
     case Lex(failure, _)          => failure.message
+    case Nesting(failure, _)      => failure.message
 
 end ParseError
