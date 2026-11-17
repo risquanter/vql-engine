@@ -1,15 +1,14 @@
 # Implementation Plan: A Consumer Inspects a Targeting Formula Only through the Engine
 
-**Status:** PROPOSED, 2026-11-17. Drafted in register's session from a ruling
+**Status:** APPROVED, 2026-11-17. Drafted in register's session from a ruling
 by the user on 2026-11-17, and elevated in the engine's session the same day.
-One decision is open, `TFI-D-1` (§3). Every other point is settled by
-derivation (§2), and approval of this document rules them.
+`TFI-D-1` was ruled A on 2026-11-17 (§3). Every other point is settled by
+derivation (§2), and the approval of this document rules them.
 **Version this was read at:** 0.22.0, released (tag `v0.22.0`). register pins
 0.22.0.
-**Target version:** 0.23.0 if `TFI-D-1` is ruled A, because `Targeting` gains a
-parameter and every construction of it changes. 0.22.1 if it is ruled B,
-because B only adds. Under early-semver a pre-1.0 breaking change bumps the
-minor version.
+**Target version:** 0.23.0, because `Targeting` gains a parameter and every
+construction of it changes. Under early-semver a pre-1.0 breaking change bumps
+the minor version.
 **Plan code:** `TFI`, the initials of the filename slug
 `targeting-formula-inspection`. Decisions are `TFI-D-<n>`.
 **Records this plan amends:** `docs/ADR-018.md` §1, §2, §3, its
@@ -197,9 +196,12 @@ compile, and uses no JDK method Scala.js lacks (§5.2).
 
 ---
 
-## 3. Open decision
+## 3. Ruled decision
 
 ### TFI-D-1 — where the forbidden predicates go
+
+**Ruled (user, 2026-11-17): A**, a second parameter on `Targeting`. The options
+as they were presented are kept below as the record of the ruling.
 
 **Why it matters now.** The forbidden set has to reach the targeting walk. Where
 it is declared decides whether 0.23.0 breaks the one construction of
@@ -271,7 +273,7 @@ other consumer.
 | ADR-015 (value boundaries) | Not relevant | No `Value` and no literal validator is touched. `literalArguments` returns text, never a carrier. |
 | ADR-016 (carrier witness) | Proposed, not validated against | No literal payload changes. |
 | ADR-017 (formula ranges) | Not relevant | No range or satisfying-set code changes. |
-| ADR-018 (fragment membership) | Relevant, **amended** | §1's code block gains the parameter (under A) and the case. §2 gains `violations` and defines `check` from it. §3 gains the forbidden-predicate rule and states that `violations` walks below a quantifier and into a refused application. The Alternatives Rejected entry for the list return is marked where it sits as taken up by `violations`. The implementation table gains `violations` and `literalArguments`. |
+| ADR-018 (fragment membership) | Relevant, **amended** | §1's code block gains the parameter and the case. §2 gains `violations` and defines `check` from it. §3 gains the forbidden-predicate rule and states that `violations` walks below a quantifier and into a refused application. The Alternatives Rejected entry for the list return is marked where it sits as taken up by `violations`. The implementation table gains `violations` and `literalArguments`. |
 | ADR-019 | Superseded by ADR-023 | Not validated against. |
 | ADR-020 (error accumulation) | Not relevant | The binder is not touched. |
 | ADR-021 | Superseded by ADR-023 | Not validated against. |
@@ -310,8 +312,6 @@ print nothing (§7).
 
 ### 5.1 The fragment — `core/src/main/scala/vql/fragment/Fragment.scala`
 
-Under `TFI-D-1` A:
-
 ```scala
 enum Fragment:
   /**
@@ -335,13 +335,6 @@ enum FragmentViolation:
   case QuantifierDepthExceeded(limit: Int, found: Int)       // unchanged
 ```
 
-Under `TFI-D-1` B, `Targeting` keeps its one parameter, and `Fragment` gains:
-
-```scala
-  /** No atom whose predicate is in `forbiddenPredicates`, compared after lower-casing both names. */
-  case PredicatesExcluded(forbiddenPredicates: Set[SymbolName])
-```
-
 `FragmentViolation`'s scaladoc changes from "carrying the first violation" to
 saying that `check` carries the first violation and `violations` carries all of
 them, in pre-order, left-to-right traversal.
@@ -352,8 +345,7 @@ family in `core/src/main/scala/vql/fragment/Fragment.scala`, whose member
 nearest existing case, `TypeCheckError.UnknownPredicate(name: SymbolText)`,
 denotes a name the catalog does not declare, which is a different concept: a
 forbidden predicate may be declared. `forbiddenPredicates` follows
-`admittedFunctions: Set[SymbolName]`, its neighbour in the same case. Under B,
-`PredicatesExcluded` joins `Fragment` in the same file, beside `Screening`.
+`admittedFunctions: Set[SymbolName]`, its neighbour in the same case.
 
 **Raw primitives.** None is new. `limit` and `found` stay `Int`.
 
@@ -394,7 +386,7 @@ object FragmentCheck:
   def literalArguments(formula: Formula[FOL], function: SymbolName): List[LiteralText]
 ```
 
-The bodies, under `TFI-D-1` A:
+The bodies:
 
 ```scala
   def violations(formula: Formula[FOL], fragment: Fragment): List[FragmentViolation] =
@@ -462,12 +454,7 @@ The bodies, under `TFI-D-1` A:
 ```
 
 `checkTargeting`, `firstFnViolation` and `firstFn` are removed, because
-`violations` replaces them. `quantifierDepth` is unchanged. Under B, a
-private `excludedPredicates(formula, forbidden)` walks every atom, below
-quantifiers too, and returns its `PredicateNotAllowed` elements. `violations`
-gains the arm `case PredicatesExcluded(forbidden) => excludedPredicates(formula, forbidden)`,
-and `Targeting`'s arm calls `targetingViolations` with no forbidden names. The
-bodies written above are A's.
+`violations` replaces them. `quantifierDepth` is unchanged.
 
 `check` now walks the whole formula before it answers, where today it stops at
 the first violation. ADR-024 bounds the tree at 64 parentheses and 256 operators
@@ -494,17 +481,17 @@ and returns text.
 
 ### Phase 1 — the engine
 
-1. Edit `Fragment.scala` as §5.1 states for the ruled option.
+1. Edit `Fragment.scala` as §5.1 states.
 2. Edit `FragmentCheck.scala` as §5.2 states. Its object scaladoc says it
    decides membership and lists a function's literal arguments.
 3. Edit `core/src/test/scala/vql/fragment/FragmentCheckSpec.scala`:
    - every `Fragment.Targeting(admitted)` becomes
-     `Fragment.Targeting(admitted, Set.empty)` (under A). No assertion
+     `Fragment.Targeting(admitted, Set.empty)`. No assertion
      changes;
    - the tests §7 lists are added.
 4. Edit `core/.jvm/src/test/scala/parser/NestingBoundStackSpec.scala`: the
    1 MiB test's `Fragment.Targeting(Set(SymbolName("f")))` gains its second
-   argument (under A), and the test also calls `violations` and
+   argument, and the test also calls `violations` and
    `literalArguments` on the same formula.
 5. Run `sbt test`.
 
@@ -516,8 +503,7 @@ and returns text.
 2. `docs/Architecture.md`, from line 125: `Targeting(admitted, forbidden)`,
    and `violations` and `literalArguments` beside `check`.
 3. `README.md`, line 70: the same.
-4. `CHANGELOG.md`, the 0.23.0 section under A or the 0.22.1 section under B:
-   the changed `Targeting` (A) or the new case (B), the new
+4. `CHANGELOG.md`, the 0.23.0 section: the changed `Targeting`, the new
    `PredicateNotAllowed`, `violations` and `literalArguments`, and that `check`
    now reports a forbidden predicate.
 5. `.claude/skills/vql-adr-constraints/SKILL.md`, Layer 4, row "ADR-018 §3": it
@@ -564,21 +550,11 @@ ADR-018 §5 states for `check`.
 
 ## File inventory
 
-Proposed. On approval this list moves to
-`docs/PLAN-targeting-formula-inspection-INVENTORY.md` through
-`.claude/protocol/pending`, and this section becomes a pointer to it.
-
-- `core/src/main/scala/vql/fragment/Fragment.scala`
-- `core/src/main/scala/vql/fragment/FragmentCheck.scala`
-- `core/src/test/scala/vql/fragment/FragmentCheckSpec.scala`
-- `core/.jvm/src/test/scala/parser/NestingBoundStackSpec.scala`
-- `docs/ADR-018.md`
-- `docs/Architecture.md`
-- `README.md`
-- `CHANGELOG.md`
-- `build.sbt` (the version line, run by the user)
-- `.claude/skills/vql-adr-constraints/SKILL.md` (outside the gated region; the
-  approval script lists no `.claude/` path)
+The inventory is `docs/PLAN-targeting-formula-inspection-INVENTORY.md`, which
+the user writes by running `.claude/bin/approve-inventory`. One file the work
+edits is not in it: `.claude/skills/vql-adr-constraints/SKILL.md`, because the
+approval script lists no `.claude/` path. That file is outside the gated
+region. The version line in `build.sbt` is changed by the user.
 
 ---
 

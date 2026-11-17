@@ -123,11 +123,16 @@ evaluation. See [ADR-003](ADR-003.md).
 
 **Fragment membership:**
 `fragment.FragmentCheck.check(formula, fragment)` decides, structurally, whether
-a parsed `Formula[FOL]` lies in a declared `Fragment` (`Targeting(admitted)` or
-`Screening(k)`), returning the first `FragmentViolation` otherwise. `Targeting`
-takes the functions it admits as a set of `SymbolName`s. A consumer that admits
-the functions returning a domain sort derives the set with
-`TypeCatalog.domainReturningFunctions`. The check runs on the parse tree before
+a parsed `Formula[FOL]` lies in a declared `Fragment` (`Targeting(admitted, forbidden)`
+or `Screening(k)`), returning the first `FragmentViolation` otherwise.
+`FragmentCheck.violations(formula, fragment)` returns every violation, in pre-order
+and one per occurrence, and `check` returns its first element.
+`FragmentCheck.literalArguments(formula, function)` lists the literal argument of
+every application of `function`, left to right with repeats kept. `Targeting`
+takes the functions it admits and the predicates it forbids as sets of
+`SymbolName`s. A predicate is compared to the forbidden names after both are
+lower-cased. A consumer that admits the functions returning a domain sort
+derives the set with `TypeCatalog.domainReturningFunctions`. The check runs on the parse tree before
 any typed bind, takes no `TypeCatalog` or model, and forks no parser. Callers with text parse via `FOLParser.parse` and map the foundation
 `ParseError` at their own boundary: `Syntax`, `Trailing`, `Lex` and `Nesting` each carry a
 typed value and a `SourcePosition`. See [ADR-018](ADR-018.md).

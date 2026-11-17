@@ -3,6 +3,32 @@
 This project follows early-semver (pre-1.0): breaking changes bump the minor
 version.
 
+## 0.23.0
+
+### Changed (breaking)
+
+- **`Fragment.Targeting` takes a second parameter, `forbiddenPredicates:
+  Set[SymbolName]`.** An atom whose predicate name equals a forbidden name,
+  after both are lower-cased, is refused. `Targeting(admitted)` becomes
+  `Targeting(admitted, Set.empty)`. See ADR-018.
+- **`FragmentViolation` has a new case, `PredicateNotAllowed(predicate:
+  SymbolText)`.** It holds the predicate's name as the formula wrote it. A
+  consumer's exhaustive match over `FragmentViolation` meets it.
+
+### Added
+
+- `FragmentCheck.violations(formula, fragment)`: every violation, in pre-order,
+  left-to-right traversal, one per occurrence. It walks below a quantifier and
+  into a refused application's arguments.
+- `FragmentCheck.literalArguments(formula, function)`: the literal argument of
+  every application of `function` whose only argument is a literal, as
+  `LiteralText`, left to right with repeats kept.
+
+### Changed
+
+- `FragmentCheck.check` returns the first element of `violations`, so it reports
+  a forbidden predicate.
+
 ## 0.22.0
 
 ### Changed (breaking)
