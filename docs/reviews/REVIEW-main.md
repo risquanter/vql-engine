@@ -75,3 +75,67 @@ escalated:
     caller text is unverified (security 7, refusal messages that quote a
     caller's text) → security
 ```
+
+```
+COVERAGE  tier=complex  scope=the routine tier's two complex escalations on main
+          (File scope source 2: the commits 7a80cd1, 0cf7708, 58b81ba, 5652015,
+          8f07978, b98283a beyond origin/main): TypeCatalog.scala:84-86 and the
+          move of TypeCatalogError and DeclarationSite to vql.error
+read-in-full:
+  core/src/main/scala/vql/typed/TypeCatalog.scala
+  core/src/main/scala/vql/error/TypeCatalogError.scala
+  core/src/main/scala/vql/error/QueryError.scala
+  core/src/main/scala/vql/error/TypeCheckError.scala
+  core/src/main/scala/vql/error/RuntimeModelError.scala
+  core/src/main/scala/vql/error/ParseRefusal.scala
+  core/src/main/scala/vql/typed/TypeDefs.scala
+  core/src/main/scala/vql/typed/RuntimeModel.scala
+  core/src/main/scala/vql/typed/FolModel.scala
+  core/src/main/scala/vql/semantics/VagueSemantics.scala
+  core/src/test/scala/vql/typed/TypeCatalogSpec.scala
+  docs/PLAN-catalog-errors-in-vql-error.md
+  docs/ADR-001.md, docs/ADR-004.md, docs/ADR-006.md, docs/ADR-012.md, docs/ADR-023.md
+  CLAUDE.md, CHANGELOG.md (0.22.0)
+  register: modules/common/src/main/scala/com/risquanter/register/common/FolSymbols.scala:200-262
+  register: modules/server/src/main/scala/com/risquanter/register/foladapter/RiskTreeKnowledgeBase.scala:340-420
+  register: modules/server/src/main/scala/com/risquanter/register/services/QueryServiceLive.scala:60-120
+  register: modules/server/src/main/scala/com/risquanter/register/services/cache/MitigationScopeResolver.scala:60-100
+  register: modules/server/src/main/scala/com/risquanter/register/http/DefectCatchAllInterceptor.scala
+  examples/ does not exist; core/src/main/scala/examples/VagueDemo.scala calls unsafe only
+discharged:
+  1 adversarial line scan — PASS — TypeCatalogError.scala:12-17 and :28-31 match
+    every case, so message cannot throw; TypeCatalog.scala:62-64 keeps apply's
+    Right/Left split; :84-86 changes the exception text only
+  2 removed-behaviour audit — PASS — every field the old toString printed
+    (type, site kind, symbol, parameter kind, index) is in the new sentence via
+    DeclarationSite.label, TypeCatalogError.scala:12-17; error order unchanged,
+    collectErrors TypeCatalog.scala:90-141 is untouched
+  3 cross-module tracing — PASS —
+    exception text: no reader. register calls unsafe at FolSymbols.scala:248
+      (object val, fixed signatures) and RiskTreeKnowledgeBase.scala:387 (inside
+      schemaFor, reached from QueryServiceLive.scala:88 and
+      MitigationScopeResolver.scala:83). A throw there becomes a ZIO defect,
+      DefectCatchAllInterceptor.scala:115-125 logs the cause and answers
+      WireError.InternalFault(trace) with no text. No register test, record or
+      plan reads "Invalid TypeCatalog".
+    package move: `grep -rn "TypeCatalogError\|DeclarationSite"` over register
+      modules/ prints nothing; register's vql.typed imports are named, no wildcard.
+      Docs mention only removed or point-in-time content (docs/dev/TODO.md:2845-2847,
+      docs/dev/plans/PLAN-RISKTRANSFORM.md:4937-4938). Plan §10 holds.
+    facade: VagueSemantics.scala builds no catalog and surfaces no TypeCatalogError
+    validation boundary for the security tier: TypeCatalog.apply ->
+      collectErrors at TypeCatalog.scala:62, reached from unsafe at :81; register's
+      constant keys come from ValuationBasis symbols at FolSymbols.scala:222 and its
+      validator keys are fixed sorts at RiskTreeKnowledgeBase.scala:378-385
+  4 state and interleaving — discharged: the library holds no shared mutable state
+  5 invariant reconstruction — PASS — valid-by-construction catalog
+    (TypeCatalog.scala:19 private constructor); vql.error imports no vql.typed
+    (TypeCatalogError.scala:3); one declaration per type; deterministic error order
+  6 design altitude — PASS; if/else check PASS — the ifs at TypeCatalog.scala:101,
+    :107, :113, :122, :131 are single membership predicates
+  7 terminology freshness (meaning level) — discharged: no glossary
+  8 inline verification — 1 finding kept, CONFIRMED (docs/ADR-004.md:67-69)
+  sbt test — pass, JVM and Node
+escalated:
+  none
+```
