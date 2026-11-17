@@ -168,10 +168,10 @@ once in `vql.error` (ADR-023). See [ADR-002](ADR-002.md) and
 
 ## Build
 
-Scala 3.8.4, sbt 1.12.15, GraalVM Java 25.
+Scala 3.8.4, sbt 1.13.0, GraalVM Java 25.
 
 No external runtime dependencies beyond `com.risquanter::hdr-rng`.
-Test framework: munit 1.0.4.
+Test framework: munit 1.3.5.
 
 ```
 sbt test          # the whole suite, JVM and Scala.js

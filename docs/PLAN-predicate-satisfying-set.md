@@ -177,7 +177,7 @@ from the code and the records.
 10. **PSS-D-4: the law check ships in the published artifact.** The law is
     stated in engine terms, and the engine can compute both sides of it. A
     consumer-written check repeats the per-element filter in every consumer.
-    `SatisfyingCarriersLaw.check` (§5.4) is main code and depends on no test
+    `SatisfyingCarriersCheck.check` (§5.4) is main code and depends on no test
     framework.
 
 11. **PSS-D-5: the version is 0.22.0.** `CLAUDE.md`'s table: "A public
@@ -200,20 +200,21 @@ from the code and the records.
 | ADR-001 (many-sorted binding) | Relevant, compliant | `RuntimeModel.validateAgainst` and `FolModel` keep every check. No entry point changes. The set evaluation reads only bound formulas. |
 | ADR-002 (parser-combinator style) | Not relevant | No parser is touched. |
 | ADR-003 (HDR sampling) | Relevant, compliant | The sample is drawn as today, from the range in domain order. Scope evaluation over it returns the same elements. Only the refusal choice changes, to domain order (§2, settled point 8). |
-| ADR-004 (layering) | Relevant, compliant | `ElementSet` and `SatisfyingCarriersLaw` live in `vql.typed` and import `vql.error` and `vql.id` only. `ElementSet`'s operations live in its companion object, beside data with no methods (§1). |
-| ADR-006 (enum vs sealed trait) | Relevant, compliant | `ElementSet` and `LawViolation` are pure-data `enum`s. `Partition` and `DomainView` are case classes. New files follow §4 and §5. |
+| ADR-004 (layering) | Relevant, compliant | `ElementSet` and `SatisfyingCarriersCheck` live in `vql.typed` and import `vql.error` and `vql.id` only. `ElementSet`'s operations live in its companion object, beside data with no methods (§1). |
+| ADR-006 (enum vs sealed trait) | Relevant, compliant | `ElementSet` and `SatisfyingCarriersViolation` are pure-data `enum`s. `Partition` and `DomainView` are case classes. New files follow §4 and §5. |
 | ADR-007 (OCaml-ported core) | Not relevant | No file in its scope tables is touched. |
-| ADR-012 (error channel) | Relevant, compliant | `MapDispatcher`'s key check is a `require` on what the dispatcher is. Evaluation keeps its `Either` channel. `SatisfyingCarriersLaw.check` returns its finding as an `Either`, as `FragmentCheck.check` does (ADR-018's cross-ADR section). |
+| ADR-012 (error channel) | Relevant, compliant | `MapDispatcher`'s key check is a `require` on what the dispatcher is. Evaluation keeps its `Either` channel. `SatisfyingCarriersCheck.check` returns its finding as an `Either`, as `FragmentCheck.check` does (ADR-018's cross-ADR section). |
 | ADR-014 (quantifiability) | Relevant, compliant | The set evaluation runs on the root variable's domain, which the binder and `satisfyingSet`'s replicated check already made a domain type. Inner quantifiers are evaluated per element through `quantify`, unchanged. |
 | ADR-015 (value boundaries) | Relevant, **amended** | `satisfyingCarriers` returns carriers, and the engine wraps them, as with `evalFunction` (§2, settled point 3). Dispatchers keep reading `args(i).extract[A]`. No cast is added. The implementation table's `RuntimeModel.scala` row gains `satisfyingCarriers`. |
 | ADR-016 (carrier witness) | Not relevant, Proposed | `LiteralRef.value` is not touched. |
 | ADR-017 (formula ranges) | Relevant, **amended** | §1's definition of `D_R` and §2's exhaustive extraction hold. An answered set is the whole answer over the domain, and nothing is sampled. §6's bullet "Enumerates `model.domains(sort(v))` and filters with the existing `evalFormula`" describes the mechanism that changes. Phase 3 brings it to ADR-026 and updates the implementation table. |
 | ADR-018 (fragment membership) | Not relevant | `FragmentCheck` reads the parse tree, not a model. |
 | ADR-020 (binder error accumulation) | Not relevant | The binder is not touched. |
-| ADR-022 (typed refusals) | Relevant, compliant | No refusal case is added or reshaped. `PredicateRefused` and `FunctionRefused` reach the caller as today. `LawViolation.Refused` holds the dispatcher's own text, as `PredicateRefused.dispatcherMessage` does, and is a check result, never a refusal of the caller's query. |
-| ADR-023 (identifiers in `vql.id`) | Relevant, compliant | No error type is added. `LawViolation` is a check result that holds `Value`s, so it cannot sit in `vql.error`, which does not import `vql.typed`. It sits beside the check, as `FragmentViolation` sits in `vql.fragment`. |
+| ADR-022 (typed refusals) | Relevant, compliant | No refusal case is added or reshaped. `PredicateRefused` and `FunctionRefused` reach the caller as today. `SatisfyingCarriersViolation.Refused` holds the dispatcher's own text, as `PredicateRefused.dispatcherMessage` does, and is a check result, never a refusal of the caller's query. |
+| ADR-023 (identifiers in `vql.id`) | Relevant, compliant | No error type is added. `SatisfyingCarriersViolation` is a check result that holds `Value`s, so it cannot sit in `vql.error`, which does not import `vql.typed`. It sits beside the check, as `FragmentViolation` sits in `vql.fragment`. |
 | ADR-024 (parse depth bound) | Relevant, compliant | §5 asks that a new recursive walk of the tree be measured against both limits. `partition` is one. Phase 3 item 2 measures it on a 1 MiB interpreted JVM thread and on Node. |
 | ADR-025 (order-independent evaluation) | Relevant, **amended** | §1 to §3 hold. The set evaluation gives Kleene's value at every element (§4.3), and refusals are chosen by domain order. §5's sentence "Range extraction, scope evaluation, `satisfyingSet` and every quantifier walk a domain in its declared order" describes per-element walking. Phase 3 brings it to the set evaluation. |
+| ADR-00X (record template) | Relevant, compliant | Phase 3 item 3 writes ADR-026 to its structure: Context, Decision, Code Smells, Cross-ADR Relationship, Implementation and Alternatives Rejected. The amendments to ADR-015, ADR-017 and ADR-025 keep each record's structure. |
 
 **Deviations detected:** none.
 
@@ -375,7 +376,7 @@ trait RuntimeDispatcher:
    * The carriers of every element `e` for which `name` holds with arguments `before ++ (e :: after)`,
    * or `None` to decline. An answer must keep the law: at every element of the open position's
    * domain, `evalPredicate` refuses nothing and agrees with the answer, and every method answers the
-   * same arguments the same way each time (ADR-026). `SatisfyingCarriersLaw.check` tests it.
+   * same arguments the same way each time (ADR-026). `SatisfyingCarriersCheck.check` tests it.
    *
    * {{{
    * // leaf is true for "a1" and "a3"
@@ -466,6 +467,21 @@ end ElementSet
 `DomainView` joins `RuntimeModel.scala`, beside `OrderedDomain`, which it
 indexes. `RuntimeModel` gains one lazy field. Its existing `elements` field
 stays.
+
+**Family of `DomainView`.** It joins the model family in
+`core/src/main/scala/vql/typed/RuntimeModel.scala`, whose member
+`final case class OrderedDomain private (carriers: Vector[Any])` holds a
+domain's carriers in declared order. No existing type holds a domain's
+elements together with their set and their positions. The nearest field,
+`RuntimeModel.elements: Map[TypeId, Vector[Value]]`, holds the ordered
+elements only, and `DomainView.ordered` is built from it. `DomainView` has no
+private constructor, unlike the family's public members, because it is
+`private[typed]` and only `views` builds it.
+
+**Raw primitive.** `position: Map[Value, Int]` maps each element to its
+zero-based index in `ordered`, the index `zipWithIndex` yields. No opaque type
+for a position exists, and `DeclarationSite.Parameter.index` holds its position
+as `Int` for the same reason.
 
 ```scala
 /** One domain's elements in declared order, the same elements as a set, and each one's position. */
@@ -707,23 +723,31 @@ private def perElement(
 `classify`, `negate`, `conjoin`, `disjoin`, `evalAtom`, `evalTerms` and
 `evalTerm` are unchanged.
 
-### 5.4 The law check — `core/src/main/scala/vql/typed/SatisfyingCarriersLaw.scala`, new
+### 5.4 The law check — `core/src/main/scala/vql/typed/SatisfyingCarriersCheck.scala`, new
 
-`LawViolation` is a new type. It is a check result like `FragmentViolation` in
+`SatisfyingCarriersCheck` is a new object. It joins the operations family, one
+object per subject, whose member `object FragmentCheck` is in
+`core/src/main/scala/vql/fragment/FragmentCheck.scala`. It follows that
+family's `<Subject>Check` pattern. Its `check` returns a check result as an
+`Either`, as `FragmentCheck.check` does. No existing object checks a
+dispatcher's answers.
+
+`SatisfyingCarriersViolation` is a new type. It is a check result like `FragmentViolation` in
 `vql/fragment/Fragment.scala` (`case QuantifierNotAllowed` is one of its
-cases), and it holds `Value`s, so it sits in `vql.typed`. `dispatcherMessage`
+cases). It follows that family's `<Check>Violation` pattern and sits beside its
+check. It holds `Value`s, so it sits in `vql.typed`. `dispatcherMessage`
 is the dispatcher's own text, as in `EvaluationFailure.PredicateRefused`.
 
 ```scala
 package vql.typed
 
-/** What `SatisfyingCarriersLaw.check` found wrong with a dispatcher's set answer. */
-enum LawViolation:
+/** What `SatisfyingCarriersCheck.check` found wrong with a dispatcher's set answer. */
+enum SatisfyingCarriersViolation:
   case NoDomain(sort: TypeId)
   case Refused(element: Value, dispatcherMessage: String)
   case Disagrees(element: Value, evaluated: Boolean)
 
-object SatisfyingCarriersLaw:
+object SatisfyingCarriersCheck:
 
   /**
    * `Right(())` when the dispatcher declines `name` with these arguments, or when its answer agrees
@@ -736,9 +760,9 @@ object SatisfyingCarriersLaw:
     sort: TypeId,
     before: List[Value],
     after: List[Value],
-  ): Either[LawViolation, Unit]
+  ): Either[SatisfyingCarriersViolation, Unit]
 
-end SatisfyingCarriersLaw
+end SatisfyingCarriersCheck
 ```
 
 ---
@@ -754,13 +778,13 @@ starts. The plan ships whole, as one release.
 2. `vql/typed/MapDispatcher.scala` (§5.1). The scaladoc's usage block gains a
    `satisfyingSets` entry.
 3. `vql/typed/ElementSet.scala` (§5.2).
-4. `vql/typed/SatisfyingCarriersLaw.scala` (§5.4).
+4. `vql/typed/SatisfyingCarriersCheck.scala` (§5.4).
 5. `core/src/test/scala/vql/typed/ElementSetSpec.scala`, new. Over a domain
    of six elements, for every pair drawn from 8 sets (4 listed, 4 complemented,
    including both empties), the elements of `intersect`, `union` and
    `complement` equal the same operation on the materialized sets. `isEmpty`
    and `ordered` agree with the materialized set in domain order.
-6. `core/src/test/scala/vql/typed/SatisfyingCarriersLawSpec.scala`, new:
+6. `core/src/test/scala/vql/typed/SatisfyingCarriersCheckSpec.scala`, new:
    - a dispatcher that declines gives `Right(())`;
    - one whose answer matches `evalPredicate` gives `Right(())`;
    - one whose answer adds an element gives `Disagrees(e, false)` at that
@@ -862,7 +886,7 @@ starts. The plan ships whole, as one release.
      - `vql/typed/MapDispatcher.scala`;
      - `vql/typed/ElementSet.scala`;
      - `vql/typed/TypedSemantics.scala`;
-     - `vql/typed/SatisfyingCarriersLaw.scala`.
+     - `vql/typed/SatisfyingCarriersCheck.scala`.
 4. `docs/ADR-017.md`:
    - §6's bullet "**Exact and deterministic.** Enumerates
      `model.domains(sort(v))` and filters with the existing `evalFormula`"
@@ -905,7 +929,7 @@ starts. The plan ships whole, as one release.
 10. `CHANGELOG.md`, 0.22.0:
     - "Changed (breaking)": `MapDispatcher` gains `satisfyingSets`.
     - "Added": `RuntimeDispatcher.satisfyingCarriers`,
-      `SatisfyingCarriersLaw` and `LawViolation`.
+      `SatisfyingCarriersCheck` and `SatisfyingCarriersViolation`.
     - "Fixed": a sampled scope reports the refusal at the element first in
       domain order.
 11. `docs/TODOS.md`: T-016's status becomes "RESOLVED by
@@ -922,7 +946,7 @@ starts. The plan ships whole, as one release.
 The tests added or changed are listed in §6. These commands must be green:
 
 ```bash
-sbt "folEngineJVM/testOnly vql.typed.ElementSetSpec vql.typed.SatisfyingCarriersLawSpec vql.typed.MapDispatcherSpec vql.typed.SetEvaluationSpec vql.semantics.VagueSemanticsTypedSpec parser.NestingBoundStackSpec"
+sbt "folEngineJVM/testOnly vql.typed.ElementSetSpec vql.typed.SatisfyingCarriersCheckSpec vql.typed.MapDispatcherSpec vql.typed.SetEvaluationSpec vql.semantics.VagueSemanticsTypedSpec parser.NestingBoundStackSpec"
 # expected: ends in [success]
 sbt test
 # expected: ends in [success]; both platforms, so Phase 3 item 2's formulas run on Node
@@ -948,10 +972,10 @@ for f in docs/ADR-*.md; do grep -q "\`$(basename "$f")\`" .claude/skills/vql-adr
 - `core/src/main/scala/vql/typed/RuntimeModel.scala`
 - `core/src/main/scala/vql/typed/MapDispatcher.scala`
 - `core/src/main/scala/vql/typed/ElementSet.scala` (new)
-- `core/src/main/scala/vql/typed/SatisfyingCarriersLaw.scala` (new)
+- `core/src/main/scala/vql/typed/SatisfyingCarriersCheck.scala` (new)
 - `core/src/main/scala/vql/typed/TypedSemantics.scala`
 - `core/src/test/scala/vql/typed/ElementSetSpec.scala` (new)
-- `core/src/test/scala/vql/typed/SatisfyingCarriersLawSpec.scala` (new)
+- `core/src/test/scala/vql/typed/SatisfyingCarriersCheckSpec.scala` (new)
 - `core/src/test/scala/vql/typed/SetEvaluationSpec.scala` (new)
 - `core/src/test/scala/vql/typed/MapDispatcherSpec.scala`
 - `core/src/test/scala/vql/semantics/VagueSemanticsTypedSpec.scala`
@@ -998,4 +1022,4 @@ This is written into `register/docs/dev/TODO.md` as one item in Phase 3.
   with the `NodeId`s, as carriers, and declines any other argument shape.
 - `PLAN-TARGETING-SET-EVALUATION.md` §4 quotes §5.1's `satisfyingCarriers`
   and `MapDispatcher.satisfyingSets`. Its §5 law tests may call
-  `SatisfyingCarriersLaw.check`.
+  `SatisfyingCarriersCheck.check`.
