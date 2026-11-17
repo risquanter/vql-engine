@@ -75,4 +75,22 @@ class NestingBoundStackSpec extends FunSuite:
     assertEquals(thrown, None)
   }
 
+  test("the fragment walks descend through refused applications nested to each nesting limit on 1 MiB") {
+    // 256 binary `-`s nest left 256 deep, 256 unary `-`s nest right 256 deep, and 63 `f(`s nest 64 parentheses
+    val sources = List(
+      "p(" + List.fill(257)("x").mkString(" - ") + ")",
+      "p(" + "- " * 256 + "x)",
+      "p(" + "f(" * 63 + "x" + ")" * 63 + ")",
+    )
+    val thrown  = thrownOnSmallStack {
+      sources.foreach { source =>
+        val formula = FOLParser.parse(source).fold(e => throw new AssertionError(e.message), identity)
+        if FragmentCheck.violations(formula, Fragment.Targeting(Set.empty, Set.empty)).isEmpty then
+          throw new AssertionError(s"no violation reported for $source")
+        FragmentCheck.literalArguments(formula, SymbolName("f"))
+      }
+    }
+    assertEquals(thrown, None)
+  }
+
 end NestingBoundStackSpec

@@ -222,3 +222,58 @@ escalated:
     LiteralText (security trigger: the fields of a refusal that reports on a
     caller's text) → security
 ```
+
+```
+COVERAGE  tier=complex  scope=the routine tier's escalation to complex:
+          core/src/main/scala/vql/fragment/Fragment.scala:19, :42 (File scope
+          source 2, the open changes ba1ae06 and aca8d96, now pushed)
+read-in-full:
+  core/src/main/scala/vql/fragment/Fragment.scala
+  core/src/main/scala/vql/fragment/FragmentCheck.scala
+  core/src/test/scala/vql/fragment/FragmentCheckSpec.scala
+  core/.jvm/src/test/scala/parser/NestingBoundStackSpec.scala
+  core/src/main/scala/parser/FOLAtomParser.scala
+  core/src/main/scala/parser/TermParser.scala:1-140
+  core/src/main/scala/lexer/TokenText.scala
+  core/src/main/scala/vql/id/Identifiers.scala
+  docs/PLAN-targeting-formula-inspection.md
+  docs/ADR-018.md
+  docs/ADR-024.md:40-75
+  CHANGELOG.md:1-40
+  register: modules/common/src/main/scala/com/risquanter/register/domain/data/TargetingPredicate.scala
+  register: modules/common/src/test/scala/com/risquanter/register/domain/data/TargetingPredicateSpec.scala
+  register: build.sbt:1-20, :40, :105
+discharged:
+  1 adversarial line scan — PASS — FragmentCheck.scala:83, :89: predicate
+    names reach lowerCase only from FOLAtomParser.scala:40 (relOps) and
+    :66-82 (Token.Word), and StringUtil.scala:74-75 makes every Word ASCII,
+    so Character.toLowerCase gives the same result on the JVM and Scala.js
+    for every parsed name; SymbolText.of at :84 admits all five relOps
+  2 removed-behaviour audit — PASS — the old early return at a quantifier and
+    at a refused Fn is replaced by a prepend (FragmentCheck.scala:78-79, :105),
+    so the head of violations equals the old checkTargeting result whenever
+    forbiddenPredicates is empty; pinned by FragmentCheckSpec "check returns
+    the first element of violations" (hand-built and parsed lists)
+  3 cross-module tracing — PASS, 1 finding reported — engine callers of
+    FragmentCheck: NestingBoundStackSpec.scala only; register callers:
+    TargetingPredicate.scala:146 (one Targeting construction) and :149-153
+    (one match over FragmentViolation); both fail to compile on 0.23.0, the
+    match through register build.sbt:12 "-Wconf:msg=match may not be
+    exhaustive:error"; no caller relies on check stopping early
+  4 state and interleaving — discharged: the library holds no shared mutable
+    state
+  5 invariant reconstruction — PASS — check == violations.headOption.toLeft(())
+    by construction at FragmentCheck.scala:21-24; recursion depth of
+    termViolations through refused applications measured at 256 left-nested
+    and 256 right-nested `-` and 64 parentheses on a 1 MiB JVM thread
+    (NestingBoundStackSpec.scala, new test) and on Node (FragmentCheckSpec.scala,
+    new test)
+  6 design altitude and if/else — PASS — FragmentCheck.scala:42 is one
+    comparison
+  7 terminology freshness (meaning level) — discharged: no glossary
+  8 inline verification — 1 finding kept (NOTE), the stack-depth candidate
+    refuted by the new tests
+  suite: sbt test pass, JVM and Node
+escalated:
+  none
+```

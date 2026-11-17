@@ -411,4 +411,16 @@ class FragmentCheckSpec extends FunSuite:
     assertEquals(FragmentCheck.check(f, fragment), Right(()))
     assertEquals(FragmentCheck.literalArguments(f, SymbolName("f")), Nil)
 
+  test("violations descends through refused applications nested to each nesting limit"):
+    // 256 binary `-`s nest left 256 deep, 256 unary `-`s nest right 256 deep, and 63 `f(`s nest 64 parentheses
+    val refusedMinus = FragmentViolation.FunctionApplicationNotAllowed(SymbolText.of("-"))
+    val refusedF     = FragmentViolation.FunctionApplicationNotAllowed(SymbolText.of("f"))
+    val nothing      = Fragment.Targeting(Set.empty, Set.empty)
+    val binary       = parsed("p(" + List.fill(257)("x").mkString(" - ") + ")")
+    val unary        = parsed("p(" + "- " * 256 + "x)")
+    val applications = parsed("p(" + "f(" * 63 + "x" + ")" * 63 + ")")
+    assertEquals(FragmentCheck.violations(binary, nothing), List.fill(256)(refusedMinus))
+    assertEquals(FragmentCheck.violations(unary, nothing), List.fill(256)(refusedMinus))
+    assertEquals(FragmentCheck.violations(applications, nothing), List.fill(63)(refusedF))
+
 end FragmentCheckSpec
