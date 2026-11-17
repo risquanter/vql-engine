@@ -21,7 +21,9 @@ The global instructions (`~/.claude/CLAUDE.md`) and the global skills bind here 
 in every repository. Three of them are named because a step below depends on them:
 `plan-writing-style` before writing or reviewing a plan, `doc-writing-style` before
 writing a consumer-facing document such as `README.md`, and `boyscout` before
-editing source.
+editing source. A review runs through `/code-review-routine`,
+`/code-review-complex` or `/security-review-deep`, which apply
+`vql-code-quality-review`'s criteria under `review-protocol`'s process rules.
 
 ## HARD GATES — always in force
 
@@ -156,6 +158,9 @@ and the family search for every new type.
 | `CLAUDE.md` (this file) | The gates, the plan gate, the commands, versioning |
 | `docs/WORKING-INSTRUCTIONS.md` | The phase protocol, code standards, ADR lifecycle, report formats |
 | `.claude/skills/vql-adr-constraints/SKILL.md` | Which decision records bear on a change, and where records meet |
+| `.claude/skills/vql-code-quality-review/SKILL.md` | The criteria the review tiers apply, including the library's security checklist |
+| `.claude/skills/vql-supply-chain/SKILL.md` | Dependency pins, the adoption cooldown, the trust policy, what is verified |
+| `docs/reviews/` | The coverage entries the review tiers write, one file per branch |
 | `docs/ADR-*.md` | Which design constraints bind |
 | `docs/Architecture.md` | The package map, the layers and the evaluation pipeline |
 | `docs/VagueQuantifiers.md` | The paper's theory mapped to the implementation |
