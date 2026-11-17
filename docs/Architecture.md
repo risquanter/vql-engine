@@ -29,7 +29,7 @@ core/src/main/scala/
     ├── fragment/    Fragment, FragmentViolation, FragmentCheck
     ├── result/      VagueQueryResult, EvaluationOutput
     ├── error/       QueryError, QueryException, ParseRefusal, TypeCheckError,
-    │                RuntimeModelError
+    │                RuntimeModelError, TypeCatalogError
     └── id/          TypeId, SymbolName (imports nothing; vql.error and vql.typed both import it)
 ```
 

@@ -80,6 +80,7 @@ These are restated from register's rulings as this plan's own.
 - Moving `TypeCatalogError` to `vql.error`. ADR-023 §2 names the errors that
   package declares: "`TypeCheckError` and `RuntimeModelError` are declared in
   `vql.error`". `TypeCatalogError` is not among them and stays in `vql.typed`.
+  `PLAN-catalog-errors-in-vql-error.md` moves `TypeCatalogError` to `vql.error`.
 - The two Layer 4 rows `docs/TODOS.md` T-013 records as describing register
   before 0.18.0. T-013 stays open and is not part of this plan.
 
@@ -244,7 +245,7 @@ is reversible by one sentence from the user.
 | ADR-018 (fragment membership) | Relevant, **amended** | §1's `Targeting` case gains a parameter. §3's rule changes from "no `Term.Fn`" to "no `Term.Fn` outside the admitted set, and the admitted applications' arguments are walked". §5 holds. Phase 4 amends the record in place. |
 | ADR-020 (binder error accumulation) | Not relevant | The binder is not edited. |
 | ADR-022 (typed refusals) | Relevant, compliant | `FunctionApplicationNotAllowed` now holds a `SymbolText`, the type §2 names for a function name. No sentence is added. |
-| ADR-023 (identifiers in `vql.id`) | Relevant, compliant | `vql.fragment` imports `SymbolName` from `vql.id`, not from `vql.typed`. `TypeCatalogError` names a sort by `TypeId` and a symbol by `SymbolName`. It stays in `vql.typed`, because §2 names `TypeCheckError` and `RuntimeModelError` only. |
+| ADR-023 (identifiers in `vql.id`) | Relevant, compliant | `vql.fragment` imports `SymbolName` from `vql.id`, not from `vql.typed`. `TypeCatalogError` names a sort by `TypeId` and a symbol by `SymbolName`. It stays in `vql.typed`, because §2 names `TypeCheckError` and `RuntimeModelError` only. `PLAN-catalog-errors-in-vql-error.md` moves `TypeCatalogError` to `vql.error`. |
 
 **Deviations detected:** one, ADR-018, and it is the plan's purpose. Its form
 was `NRF-D-1`, ruled A, and Phase 4 amends the record to that form.

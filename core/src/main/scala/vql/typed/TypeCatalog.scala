@@ -1,32 +1,11 @@
 package vql.typed
 
 import TypeDecl.*
-import vql.error.SymbolKind
+import vql.error.{DeclarationSite, SymbolKind, TypeCatalogError}
 
 case class FunctionSig(params: List[TypeId], returns: TypeId)
 
 case class PredicateSig(params: List[TypeId])
-
-/** The place in a catalog declaration that names a type. */
-enum DeclarationSite:
-  case Constant(name: String)
-  case Parameter(symbol: SymbolName, kind: SymbolKind, index: Int)
-  case FunctionReturn(function: SymbolName)
-  case LiteralValidator
-
-  def label: String = this match
-    case Constant(name)                             => s"constant '$name'"
-    case Parameter(symbol, SymbolKind.Function, i)  => s"function '${symbol.value}' parameter $i"
-    case Parameter(symbol, SymbolKind.Predicate, i) => s"predicate '${symbol.value}' parameter $i"
-    case FunctionReturn(function)                   => s"function '${function.value}' return type"
-    case LiteralValidator                           => "literal validator"
-
-enum TypeCatalogError:
-  /** `typeId` is named at `site` and is not declared in [[TypeCatalog.types]]. */
-  case UnknownType(typeId: TypeId, site: DeclarationSite)
-
-  /** `symbol` is declared both as a function and as a predicate. */
-  case NameCollision(symbol: SymbolName)
 
 /**
  * A validated type catalog.
@@ -80,15 +59,14 @@ object TypeCatalog:
     predicates: Map[SymbolName, PredicateSig] = Map.empty,
     literalValidators: Map[TypeId, String => Option[Any]] = Map.empty,
   ): Either[List[TypeCatalogError], TypeCatalog] =
-    val errors = collectErrors(types, constants, functions, predicates, literalValidators)
-    if errors.isEmpty then
-      Right(new TypeCatalog(types, constants, functions, predicates, literalValidators))
-    else Left(errors)
+    collectErrors(types, constants, functions, predicates, literalValidators) match
+      case Nil    => Right(new TypeCatalog(types, constants, functions, predicates, literalValidators))
+      case errors => Left(errors)
 
   /**
-   * Construct without returning Either. Throws [[IllegalArgumentException]] if validation fails.
-   * Use only in tests or application startup where a catalog inconsistency is a programming error,
-   * not a user error.
+   * Construct without returning Either. Throws [[IllegalArgumentException]] if validation fails,
+   * and the exception's text holds each error's sentence. Use only in tests or application startup
+   * where a catalog inconsistency is a programming error, not a user error.
    *
    * @param types
    *   See [[apply]] for semantics.
@@ -104,7 +82,7 @@ object TypeCatalog:
       .fold(
         errors =>
           throw IllegalArgumentException(
-            s"Invalid TypeCatalog: ${errors.map(_.toString).mkString(", ")}"
+            s"Invalid TypeCatalog: ${errors.map(_.message).mkString("; ")}"
           ),
         identity,
       )

@@ -2,7 +2,7 @@ package vql.typed
 
 import TypeDecl.*
 import munit.FunSuite
-import vql.error.SymbolKind
+import vql.error.{DeclarationSite, SymbolKind, TypeCatalogError}
 
 class TypeCatalogSpec extends FunSuite:
 
@@ -199,5 +199,42 @@ class TypeCatalogSpec extends FunSuite:
       )
 
     assertEquals(catalog.domainReturningFunctions, Set(SymbolName("node_id")))
+
+  test("UnknownType's message names the type and each declaration site"):
+    val ghost = TypeId("Ghost")
+    val cases = List(
+      DeclarationSite.Constant("root") -> "unknown type 'Ghost' in constant 'root'",
+      DeclarationSite.Parameter(SymbolName("f"), SymbolKind.Function, 0) ->
+        "unknown type 'Ghost' in function 'f' parameter 0",
+      DeclarationSite.Parameter(SymbolName("p"), SymbolKind.Predicate, 1) ->
+        "unknown type 'Ghost' in predicate 'p' parameter 1",
+      DeclarationSite.FunctionReturn(SymbolName("p95")) ->
+        "unknown type 'Ghost' in function 'p95' return type",
+      DeclarationSite.LiteralValidator -> "unknown type 'Ghost' in literal validator",
+    )
+    cases.foreach { (site, expected) =>
+      assertEquals(TypeCatalogError.UnknownType(ghost, site).message, expected)
+    }
+
+  test("NameCollision's message names the symbol"):
+    assertEquals(
+      TypeCatalogError.NameCollision(SymbolName("foo")).message,
+      "'foo' is declared as both a function and a predicate",
+    )
+
+  test("unsafe reports each refused declaration by its message"):
+    val asset = TypeId("Asset")
+    val ghost = TypeId("Ghost")
+
+    val thrown = intercept[IllegalArgumentException](
+      TypeCatalog.unsafe(
+        types = Set(DomainType(asset)),
+        functions = Map(SymbolName("p95") -> FunctionSig(List(asset), ghost)),
+      )
+    )
+    assertEquals(
+      thrown.getMessage,
+      "Invalid TypeCatalog: unknown type 'Ghost' in function 'p95' return type",
+    )
 
 end TypeCatalogSpec
