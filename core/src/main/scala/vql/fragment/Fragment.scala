@@ -10,12 +10,13 @@ import vql.id.SymbolName
  */
 enum Fragment:
   /**
-   * No quantifier nodes, and no function application outside `admittedFunctions`. Admits variables
+   * No quantifier nodes, no function application outside `admittedFunctions`, and no atom whose
+   * predicate is in `forbiddenPredicates`, compared after lower-casing both names. Admits variables
    * and inline literals (`Term.Const`). An admitted application's arguments are walked by the same
-   * rule, so a refused function inside an admitted one is still refused. `Targeting(Set.empty)`
-   * admits no function at all, arithmetic operators included.
+   * rule, so a refused function inside an admitted one is still refused. `Targeting(Set.empty,
+   * Set.empty)` admits no function at all, arithmetic operators included, and forbids no predicate.
    */
-  case Targeting(admittedFunctions: Set[SymbolName])
+  case Targeting(admittedFunctions: Set[SymbolName], forbiddenPredicates: Set[SymbolName])
 
   /**
    * Quantifier nesting depth (quantifier rank) at most `maxQuantifierDepth`, 0-indexed: the largest
@@ -26,9 +27,9 @@ enum Fragment:
   case Screening(maxQuantifierDepth: Int)
 
 /**
- * The specific fragment rule a formula broke. Returned as the `Left` of [[FragmentCheck.check]],
- * carrying the first violation in pre-order, left-to-right traversal. Mirrors the typed-error house
- * style of `vql.error.TypeCheckError`.
+ * The specific fragment rule a formula broke. [[FragmentCheck.check]] carries the first violation
+ * as its `Left`, and [[FragmentCheck.violations]] carries all of them, both in pre-order,
+ * left-to-right traversal. Mirrors the typed-error house style of `vql.error.TypeCheckError`.
  */
 enum FragmentViolation:
   /** Targeting: a `Forall`/`Exists` node is present. */
@@ -36,6 +37,9 @@ enum FragmentViolation:
 
   /** Targeting: a `Term.Fn` outside the admitted set is present; `function` is its name. */
   case FunctionApplicationNotAllowed(function: SymbolText)
+
+  /** Targeting: an atom's predicate is forbidden; `predicate` is its name as the formula wrote it. */
+  case PredicateNotAllowed(predicate: SymbolText)
 
   /**
    * Screening: the formula's maximum quantifier nesting depth `found` exceeds the fragment's

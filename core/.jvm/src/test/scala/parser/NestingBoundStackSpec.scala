@@ -63,7 +63,12 @@ class NestingBoundStackSpec extends FunSuite:
       val query = VagueQueryParser.parse(s"Q[>=]^{1/2} x (p(x), $scope)").fold(e => throw new AssertionError(e.formatted), identity)
       VagueSemantics.evaluateTyped(query, model, samplingParams = SamplingParams.exact).fold(e => throw new AssertionError(e.formatted), identity)
       val formula = FOLParser.parse(scope).fold(e => throw new AssertionError(e.message), identity)
-      FragmentCheck.check(formula, Fragment.Targeting(Set(SymbolName("f")))).fold(v => throw new AssertionError(v.toString), identity)
+      val targeting = Fragment.Targeting(Set(SymbolName("f")), Set(SymbolName("q")))
+      FragmentCheck.check(formula, targeting).fold(v => throw new AssertionError(v.toString), identity)
+      FragmentCheck.violations(formula, targeting) match
+        case Nil        => ()
+        case violations => throw new AssertionError(violations.toString)
+      FragmentCheck.literalArguments(formula, SymbolName("f"))
       FOLPrinter.print(formula)
       ()
     }
