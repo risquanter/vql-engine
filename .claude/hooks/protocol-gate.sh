@@ -182,7 +182,7 @@ if [ "$TOOL" = "Bash" ]; then
     *".claude/protocol"*|*".claude/bin"*|*".claude/hooks"*|*".claude/settings.json"*)
       deny "Blocked: the working-protocol machinery is user-owned — the approval token (.claude/protocol/), this hook (.claude/hooks/), the approval script (.claude/bin/), and the hook wiring (.claude/settings.json). Only the user creates, refreshes, runs, or removes any of it (G7 in CLAUDE.md).
 
-To READ any of these files, use the Read tool — it is not gated. To propose an inventory amendment, write .claude/protocol/pending with the Write tool, not through Bash. To have anything else run or changed, hand the user the exact command and stop."
+This refusal is final for its effect. Hand the user the exact command and stop, and do not reach the same effect with another tool. For later calls, chosen before the call: these files are read with the Read tool, and an inventory amendment is written to .claude/protocol/pending with the Write tool."
       ;;
   esac
 
@@ -274,7 +274,7 @@ Do not retry, do not reshape the command, and do not look for another route to t
 
   deny "Blocked: this Bash command would write into the gated region (core/, project/, build.sbt, .github/) or into a file inventory (docs/PLAN-*-INVENTORY.md). Detected $WRITE.
 
-Bash file writes never reach the file-inventory check that gates Edit/Write, so allowing them would make that check optional. Edits there go through the Edit/Write tools. Deleting, moving or renaming a gated file is handed to the user.
+Bash file writes never reach the file-inventory check that gates Edit/Write, so allowing them would make that check optional. This refusal is final for its effect: do not now make the same change with Edit or Write. A gated file is changed with Edit or Write only when that tool is chosen before the call. Deleting, moving or renaming a gated file is handed to the user.
 
 A file inventory is never written by the agent at all, by any route. To have paths added to one: $PENDING_HOWTO The one-shot exemption below does not cover inventories.
 
