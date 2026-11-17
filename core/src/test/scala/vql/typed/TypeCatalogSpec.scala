@@ -237,4 +237,24 @@ class TypeCatalogSpec extends FunSuite:
       "Invalid TypeCatalog: unknown type 'Ghost' in function 'p95' return type",
     )
 
+  test("unsafe joins several refused declarations' messages with a semicolon"):
+    val asset = TypeId("Asset")
+    val ghost = TypeId("Ghost")
+
+    val thrown = intercept[IllegalArgumentException](
+      TypeCatalog.unsafe(
+        types = Set(DomainType(asset)),
+        functions = Map(
+          SymbolName("p95") -> FunctionSig(List(asset), ghost),
+          SymbolName("foo") -> FunctionSig(List(asset), asset),
+        ),
+        predicates = Map(SymbolName("foo") -> PredicateSig(List(asset))),
+      )
+    )
+    assertEquals(
+      thrown.getMessage,
+      "Invalid TypeCatalog: unknown type 'Ghost' in function 'p95' return type; " +
+        "'foo' is declared as both a function and a predicate",
+    )
+
 end TypeCatalogSpec
