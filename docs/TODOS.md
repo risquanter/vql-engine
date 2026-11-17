@@ -588,3 +588,89 @@ of a stored targeting predicate, ruled at 4 096 characters. Register's figures
 were measured in its `commonJVM/console` against 0.18.0 on JDK 21.
 `core/src/main/scala/parser/` and `core/src/main/scala/lexer/` are unchanged
 from `v0.18.0` to `v0.19.0`.
+
+---
+
+## T-015 — An argument list is outside the nesting bound and overflows a native-image stack
+
+**Status:** OPEN.
+
+`NestingBound.check` counts parentheses, operator tokens and quantified
+variables. It does not count `Token.Comma`. `parseList` in
+`parser/Combinators.scala` composes one closure per argument and then calls
+through all of them, so its stack depth is the argument count.
+
+`PLAN-parse-depth-bound` §4.2 left the list unbounded on this ground: "A list
+that long holds 12 000 tokens, which register's 4 096-character bound already
+excludes." Its §4.3 measured 4 324 arguments on a 1 MiB interpreted JVM thread.
+
+Measured on 2026-11-16 against register's server image at 0.22.0, a GraalVM
+native image built `--static --libc=musl` with no stack size set, with engine
+0.20.0: a targeting predicate `p(x,x,…)` of 1 536 arguments parses, and one of
+1 792 arguments, which is 3 586 characters, throws `StackOverflowError` at
+`parser.Combinators$.parseList` (`Combinators.scala` line 106). The process
+exits. The same image parses 256 negations and a 257-atom chain, which are the
+limits of ADR-024.
+
+So register's length bound does not exclude the overflow on that platform.
+
+**Ruled for register (user, 2026-11-16):** register bounds a targeting source
+and a query text at 2 048 characters, and keeps that bound after this item
+lands. The engine bounds the arguments as well, so that each bound alone stops
+the overflow. The engine's limit is the most a 2 048-character text can hold:
+`p(x,x,…)` with 1 023 arguments, which is 1 022 commas. That is under the 1 536
+arguments measured to parse on the native image.
+
+**Scope:** the pre-parse pass counts `Token.Comma` and refuses a text past the
+limit, as it refuses one past the parenthesis and operator limits. The other
+remedy stays open to this repository's plan as an addition: `parseList`
+accumulating its list without composing closures, which ADR-007's verbatim port
+of the combinators has to allow. Register's largest predicate under its bound
+picks 42 nodes by identifier, which is 42 commas and 41 operators.
+
+**Context:** register PLAN-RISKTRANSFORM, the security review of milestone M4,
+finding 1.
+
+---
+
+## T-016 — A knowledge base can answer a predicate's whole satisfying set
+
+**Status:** OPEN.
+
+`TypedSemantics.satisfyingSet` walks the free variable's domain and evaluates
+the formula once per element, calling the dispatcher's `evalPredicate` once per
+atom per element. Its cost is the domain size times the atom count.
+
+Measured on 2026-11-16 for register's mitigation targeting. On the JVM, engine
+0.21.0 evaluates 257 true atoms joined by `/\` over 10 000 elements in about
+80 ms. Register's native server image, engine 0.20.0, resolves at about 210 ns
+per atom per element. At register's bounds, 1 000 predicates of about 186 atoms
+over 10 000 nodes, one resolution extrapolates to about 6.5 minutes.
+
+Many predicates a knowledge base serves are answered from an index as a whole
+set: every value standing in the relation to a fixed argument. Register's
+`descendant_of(x, P)` is the subtree under `P`. A formula over such atoms is
+then set algebra: `/\` is intersection, `\/` is union, `~` is the complement
+in the domain.
+
+**Scope:**
+
+- `RuntimeDispatcher` gains an optional question. Given a predicate name, the
+  fixed arguments and one open position, it answers the set of values of the
+  open position that satisfy it, or declines. Declining is the default, so a
+  dispatcher that does not answer keeps today's behaviour.
+- `satisfyingSet` evaluates a subformula as set algebra when every atom in it
+  is answered as a set. It falls back to per-element evaluation for the rest,
+  under the same Kleene semantics: a dispatcher refusal is an unknown truth
+  value, so a set answer must be exact or the dispatcher declines.
+- The law a dispatcher must keep, stated in the engine's documentation and
+  testable by every consumer: the set it answers equals the domain filtered by
+  its own `evalPredicate`.
+
+The question names only engine types (`SymbolName`, `Value`), so any knowledge
+base may answer it.
+
+**Plan:** `docs/PLAN-predicate-satisfying-set.md`, a draft.
+
+**Context:** register PLAN-TARGETING-SET-EVALUATION, which consumes the release
+carrying this item.
