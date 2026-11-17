@@ -335,7 +335,7 @@ Shared root cause with T-009.
 (`Fragment`, `FragmentViolation`, `FragmentCheck`) is in main with unit and
 parse-through tests; both fragments (`Targeting`, `Screening(k)`) ship.
 [ADR-018](ADR-018.md) records the design (Accepted 2026-08-12);
-[DONE_PLAN-fragment-membership-api.md](DONE_PLAN-fragment-membership-api.md) is the plan.
+[DONE_PLAN-fragment-membership-api.md](archive/plans/DONE_PLAN-fragment-membership-api.md) is the plan.
 Bundles as the additive (non-breaking) Central release **0.12.0**, ahead of the
 T-000 package rename (0.13.1).
 The contract and rulings below are retained as the specification of the shipped
@@ -437,7 +437,7 @@ fragment added additively — not this one.
   `FOLParser.parse` — register's write-path formula validation — not the
   vague-query (`VagueQueryParser` → `ParsedQuery`) path. Consistent with §8.4-3.
 
-**Implemented under [DONE_PLAN-fragment-membership-api.md](DONE_PLAN-fragment-membership-api.md)
+**Implemented under [DONE_PLAN-fragment-membership-api.md](archive/plans/DONE_PLAN-fragment-membership-api.md)
 and [ADR-018](ADR-018.md).** The code in `vql.fragment` follows the shape above:
 first-violation `Either[FragmentViolation, Unit]`, pre-order left-to-right
 traversal, `Term.Const`/`Term.Var` admitted and every `Term.Fn` rejected by
