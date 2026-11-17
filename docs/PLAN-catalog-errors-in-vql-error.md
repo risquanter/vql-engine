@@ -411,6 +411,7 @@ is required.
 - `CHANGELOG.md`
 - `.claude/skills/vql-code-quality-review/SKILL.md`
 - `docs/PLAN-node-returning-functions.md`
+- `build.sbt` (the version line, run by the user)
 
 ---
 

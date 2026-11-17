@@ -10,13 +10,13 @@ version.
 - **`TypeCatalogError` and `DeclarationSite` are declared in `vql.error`.** A
   consumer that names either one imports it from there. See ADR-023.
 
-### Changed
-
-- `TypeCatalog.unsafe` reports each refused declaration as a sentence.
-
 ### Added
 
 - `TypeCatalogError.message`.
+
+### Changed
+
+- `TypeCatalog.unsafe` reports each refused declaration as a sentence.
 
 ## 0.21.0
 
