@@ -13,7 +13,7 @@ import vql.id.SymbolName
  * computes the set with `TypeCatalog.domainReturningFunctions` and passes it in. Callers with query
  * text parse via `FOLParser.parse` and map the foundation `ParseError` at their own boundary, the
  * same input discipline as `VagueSemantics.satisfyingSet` (ADR-017 §6). Its cases `Syntax`,
- * `Trailing` and `Lex` each carry a typed value and a `SourcePosition` (ADR-022).
+ * `Trailing`, `Lex` and `Nesting` each carry a typed value and a `SourcePosition` (ADR-022).
  */
 object FragmentCheck:
 
@@ -29,7 +29,7 @@ object FragmentCheck:
    * quantifier and into a refused application's arguments.
    * {{{
    * // Targeting(Set(SymbolName("node_id")), Set(SymbolName("mitigated")))
-   * forall y. Mitigated(y) /\ p95(node_named(y))
+   * forall y. Mitigated(y) /\ gt(p95(node_named(y)), 0)
    * // List(QuantifierNotAllowed, PredicateNotAllowed(Mitigated),
    * //      FunctionApplicationNotAllowed(p95), FunctionApplicationNotAllowed(node_named))
    * }}}

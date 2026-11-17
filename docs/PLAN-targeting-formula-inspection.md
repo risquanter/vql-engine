@@ -170,8 +170,9 @@ compile, and uses no JDK method Scala.js lacks (§5.2).
    Lower-casing uses `Character.toLowerCase` on each character, which ignores
    the default locale. `String.toLowerCase()` uses it, and under a Turkish
    locale maps `I` to `ı`, so `MITIGATED` would not match.
-5. **`literalArguments` sits in `FragmentCheck`.** It walks the same tree, and
-   the two walks share the private recursion over the formula's atoms. A new
+5. **`literalArguments` sits in `FragmentCheck`.** It walks the same tree
+   `violations` walks, with its own private recursion over the formula's
+   atoms. A new
    object would need a name the project has no term for. This is reversible.
 6. **`FragmentViolation` gains no `message` and stays in `vql.fragment`.**
    ADR-018's ADR-012 cross-reference calls `check`'s result
@@ -368,7 +369,7 @@ object FragmentCheck:
    * quantifier and into a refused application's arguments.
    * {{{
    * // Targeting(Set(SymbolName("node_id")), Set(SymbolName("mitigated")))
-   * forall y. Mitigated(y) /\ p95(node_named(y))
+   * forall y. Mitigated(y) /\ gt(p95(node_named(y)), 0)
    * // List(QuantifierNotAllowed, PredicateNotAllowed(Mitigated),
    * //      FunctionApplicationNotAllowed(p95), FunctionApplicationNotAllowed(node_named))
    * }}}

@@ -314,6 +314,51 @@ class FragmentCheckSpec extends FunSuite:
       ),
     )
 
+  test("e2e: an application in predicate position is an atom, so only its arguments can be refused functions"):
+    val fragment = Fragment.Targeting(nodeId, Set(SymbolName("mitigated")))
+    assertEquals(
+      FragmentCheck.violations(parsed("""forall y. Mitigated(y) /\ gt(p95(node_named(y)), 0)"""), fragment),
+      List(
+        FragmentViolation.QuantifierNotAllowed,
+        predicateRefused("Mitigated"),
+        FragmentViolation.FunctionApplicationNotAllowed(SymbolText.of("p95")),
+        FragmentViolation.FunctionApplicationNotAllowed(SymbolText.of("node_named")),
+      ),
+    )
+    assertEquals(
+      FragmentCheck.violations(parsed("""forall y. Mitigated(y) /\ p95(node_named(y))"""), fragment),
+      List(
+        FragmentViolation.QuantifierNotAllowed,
+        predicateRefused("Mitigated"),
+        FragmentViolation.FunctionApplicationNotAllowed(SymbolText.of("node_named")),
+      ),
+    )
+
+  test("check returns the first element of violations for every hand-built targeting formula above"):
+    val formulas = List(
+      atom("p", mkVar("x")),
+      atom("p", mkVar("x"), mkConst("42")),
+      Formula.And(atom("p", mkVar("x")), Formula.Not(atom("q", mkVar("y")))),
+      Formula.mkForall("x", atom("p", mkVar("x"))),
+      Formula.mkExists("x", atom("p", mkVar("x"))),
+      atom("p", mkFn("f", List(mkVar("x")))),
+      atom("gt", mkFn("+", List(mkVar("x"), mkVar("y"))), mkVar("z")),
+      atom("p", mkFn("f", List(mkFn("g", List(mkVar("x")))))),
+      atom("eq", mkVar("x"), mkFn("node_id", List(mkConst("a1")))),
+      atom("eq", mkVar("x"), mkFn("node_id", List(mkFn("p95", List(mkVar("y")))))),
+      Formula.And(
+        atom("eq", mkVar("x"), mkFn("node_id", List(mkConst("a1")))),
+        Formula.mkExists("y", atom("p", mkVar("y"))),
+      ),
+      Formula.And(atom("p", mkFn("f", List(mkVar("x")))), Formula.mkExists("y", atom("q", mkVar("y")))),
+      Formula.And(atom("p", mkVar("x")), Formula.mkExists("y", atom("q", mkVar("y")))),
+      Formula.mkForall("x", atom("p", mkFn("f", List(mkVar("x"))))),
+    )
+    for
+      fragment <- List(Fragment.Targeting(Set.empty, Set.empty), Fragment.Targeting(nodeId, Set.empty))
+      f        <- formulas
+    do assertEquals(FragmentCheck.check(f, fragment), FragmentCheck.violations(f, fragment).headOption.toLeft(()), f)
+
   test("e2e: check returns the first element of violations for every targeting formula above"):
     val formulas = List(
       "P(x)",
@@ -359,8 +404,8 @@ class FragmentCheckSpec extends FunSuite:
   // ==================== At the nesting limits ====================
 
   test("violations and literalArguments return on a formula at both nesting limits"):
-    // 253 negations and `p(` with 62 `f(`s: 253 operators and 64 parentheses, within ADR-024's limits
-    val f        = parsed("~ " * 253 + "p(" + "f(" * 62 + "x" + ")" * 62 + ")")
+    // 256 negations are 256 operators, and `p(` with 63 `f(`s nests 64 parentheses: both of ADR-024's limits
+    val f        = parsed("~ " * 256 + "p(" + "f(" * 63 + "x" + ")" * 63 + ")")
     val fragment = Fragment.Targeting(Set(SymbolName("f")), Set(SymbolName("q")))
     assertEquals(FragmentCheck.violations(f, fragment), Nil)
     assertEquals(FragmentCheck.check(f, fragment), Right(()))

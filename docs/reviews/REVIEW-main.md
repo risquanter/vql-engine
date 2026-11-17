@@ -139,3 +139,86 @@ discharged:
 escalated:
   none
 ```
+
+```
+COVERAGE  tier=routine  scope=the open changes on main (File scope source 2):
+          git diff origin/main...HEAD, the commits 808c3fd, 6cbb973, ba1ae06 and
+          fbcf1f8; the working tree was clean at the start
+read-in-full:
+  .claude/skills/vql-adr-constraints/SKILL.md
+  CHANGELOG.md
+  README.md
+  build.sbt
+  core/.jvm/src/test/scala/parser/NestingBoundStackSpec.scala
+  core/src/main/scala/vql/fragment/Fragment.scala
+  core/src/main/scala/vql/fragment/FragmentCheck.scala
+  core/src/test/scala/vql/fragment/FragmentCheckSpec.scala
+  docs/ADR-004.md
+  docs/ADR-018.md
+  docs/Architecture.md
+  docs/PLAN-catalog-errors-in-vql-error.md
+  docs/PLAN-targeting-formula-inspection-INVENTORY.md
+  docs/PLAN-targeting-formula-inspection.md
+  also read: CLAUDE.md, docs/WORKING-INSTRUCTIONS.md,
+    .claude/skills/vql-code-quality-review/SKILL.md, docs/ADR-001.md,
+    docs/ADR-006.md, docs/ADR-007.md, docs/ADR-012.md, docs/ADR-014.md,
+    docs/ADR-022.md, docs/ADR-023.md, docs/ADR-024.md,
+    docs/PLAN-catalog-errors-in-vql-error-INVENTORY.md,
+    .claude/hooks/protocol-gate.sh, .claude/protocol/approved,
+    core/src/main/scala/parser/NestingBound.scala,
+    core/src/test/scala/parser/NestingBoundSpec.scala,
+    core/src/main/scala/lexer/TokenText.scala (LiteralText, SymbolText),
+    core/src/main/scala/parser/TermParser.scala:35-115,
+    core/src/main/scala/parser/ParseError.scala:19-38,
+    register: docs/dev/decision-records/ADR-029-input-injection-defence.md:89,
+    register: TargetingPredicate.scala:146 (the one Targeting construction)
+discharged:
+  1 plan conformance — PASS — Fragment.scala:19, :41-42 match plan §5.1;
+    FragmentCheck.scala:21-24, :37-42, :52-53, :60-124 match §5.2 verbatim;
+    FragmentCheckSpec.scala and NestingBoundStackSpec.scala:66-71 match §6
+    Phase 1 steps 3 and 4 (no assertion changed); every changed file is a
+    bullet of PLAN-targeting-formula-inspection-INVENTORY.md except
+    .claude/skills/vql-adr-constraints/SKILL.md, which the plan's File
+    inventory section names as outside the gated region; the test at
+    FragmentCheckSpec.scala:406 is authorized by plan §4's ADR-024 row
+    ("and on Node"); §7 commands print nothing
+  2 family search — PASS —
+    `grep -rn "enum .*Violation" core/src/main/scala` → Fragment.scala:34
+      `enum FragmentViolation:`; PredicateNotAllowed(predicate: SymbolText)
+      follows FunctionApplicationNotAllowed(function: SymbolText); nearest other
+      case TypeCheckError.UnknownPredicate(name: SymbolText) denotes an
+      undeclared name, a different concept
+    forbiddenPredicates: Set[SymbolName] follows admittedFunctions:
+      Set[SymbolName] in Fragment.scala:19
+    `grep -rn "^object [A-Z]" core/src/main/scala/vql` → FragmentCheck.scala:18
+      `object FragmentCheck`; violations and literalArguments sit beside
+      `def check`
+    `grep -rn "toLowerCase" core/src/main/scala` → only FragmentCheck.scala:89;
+      no existing lower-casing helper
+    `grep -rn "def overatoms|def atomUnion|def predicates|def functions"
+      core/src/main/scala` → nothing; no existing atom walk duplicates atomTerms
+  3 mechanical bug scan — PASS — check's match on List is exhaustive
+    (FragmentCheck.scala:22-24); literalsIn covers Var, Const, Fn (:120-124);
+    LiteralText(literal) at :122 cannot throw on parsed input: Lexer.scala:95
+    refuses a quoted character outside literalChars and TermParser.scala:39,
+    :109 builds every other Const from digits, "nil" or a decimal;
+    SymbolText.of at :84 accepts the infix relation names (TokenText.scala)
+  4 convention conformance — 1 comment defect fixed (FragmentCheck.scala:32);
+    if/else check PASS — FragmentCheck.scala:42 is one comparison
+  5 test presence — PASS after two tests added (FragmentCheckSpec.scala:317,
+    :337); sbt test pass, JVM and Node
+  6 drive-by changes — PASS — 808c3fd edits docs/ADR-004.md:69 and
+    docs/PLAN-catalog-errors-in-vql-error.md, both under that plan, whose
+    inventory lists docs/ADR-004.md
+  7 boyscout pass — 3 findings reported (README.md:70, README.md:10,
+    docs/ADR-018.md:248); 1 stale comment fixed (FragmentCheck.scala:15-16)
+  8 terminology freshness (name level) — discharged: no glossary
+escalated:
+  core/src/main/scala/vql/fragment/Fragment.scala:19, :42 — a public case gains a
+    parameter and a public enum gains a case, which register matches
+    (wire contracts: public API shapes) → complex
+  core/src/main/scala/vql/fragment/FragmentCheck.scala:81-89, :122 — a walk over a
+    parser's output whose results carry caller text as SymbolText and
+    LiteralText (security trigger: the fields of a refusal that reports on a
+    caller's text) → security
+```
