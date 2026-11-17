@@ -62,3 +62,6 @@ _opam/
 # Temp folder
 /temp/
 /temp/*
+
+# Approval token, pending proposal and override log: local state, user-owned
+.claude/protocol/

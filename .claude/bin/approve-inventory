@@ -1,0 +1,257 @@
+#!/usr/bin/env bash
+# Add files to a plan's file inventory and point the approval token at that
+# plan. Run by the user, from the user's own terminal, never by the agent.
+#
+# The file inventory is the list the approval hook reads to decide whether a
+# gated edit is permitted. It lives in its own document beside the plan
+# (docs/PLAN-<name>-INVENTORY.md), which the hook denies the agent from
+# writing, so the agent can propose an amendment but cannot apply one.
+#
+# Input is a plain text file, .claude/protocol/pending. The agent writes it
+# and shows the same block in the chat:
+#
+#     docs/PLAN-catalog-errors-in-vql-error.md
+#     core/src/main/scala/vql/typed/TypeCatalog.scala
+#     new: core/src/main/scala/vql/error/TypeCatalogError.scala
+#
+# The first line names the plan. Every line after it is one repo-relative path
+# to authorize.
+#
+# Before anything is written, the script prints what it read and what it will
+# change, and asks "apply? [y/N]". Only "y" or "yes" applies it. Any other
+# answer leaves every file as it was, the pending file included. That prompt
+# is the approval: the pending file is the agent's proposal and authorizes
+# nothing until the user answers it.
+#
+# A path must already exist in the working tree, which catches a mistyped one.
+# A file the plan is going to CREATE cannot pass that check, so it carries the
+# marker "new:". The marker is the agent stating that the file does not exist
+# yet; the user reads that claim at the prompt, and that reading is what
+# authorizes it. An unmarked path that does not exist is rejected as a typo.
+#
+# A "#" begins a comment anywhere in a line, and blank lines are ignored.
+#
+# Usage:
+#   .claude/bin/approve-inventory            amend, then approve
+#   .claude/bin/approve-inventory amend      add the paths to the inventory
+#   .claude/bin/approve-inventory approve    add the plan to the token
+#   .claude/bin/approve-inventory --dry-run  report what would change, ask nothing
+#
+# The token holds one plan per line. Approving adds a plan beside the others;
+# a plan is closed by deleting its line from the token.
+#
+# "amend" leaves the pending file in place so "approve" can read it next;
+# "approve" and the no-argument form consume it.
+#
+# The script requires a terminal on both stdin and stdout. That catches an
+# accidental non-interactive invocation. It does NOT prove a person is present:
+# a pseudo-terminal satisfies the same test. The control that keeps the agent
+# out of this script is the hook's refusal of any command naming .claude/bin,
+# backed by the standing rule that the agent never works around a control.
+set -euo pipefail
+
+# Whether a path is already listed must be decided by the SAME rule the hook
+# uses to authorize it, or this script reports a path as covered that the hook
+# will go on to deny. Both match a whole whitespace-delimited token on a bullet
+# line, not a substring of one.
+already_listed() {
+  [ -f "$1" ] || return 1
+  awk -v want="$2" '
+    /^[[:space:]]*- / {
+      line = $0
+      sub(/^[[:space:]]*-[[:space:]]+/, "", line)
+      n = split(line, parts, /[[:space:]]+/)
+      for (i = 1; i <= n; i++) {
+        p = parts[i]
+        gsub(/^[`("*]+/, "", p)
+        gsub(/[`)"*,;:.]+$/, "", p)
+        if (p == want) { found = 1; exit }
+      }
+    }
+    END { exit(found ? 0 : 1) }
+  ' "$1"
+}
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT"
+
+PENDING=".claude/protocol/pending"
+TOKEN=".claude/protocol/approved"
+
+MODE="both"
+DRY=0
+for arg in "$@"; do
+  case "$arg" in
+    amend|approve|both) MODE="$arg" ;;
+    --dry-run) DRY=1 ;;
+    *) echo "unknown argument: $arg" >&2; exit 2 ;;
+  esac
+done
+
+if [ ! -t 0 ] || [ ! -t 1 ]; then
+  echo "refusing to run: this script requires an interactive terminal." >&2
+  echo "It authorizes gated edits, so it runs only where a person is typing." >&2
+  exit 3
+fi
+
+[ -f "$PENDING" ] || { echo "no $PENDING — nothing to apply." >&2; exit 1; }
+
+# --- read and validate the pending file -------------------------------------
+PLAN=""
+PATHS=()
+IS_NEW=()
+while IFS= read -r LINE || [ -n "$LINE" ]; do
+  LINE="${LINE%%#*}"
+  LINE="${LINE#"${LINE%%[![:space:]]*}"}"
+  LINE="${LINE%"${LINE##*[![:space:]]}"}"
+  [ -n "$LINE" ] || continue
+  if [ -z "$PLAN" ]; then
+    PLAN="$LINE"
+    continue
+  fi
+  case "$LINE" in
+    new:*)
+      LINE="${LINE#new:}"
+      LINE="${LINE#"${LINE%%[![:space:]]*}"}"
+      PATHS+=("$LINE"); IS_NEW+=(1)
+      ;;
+    *)
+      PATHS+=("$LINE"); IS_NEW+=(0)
+      ;;
+  esac
+done < "$PENDING"
+
+ERRORS=0
+fail() { echo "  error: $1" >&2; ERRORS=$((ERRORS + 1)); }
+
+[ -n "$PLAN" ] || { echo "the pending file names no plan." >&2; exit 1; }
+case "$PLAN" in
+  /*) fail "the plan path must be repo-relative, not absolute: $PLAN" ;;
+  *-INVENTORY.md) fail "name the plan, not its inventory document: $PLAN" ;;
+  docs/PLAN-*.md) [ -f "$PLAN" ] || fail "no such plan: $PLAN" ;;
+  *) fail "not a plan document under docs/: $PLAN" ;;
+esac
+
+SIDECAR="${PLAN%.md}-INVENTORY.md"
+
+i=0
+while [ "$i" -lt "${#PATHS[@]}" ]; do
+  p="${PATHS[$i]}"
+  n="${IS_NEW[$i]}"
+  i=$((i + 1))
+  [ -n "$p" ] || { fail "empty path after the 'new:' marker"; continue; }
+  case "$p" in
+    /*) fail "absolute path (must be repo-relative): $p"; continue ;;
+    *-INVENTORY.md) fail "an inventory file cannot authorize itself: $p"; continue ;;
+    .claude/*) fail "the protocol machinery is never authorized for editing: $p"; continue ;;
+  esac
+  if [ "$n" -eq 1 ]; then
+    [ -e "$p" ] && echo "  note: marked new but already exists: $p"
+  else
+    [ -e "$p" ] || fail "no such file in the working tree: $p
+         If the plan creates this file, mark the line 'new: $p'."
+  fi
+done
+
+[ "$ERRORS" -eq 0 ] || { echo "" >&2; echo "$ERRORS problem(s); nothing written." >&2; exit 1; }
+
+# --- show the proposal and ask -----------------------------------------------
+NEW=()
+for p in "${PATHS[@]}"; do
+  already_listed "$SIDECAR" "$p" || NEW+=("$p")
+done
+
+PRESENT=0
+if [ -f "$TOKEN" ]; then
+  while IFS= read -r OLD || [ -n "$OLD" ]; do
+    OLD="${OLD%%#*}"
+    OLD="$(echo "$OLD" | xargs 2>/dev/null || true)"
+    [ "$OLD" = "$PLAN" ] && PRESENT=1
+  done < "$TOKEN"
+fi
+
+echo "plan: $PLAN"
+if [ "$MODE" = "amend" ] || [ "$MODE" = "both" ]; then
+  if [ "${#NEW[@]}" -eq 0 ]; then
+    echo "inventory already covers every path; nothing to add."
+  else
+    echo "add to $SIDECAR:"
+    i=0
+    while [ "$i" -lt "${#PATHS[@]}" ]; do
+      p="${PATHS[$i]}"; n="${IS_NEW[$i]}"; i=$((i + 1))
+      already_listed "$SIDECAR" "$p" && { echo "  already listed: $p"; continue; }
+      if [ "$n" -eq 1 ]; then echo "  - $p   (new: the plan creates it)"; else echo "  - $p"; fi
+    done
+  fi
+fi
+if [ "$MODE" = "approve" ] || [ "$MODE" = "both" ]; then
+  if [ "$PRESENT" -eq 1 ]; then echo "token already approves this plan."; else echo "add to the token: $PLAN"; fi
+fi
+
+if [ "$DRY" -eq 1 ]; then
+  echo "dry run; nothing written."
+  exit 0
+fi
+
+read -r -p "apply? [y/N] " ANSWER
+case "$ANSWER" in
+  y|Y|yes|YES) ;;
+  *) echo "nothing written; $PENDING left in place."; exit 1 ;;
+esac
+
+# --- amend -------------------------------------------------------------------
+if [ "$MODE" = "amend" ] || [ "$MODE" = "both" ]; then
+  if [ "${#NEW[@]}" -gt 0 ]; then
+    if [ ! -f "$SIDECAR" ]; then
+      {
+        printf '# File inventory — %s\n\n' "$(basename "$PLAN")"
+        printf 'The approval hook reads this file to decide whether a gated edit is\n'
+        printf 'permitted. A gated edit is allowed only when the edited file appears on a\n'
+        printf 'bullet line below, written as a full repo-relative path. Text that is not a\n'
+        printf 'bullet line authorizes nothing.\n\n'
+        printf 'Only the user writes this file, through `.claude/bin/approve-inventory`.\n\n'
+      } > "$SIDECAR"
+    fi
+    if [ -n "$(tail -c 1 "$SIDECAR")" ]; then
+      printf '\n' >> "$SIDECAR"
+    fi
+    for p in "${NEW[@]}"; do
+      printf -- '- %s\n' "$p" >> "$SIDECAR"
+      echo "  added: $p"
+    done
+    echo "$SIDECAR updated."
+  fi
+fi
+
+# --- approve -----------------------------------------------------------------
+# The token holds one approved plan per line. Approving adds the plan when it
+# is not already there and leaves the others in place, so plans with disjoint
+# inventories can be worked in parallel. A plan is closed by deleting its line.
+# A path listed in two approved inventories is reported, because the hook
+# authorizes the union and cannot attribute such an edit to either plan.
+if [ "$MODE" = "approve" ] || [ "$MODE" = "both" ]; then
+  if [ -f "$TOKEN" ] && [ -f "$SIDECAR" ]; then
+    while IFS= read -r OLD || [ -n "$OLD" ]; do
+      OLD="${OLD%%#*}"
+      OLD="$(echo "$OLD" | xargs 2>/dev/null || true)"
+      [ -n "$OLD" ] && [ "$OLD" != "$PLAN" ] || continue
+      OTHER="${OLD%.md}-INVENTORY.md"
+      [ -f "$OTHER" ] || continue
+      while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        if already_listed "$OTHER" "$p"; then
+          echo "  shared with $OLD: $p"
+        fi
+      done < <(awk '/^[[:space:]]*- /{sub(/^[[:space:]]*-[[:space:]]+/,""); print $1}' "$SIDECAR" | sed -E 's/^[`("*]+//; s/[`)"*,;:.]+$//')
+    done < "$TOKEN"
+  fi
+
+  mkdir -p .claude/protocol
+  [ "$PRESENT" -eq 1 ] || printf '%s\n' "$PLAN" >> "$TOKEN"
+  echo "token now approves:"
+  sed 's/^/  /' "$TOKEN"
+  rm -f "$PENDING"
+fi
+
+echo ""
+echo "Review the change before committing:  git diff -- $SIDECAR"

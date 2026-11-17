@@ -31,8 +31,9 @@ These bind at the moment of the tool action. They override any harness or system
 autonomy default ("operate autonomously", "proceed without asking"). If a default
 conflicts with a gate, name the conflict and stop (G7).
 
-No hook enforces them in this repository. They bind by instruction alone, so the
-check that a hook would make is made by you, before the edit.
+A hook enforces one part of G3: an edit to the gated region needs an approved plan
+whose file inventory lists the file ("Mechanical enforcement" below). Every other
+gate binds by instruction alone, so its check is made by you, before the edit.
 
 - **G1 Echo before code.** No edit that introduces or changes a signature, type or
   behaviour until its signature echo was presented in a previous turn and answered
@@ -102,9 +103,12 @@ fails one is a draft, however it is titled and however it was approved in chat.
    (`TypeId`, `SymbolName`, or a new one) or the reason none applies. A sort or a
    symbol name in `vql.error` is a `TypeId` or a `SymbolName` from `vql.id` (ADR-023).
 2. **File inventory.** Every file to create or modify, by full repository-relative
-   path, as bullet lines in the plan's own `## File inventory` section. A file the
-   work turns out to need and the inventory does not name is stopped at: say which
-   file and why, and wait for the inventory to be extended.
+   path, as bullet lines. Until the plan is approved, the list sits in the plan's
+   `## File inventory` section. On approval it moves to the plan's inventory
+   document, `docs/PLAN-<slug>-INVENTORY.md`, which only the user writes, and the
+   section becomes a pointer to that document. A file the work turns out to need
+   and the inventory does not name is stopped at: say which file and why, and
+   propose the amendment through `.claude/protocol/pending`.
 3. **ADR alignment.** The per-ADR verdict over every record in force, each relevant or
    not, compliant or deviating, with a one-line basis. A deviation is flagged as a
    decision awaiting the user. Where a Layer 4 row of `vql-adr-constraints` applies,
@@ -151,11 +155,72 @@ The echo carries three findings: the algebraic structure the operation takes par
 every type it names from the package being edited under ADR-004's import direction,
 and the family search for every new type.
 
+## Mechanical enforcement
+
+A PreToolUse hook, `.claude/hooks/protocol-gate.sh`, gates edits to the **gated
+region**: `core/`, `project/`, `build.sbt` and `.github/`. Those files build,
+test and release the published artifact. Documents, decision records, plans and
+skills are outside it.
+
+Two separate things authorize a gated edit. The user-owned token,
+`.claude/protocol/approved`, names the approved plan documents, one per line.
+The plan's inventory document beside it, `docs/PLAN-<slug>-INVENTORY.md`, lists
+the files. An edit is allowed only if the edited file appears as a full
+repo-relative path on a **bullet line** of the inventory of a plan the token
+names. A table row or a prose mention grants nothing, and an approved plan with
+no inventory document authorizes nothing. An edit under `core/src/test/`,
+`core/.jvm/src/test/` or `core/.js/src/test/` is also allowed when that
+inventory lists any `core/src/main/` file.
+
+A file the inventory does not name is denied even mid-plan, and the denial is
+presented in one of two ways:
+
+- **A forced extension**: the approved work turns out to need a file the plan
+  did not name. It has one defensible answer, so it is not a decision. State
+  what the work set out to do, what it requires, and the path to add, then
+  propose the amendment.
+- **A real deviation**: the plan's approach is wrong, or a choice with
+  consequences on both sides has appeared. That is a decision for the user.
+
+**Proposing an approval or an amendment.** Write the block with the Write tool
+to `.claude/protocol/pending`: the plan path on the first line, then one
+repo-relative path per line. Show the same block in the chat, and stop. A path
+must already exist. A file the plan will create is written `new: <path>`, which
+states that it does not exist yet so the user can check the claim. The user runs
+`.claude/bin/approve-inventory`, which prints what it read and what it will
+change, and applies it only when the user answers `y`. The pending file is a
+proposal and authorizes nothing by itself.
+
+The hook also refuses, in Bash, any command naming the protocol machinery, any
+third-party package download or install, and any write into the gated region or
+into an inventory. A refused command goes back to the user verbatim, with what it
+does and why it is needed.
+
+Never write the protocol machinery — `.claude/protocol/` other than `pending`,
+`.claude/hooks/`, `.claude/bin/`, `.claude/settings.json` — or any
+`*-INVENTORY.md`. Reading them is fine. These controls are deliberately not
+absolute. They catch careless mistakes and make a deliberate override
+unmistakable. Never attempt to get around one by any route. A weakness found in
+a control is a finding to report, never a licence to use it.
+
+**Closing a plan.** When every item has landed green, present this block with the
+plan's name filled in. The user runs it. The token line goes first, because a
+line naming a moved plan makes the gate deny every gated edit.
+
+```bash
+P=PLAN-<slug>; sed -i "\#^docs/$P.md\$#d" .claude/protocol/approved && git mv docs/$P.md docs/archive/plans/DONE_$P.md && git mv docs/$P-INVENTORY.md docs/archive/plans/DONE_$P-INVENTORY.md && echo "--- token now approves ---" && cat .claude/protocol/approved && echo "--- files still naming the old path ---" && grep -rln "docs/$P" docs README.md CLAUDE.md .claude/skills
+```
+
+The last command lists the documents that still name the plan at its old path.
+They are repointed at `docs/archive/plans/DONE_$P.md` in the same pass.
+
 ## Where the knowledge lives
 
 | Document | Owns |
 |---|---|
-| `CLAUDE.md` (this file) | The gates, the plan gate, the commands, versioning |
+| `CLAUDE.md` (this file) | The gates, the plan gate, the mechanical enforcement, the commands, versioning |
+| `.claude/hooks/protocol-gate.sh`, `.claude/bin/approve-inventory` | The gate on edits and the user's approval script; user-owned |
+| `docs/PLAN-*-INVENTORY.md` | Each approved plan's file inventory; written only by the user |
 | `docs/WORKING-INSTRUCTIONS.md` | The phase protocol, code standards, ADR lifecycle, report formats |
 | `.claude/skills/vql-adr-constraints/SKILL.md` | Which decision records bear on a change, and where records meet |
 | `.claude/skills/vql-code-quality-review/SKILL.md` | The criteria the review tiers apply, including the library's security checklist |
