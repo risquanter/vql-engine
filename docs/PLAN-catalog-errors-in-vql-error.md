@@ -368,6 +368,8 @@ gains one sentence: the exception's text holds each error's sentence.
 6. `docs/PLAN-node-returning-functions.md`: below the "Not in scope" item and
    below the ADR-023 verdict row, one sentence each: "`PLAN-catalog-errors-in-vql-error.md`
    moves `TypeCatalogError` to `vql.error`."
+7. `docs/ADR-004.md`, §2's package diagram: the `error/` entry lists
+   `TypeCatalogError` after `ParseRefusal`.
 
 ---
 
@@ -402,16 +404,11 @@ is required.
 
 ## File inventory
 
-- `core/src/main/scala/vql/error/TypeCatalogError.scala`
-- `core/src/main/scala/vql/typed/TypeCatalog.scala`
-- `core/src/test/scala/vql/typed/TypeCatalogSpec.scala`
-- `docs/ADR-023.md`
-- `docs/ADR-006.md`
-- `docs/Architecture.md`
-- `CHANGELOG.md`
-- `.claude/skills/vql-code-quality-review/SKILL.md`
-- `docs/PLAN-node-returning-functions.md`
-- `build.sbt` (the version line, run by the user)
+The inventory is `docs/PLAN-catalog-errors-in-vql-error-INVENTORY.md`. It also
+names `docs/ADR-004.md`, which the complex review found. The one file it cannot
+name is `.claude/skills/vql-code-quality-review/SKILL.md`, which this plan also
+edits: the approval script lists no `.claude/` path, and skills are outside the
+gated region.
 
 ---
 
