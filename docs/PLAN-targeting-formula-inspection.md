@@ -601,7 +601,13 @@ there at this plan, so no entry is added to register's task list.
 
 **One behaviour widens.** Today `checkFragment` reports only the first fragment
 violation. A formula with both a quantifier and a function that is not admitted
-is refused with `TargetingQuantifierNotAllowed` alone. After adoption it is
+is refused with whichever of the two comes first. After adoption it is
 refused with both. This is what register's §7.6.15 asks for: "a predicate
-breaking two rules reports both". Every other refusal, and the nodes the Analyze
-view lists and their order, stay as they are.
+breaking two rules reports both". Which violation is reported today is the
+first in pre-order. After adoption every fragment refusal is reported, in the
+order the formula holds them, so the order of register's refusals follows the
+formula instead of the fixed order of its four checks. For
+`eq(x, node_named("A")) /\ mitigated(x)`, register reports
+`TargetingMitigationStateReferenced` before `TargetingNodeNameReferenced`
+today, and the reverse after adoption. The set of refusals, and the nodes the
+Analyze view lists and their order, stay as they are.
